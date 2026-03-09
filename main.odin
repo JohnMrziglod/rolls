@@ -1,11 +1,30 @@
 package game
 
+import "core:fmt"
+import "core:math/rand"
 import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
 
-particles :: [dynamic]Particle
+AREA_SIZE :: 30.0
+particles := [1000]Particle{}
+firework_rules := []FireworkRule{
+	FireworkRule{
+		type=1,
+		min_age=3, max_age=5,
+		min_velocity={-5, -5, -5},
+		max_velocity={5, 5, 5},
+		damping=0.1
+	},
+}
 
 main :: proc() {
+	// Make some particles:
+	for i in 0..<1000 {
+		particles[i] = make_particle(random_vector(-AREA_SIZE / 2.0, AREA_SIZE / 2.0))
+	}
+
+
+
 	// Initialize window
 	screen_width :: 1600
 	screen_height :: 900
@@ -40,7 +59,7 @@ main :: proc() {
 		rl.BeginMode3D(camera)
 		defer rl.EndMode3D()
 
-		rl.DrawCube(rl.Vector3{0.0, -0.5, 0.0}, AREA_SIZE, 1.0, AREA_SIZE, rl.Color) // Draw a big cube to represent the area where the dices can move
+		rl.DrawCube(rl.Vector3{0.0, -0.5, 0.0}, AREA_SIZE, 1.0, AREA_SIZE, rl.Color{255, 255, 255, 255}) // Draw a big cube to represent the area where the dices can move
 	}
 
 	rl.SetTargetFPS(60)
@@ -49,17 +68,25 @@ main :: proc() {
 	for !rl.WindowShouldClose() {
 		dt := rl.GetFrameTime()
 
-		rl.BeginDrawing()
-		defer rl.EndDrawing()
+		// update physics:
+		update_physics(dt)
 
-		rl.ClearBackground(rl.BLACK)
-
-		rl.BeginMode3D(camera)
-		for p, i in particles {
-			rl.DrawCube(p.position, 1.0, 1.0, 1.0, rl.GREEN) // Draw the particle as a cube
-		}
-		rl.EndMode3D()
-
-		rl.DrawFPS(10, 10)
+		// draw everything:
+		draw(camera)
 	}
+}
+
+draw :: proc(camera: rl.Camera3D) {
+	rl.BeginDrawing()
+	defer rl.EndDrawing()
+
+	rl.ClearBackground(rl.BLACK)
+
+	rl.BeginMode3D(camera)
+	for p, i in particles {
+		rl.DrawCube(p.position, 1.0, 1.0, 1.0, rl.GREEN) // Draw the particle as a cube
+	}
+	rl.EndMode3D()
+
+	rl.DrawFPS(10, 10)
 }

@@ -1,23 +1,68 @@
 package game
 
 import "core:math"
-import rl "vendor:raylib"
-import rlgl "vendor:raylib/rlgl"
+import "core:math/rand"
+
+real :: f32
+Vector3 :: [3]real
 
 Particle :: struct {
-	position: rl.Vector3,
-	velocity: rl.Vector3,
-	acceleration: rl.Vector3,
-	damping: f32,
-	inverse_mass: f32,
-	force_accum: rl.Vector3,
+	position: Vector3,
+	velocity: Vector3,
+	acceleration: Vector3,
+	damping: real,
+	inverse_mass: real,
+	force_accum: Vector3,
 }
 
-update_physics :: proc(particles: []Particle, dt: f32) {
+Firework :: struct {
+	using particle: Particle,
+	type: u32,
+	age: f32,
+}
+
+FireworkRule :: struct {
+	type: u32,
+	min_age: f32,
+	max_age: f32,
+	min_velocity: Vector3,
+	max_velocity: Vector3,
+	damping: real,
+	payload: []FireworkPayload,
+}
+
+FireworkPayload :: struct{
+	type: u32,
+	count: u32,
+}
+
+random_vector :: proc(min, max: f32) -> Vector3 {
+	return Vector3{
+		rand.float32_range(min, max),
+		rand.float32_range(min, max),
+		rand.float32_range(min, max),
+	}
+}
+
+make_particle :: proc(position: Vector3={0,0,0}) -> Particle {
+	return Particle{
+		position=position,
+		velocity={0.0, 0.0, 0.0},
+		acceleration={0.0, 0.0, 0.0},
+		damping=0.99,
+		inverse_mass=1.0,
+		force_accum={0.0, 0.0, 0.0},
+	}
+}
+
+update_physics :: proc(dt: f32) {
 	for &p, i in particles {
+		// INTEGRATE MOVEMENT:
 		if p.inverse_mass == 0.0 {
-			return // Infinite mass objects do not move
+			continue // Infinite mass objects do not move
 		}
+
+		p.force_accum = Vector3{0.0, -9.81, 0.0} // Clear the accumulated force
 
 		p.position += p.velocity * dt
 
@@ -25,5 +70,9 @@ update_physics :: proc(particles: []Particle, dt: f32) {
 		resulting_acceleration += p.force_accum * p.inverse_mass
 		p.velocity += resulting_acceleration * dt
 		p.velocity *= math.pow(p.damping, dt)
+
+		// Age fireworks and apply rules:
+		p.age -= dt
+
 	}
 }
