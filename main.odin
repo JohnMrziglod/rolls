@@ -136,8 +136,8 @@ DIRECTION := 0
 
 main :: proc() {
 	// Initialize window
-	screen_width :: 1600
-	screen_height :: 900
+	screen_width :: 1600*2
+	screen_height :: 900*2
 	fmt.println(
 		"Screen size:",
 		screen_width,
@@ -211,7 +211,7 @@ main :: proc() {
 		dt := rl.GetFrameTime()
 
 		// Rotate the camera by using the mouse:
-		if rl.IsMouseButtonDown(rl.MouseButton.LEFT) {
+		if rl.IsMouseButtonDown(rl.MouseButton.RIGHT) {
 			delta_x := f32(rl.GetMouseDelta().x)
 			delta_y := f32(rl.GetMouseDelta().y)
 
@@ -460,6 +460,7 @@ main :: proc() {
 					turn[DIRECTION] = 1.
 					turn *= math.PI / 2
 					dice.rotation *= rl.QuaternionFromEuler(turn.x, turn.y, turn.z)
+					dice.rotation = rl.QuaternionNormalize(dice.rotation)
 					closest_dice := dice
 					fmt.println("\nPosition:", closest_dice.position)
 					rotation := math.DEG_PER_RAD * rl.QuaternionToEuler(closest_dice.rotation)
@@ -476,34 +477,36 @@ main :: proc() {
 		if ready_to_count {
 			// Count the score for the current player based on the number of dice that are lying flat on the ground with a certain face up
 			for &dice, d in dices {
-				// Determine which face is up based on the rotation of the dice
-				up := rl.Vector3{0, 1, 0}
-
-				local_axes := math.PI/2*[6]rl.Vector3 {
-					{0, 0, 1}, // 1
-					{1, 0, 0}, // 2
-					{0, 0, 0}, // 3
-					{0, 2, 0}, // 4
-					{-1, 0, 0}, // 5
-					{0, 0, -1}, // 6
-				}
-
-				best_angle := f32(1000)
+				// Determine which face is up
+				// by checking an imaginary point on each face and seeing which is the highest in the y direction after rotation
 				best_face := 0
+				best_height :f32= -1.0
+				for face in 1 ..= 6 {
+					transform := rl.QuaternionToMatrix(dice.rotation)
 
-				for i in 0 ..< 6 {
-					axis := rl.QuaternionFromEuler(local_axes[i].x, local_axes[i].y, local_axes[i].z)
-					angle := angle_between(axis, dice.rotation)
-					if info == d do fmt.println("Face", i + 1, "Angle", angle)
+					// x, y, z coordinates of a point in the center of each face of the cube before rotation
+					point := rl.Vector3{0, 0, -1} // Front Face (1)
+					if face == 2 {
+						point = rl.Vector3{1, 0, 0} // Left (2)
+					} else if face == 3 {
+						point = rl.Vector3{0, 1, 0} // Top (3)
+					} else if face == 4 {
+						point = rl.Vector3{0, -1, 0} // Bottom (4)
+					} else if face == 5 {
+						point = rl.Vector3{-1, 0, 0} // Right (5)
+					} else if face == 6 {
+						point = rl.Vector3{0, 0, 1} // Back (6)
+					}
 
-					if angle < best_angle {
-						best_face = i
-						best_angle = angle
+					height := rl.Vector3Transform(point, transform).y
+					if info == d do fmt.println("Face", face, "height:", height)
+					if height > best_height {
+						best_height = height
+						best_face = face
 					}
 				}
-				if info == d do fmt.println("Best Face", best_face+1, "Angle:", best_angle)
 
-				dice.number_on_top = u8(best_face + 1)
+				dice.number_on_top = u8(best_face)
 				dice.current_score = i32(dice.number_on_top)
 			}
 			state = .COUNTING
@@ -534,7 +537,7 @@ main :: proc() {
 		if state == .COUNTING {
 			// counting_countdown += dt
 
-			ratio := counting_countdown / 0.5
+			ratio :f32= 0.1//counting_countdown / 0.5
 
 			if ratio >= 1.0 {
 				// After the counting animation is done, add the current score of each dice to the player's total score and reset the current score of each dice
@@ -561,9 +564,9 @@ main :: proc() {
 
 						rl.DrawText(
 							strings.clone_to_cstring(text, context.temp_allocator),
-							i32(screen_position.x + 1),
-							i32(screen_position.y + 1),
-							font_size / 2,
+							i32(screen_position.x - 4),
+							i32(screen_position.y - 4),
+							(font_size / 2)+10,
 							rl.BLACK,
 						)
 						rl.DrawText(
