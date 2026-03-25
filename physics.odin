@@ -4,12 +4,6 @@ import "core:math"
 import "core:math/linalg"
 import "core:math/rand"
 
-real :: f32
-Vector3 :: [3]real
-Matrix3 :: matrix[3,3]real
-Matrix4 :: matrix[3,4]real // the last row is awlays 0,0,0,1, we don't need to store it
-Quaternion :: quaternion128
-
 SLEEP_EPSILON :: 0.1
 
 RigidBody :: struct {
@@ -130,10 +124,6 @@ calculate_transform_matrix :: proc(position: Vector3, orientation: Quaternion) -
 	return rotmat
 }
 
-homogenous :: proc(v: Vector3) -> [4]real {
-	return [4]real{v[0], v[1], v[2], 1.0}
-}
-
 quaternion_add_vector :: proc(q: ^Quaternion, vector: Vector3) {
 	nq :Quaternion= {0, vector.x, vector.y, vector.z}
 	nq *= q^
@@ -157,7 +147,7 @@ body_integrate :: proc(body: ^RigidBody, dt: f32) {
 	body.last_frame_acceleration += body.force_accum * body.inverse_mass
 
 	// Calculate angular acceleration from torque inputs.
-	angular_acceleration := body.inverse_inertia_tensor_world * homogenous(body.torque_accum)
+	angular_acceleration := body.inverse_inertia_tensor_world * body.torque_accum
 
 	// Adjust velocities
 	// Update linear velocity from both acceleration and impulse.
@@ -175,29 +165,90 @@ body_integrate :: proc(body: ^RigidBody, dt: f32) {
 	body.position += body.velocity*dt
 
 	// Update angular position.
-	quaternion_add_vector(body.orientation, body.rotation*dt)
+	quaternion_add_vector(&body.orientation, body.rotation*dt)
 
 	// Normalise the orientation, and update the matrices with the new
 	// position and orientation
 	body_calculate_derived_data(body)
 
 	// Clear accumulators.
-	body_clear_accumulators(&body)
+	body_clear_accumulators(body)
 
 	// Update the kinetic energy store, and possibly put the body to
 	// sleep.
 	if body.can_sleep {
-	    current_motion := body.velocity*body.velocity + body.rotation*body.rotation
+	    current_motion := linalg.dot(body.velocity, body.velocity) + linalg.dot(body.rotation, body.rotation)
 
 	    bias := math.pow(0.5, dt);
 	    body.motion = bias*body.motion + (1-bias)*current_motion;
 
 	    if body.motion < SLEEP_EPSILON{
-			body_set_awake(false)
+			body_set_awake(body, false)
 		} else if body.motion > 10 * SLEEP_EPSILON {
 			body.motion = 10 * SLEEP_EPSILON
 		}
 	}
+}
+
+body_get_point_in_local_space :: proc(body: ^RigidBody, world_point: Vector3) -> Vector3 {
+	return linalg.transpose(only_rot(body.transform_matrix)) * (world_point - body.position)
+}
+
+body_get_point_in_world_space :: proc(body: ^RigidBody, local_point: Vector3) -> Vector3 {
+	return body.transform_matrix * homogenous(local_point)
+}
+body_get_direction_in_local_space :: proc(body: ^RigidBody, world_direction: Vector3) -> Vector3 {
+	return linalg.transpose(only_rot(body.transform_matrix)) * world_direction
+}
+
+body_get_direction_in_world_space :: proc(body: ^RigidBody, local_direction: Vector3) -> Vector3 {
+	return only_rot(body.transform_matrix) * local_direction
+}
+
+body_set_awake :: proc(body: ^RigidBody, awake: bool = true){
+	if awake {
+		body.is_awake = true
+
+		// add a bit of motion to avoid it falling asleep immediately
+		body.motion = SLEEP_EPSILON * 2.
+	} else {
+		body.is_awake = false
+		body.velocity = {}
+		body.rotation = {}
+	}
+}
+
+body_set_can_sleep :: proc (body: ^RigidBody, can_sleep: bool = true){
+	body.can_sleep = can_sleep
+	if !can_sleep && !body.is_awake do body_set_awake(body)
+}
+
+body_clear_accumulators :: proc(body: ^RigidBody) {
+	body.force_accum = {}
+	body.torque_accum = {}
+}
+
+body_add_force :: proc (body: ^RigidBody, force: Vector3){
+	body.force_accum += force
+	body.is_awake = true
+}
+
+body_add_force_at_body_point :: proc (body: ^RigidBody, force: Vector3, point: Vector3){
+	// convert to world coordinates
+	world_point := body_get_point_in_world_space(body, point)
+	body_add_force_at_point(body, force, world_point)
+}
+
+body_add_force_at_point :: proc (body: ^RigidBody, force: Vector3, point: Vector3){
+	body.force_accum += force
+	relative_point := point - body.position
+	body.torque_accum += linalg.cross(relative_point, force)
+	body.is_awake = true
+}
+
+body_add_torque :: proc (body: ^RigidBody, torque: Vector3){
+	body.torque_accum += torque
+	body.is_awake = true
 }
 
 random_vector :: proc(min, max: f32) -> Vector3 {
