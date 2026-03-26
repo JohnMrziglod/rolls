@@ -2,7 +2,6 @@ package game
 
 import "core:math"
 import "core:math/linalg"
-import "core:math/rand"
 
 SLEEP_EPSILON :: 0.1
 
@@ -28,6 +27,12 @@ RigidBody :: struct {
 	torque_accum: Vector3,
 	acceleration: Vector3,
 	last_frame_acceleration: Vector3,
+}
+
+check_inverse_inertia_tensor :: proc(iit: Matrix3) {
+	// assert(iit[0, 0] != 0.0)
+	// assert(iit[1, 1] != 0.0)
+	// assert(iit[2, 2] != 0.0)
 }
 
 transform_inertia_tensor :: proc(
@@ -72,34 +77,6 @@ transform_inertia_tensor :: proc(
 		t52*rotmat[1,0]+ t57*rotmat[1,1]+ t62*rotmat[1,2],
 		t52*rotmat[2,0]+ t57*rotmat[2,1]+ t62*rotmat[2,2],
 	}
-
-    // iitWorld[0,0] = t4*rotmat[0,0]+
-    //     t9*rotmat[0,1]+
-    //     t14*rotmat[0,2];
-    // iitWorld[0,1] = t4*rotmat[1,0]+
-    //     t9*rotmat[1,1]+
-    //     t14*rotmat[1,2];
-    // iitWorld[0,2] = t4*rotmat[2,0]+
-    //     t9*rotmat[2,1]+
-    //     t14*rotmat[2,2];
-    // iitWorld.data[3] = t28*rotmat[0,0]+
-    //     t33*rotmat[0,1]+
-    //     t38*rotmat[0,2];
-    // iitWorld.data[4] = t28*rotmat[1,0]+
-    //     t33*rotmat[1,1]+
-    //     t38*rotmat[1,2];
-    // iitWorld.data[5] = t28*rotmat[2,0]+
-    //     t33*rotmat[2,1]+
-    //     t38*rotmat[2,2];
-    // iitWorld.data[6] = t52*rotmat[0,0]+
-    //     t57*rotmat[0,1]+
-    //     t62*rotmat[0,2];
-    // iitWorld.data[7] = t52*rotmat[1,0]+
-    //     t57*rotmat[1,1]+
-    //     t62*rotmat[1,2];
-    // iitWorld.data[8] = t52*rotmat[2,0]+
-    //     t57*rotmat[2,1]+
-    //     t62*rotmat[2,2];
 }
 
 calculate_transform_matrix :: proc(position: Vector3, orientation: Quaternion) -> Matrix4 {
@@ -190,6 +167,54 @@ body_integrate :: proc(body: ^RigidBody, dt: f32) {
 	}
 }
 
+body_set_mass :: proc(body: ^RigidBody, mass: real) {
+	assert(mass != 0.0)
+	body.inverse_mass = 1.0 / mass
+}
+
+body_get_mass :: proc(body: ^RigidBody) -> real {
+	if body.inverse_mass == 0.0 {
+		return REAL_MAX
+	} else {
+		return 1.0 / body.inverse_mass
+	}
+}
+
+body_has_finite_mass :: proc(body: ^RigidBody) -> bool {
+	return body.inverse_mass >= 0.0
+}
+
+body_set_inertia_tensor :: proc(body: ^RigidBody, inertia_tensor: Matrix3) {
+	body.inverse_inertia_tensor = linalg.inverse(inertia_tensor)
+	check_inverse_inertia_tensor(body.inverse_inertia_tensor)
+}
+
+body_get_inertia_tensor :: proc(body: ^RigidBody) -> Matrix3 {
+	return linalg.inverse(body.inverse_inertia_tensor)
+}
+
+body_get_inertia_tensor_world :: proc(body: ^RigidBody) -> Matrix3 {
+	return linalg.inverse(body.inverse_inertia_tensor_world)
+}
+
+body_set_orientation :: proc(body: ^RigidBody, orientation: Quaternion) {
+	body.orientation = linalg.quaternion_normalize(orientation)
+}
+
+body_get_rot_matrix :: proc(body: ^RigidBody) -> Matrix3 {
+	return only_rot(body.transform_matrix)
+}
+
+body_get_gl_transform :: proc(body: ^RigidBody) -> [16]f32 {
+	m := body.transform_matrix
+	return [16]f32{
+		m[0, 0], m[1, 0], m[2, 0], 0,
+		m[0, 1], m[1, 1], m[2, 1], 0,
+		m[0, 2], m[1, 2], m[2, 2], 0,
+		m[0, 3], m[1, 3], m[2, 3], 1,
+	}
+}
+
 body_get_point_in_local_space :: proc(body: ^RigidBody, world_point: Vector3) -> Vector3 {
 	return linalg.transpose(only_rot(body.transform_matrix)) * (world_point - body.position)
 }
@@ -251,12 +276,103 @@ body_add_torque :: proc (body: ^RigidBody, torque: Vector3){
 	body.is_awake = true
 }
 
-random_vector :: proc(min, max: f32) -> Vector3 {
-	return Vector3{
-		rand.float32_range(min, max),
-		rand.float32_range(min, max),
-		rand.float32_range(min, max),
+Contact :: struct {
+	body: [2]^RigidBody,
+	friction: real,
+	restitution: real,
+	contact_point: Vector3,
+	contact_normal: Vector3,
+	contact_velocity: Vector3,
+	contact_to_world: Matrix3,
+	penetration: real,
+	desired_delta_velocity: real,
+	relative_contact_position: [2]Vector3,
+}
+
+contact_set_body_data :: proc(contact: ^Contact, one, two: ^RigidBody, friction, restitution: real) {
+	contact.body[0] = one
+	contact.body[1] = two
+	contact.friction = friction
+	contact.restitution = restitution
+}
+
+contact_match_awake_state :: proc(contact: ^Contact) {
+	// Collisions with the world never cause a body to wake up.
+	if contact.body[1] == nil do return
+
+	awake_0 := contact.body[0].is_awake
+	awake_1 := contact.body[1].is_awake
+
+	if awake_0 ~ awake_1 {
+		if awake_0 do body_set_awake(contact.body[1])
+		else do body_set_awake(contact.body[0])
 	}
+}
+
+contact_swap_bodies :: proc(contact: ^Contact) {
+	contact.contact_normal *= -1
+	contact.body[0], contact.body[1] = contact.body[1], contact.body[0]
+}
+
+contact_calculate_contact_basis :: proc(contact: ^Contact) {
+	contact.contact_to_world[0] = contact.contact_normal
+
+	if math.abs(contact.contact_normal.x) > math.abs(contact.contact_normal.y) {
+		s := 1.0 / math.sqrt(contact.contact_normal.z*contact.contact_normal.z + contact.contact_normal.x*contact.contact_normal.x)
+
+		contact.contact_to_world[1] = Vector3{contact.contact_normal.z * s, 0, -contact.contact_normal.x * s}
+	} else {
+		s := 1.0 / math.sqrt(contact.contact_normal.z*contact.contact_normal.z + contact.contact_normal.y*contact.contact_normal.y)
+
+		contact.contact_to_world[1] = Vector3{0, -contact.contact_normal.z * s, contact.contact_normal.y * s}
+	}
+
+	contact.contact_to_world[2] = linalg.cross(contact.contact_normal, contact.contact_to_world[1])
+}
+
+contact_calculate_local_velocity :: proc(contact: ^Contact, body_index: u32, duration: real) -> Vector3 {
+	body := contact.body[body_index]
+
+	// Velocity of the contact point
+	velocity := body.velocity + linalg.cross(body.rotation, contact.relative_contact_position[body_index])
+
+	// Into contact coordinates
+	contact_velocity := linalg.transpose(contact.contact_to_world) * velocity
+
+	// velocity due to forces without reactions
+	acceleration_velocity := body.last_frame_acceleration * duration
+	acceleration_velocity = linalg.transpose(contact.contact_to_world) * acceleration_velocity
+
+	// we ignore any component of acceleration in the contact normal direction, we are only interested in planar acceleration
+	acceleration_velocity.x = 0
+
+	contact_velocity += acceleration_velocity
+
+	return contact_velocity
+}
+
+contact_calculate_desired_delta_velocity :: proc(contact: ^Contact, duration: real) {
+	// @TODO: Why? To prevent jittering?
+	velocity_limit := 0.25
+
+	velocity_from_acceleration := 0.0
+	if contact.body[0].is_awake do 
+
+	contact.desired_delta_velocity = -contact.contact_velocity.x
+
+	if math.abs(contact.desired_delta_velocity) < velocity_limit {
+		contact.desired_delta_velocity = 0
+	}
+}
+
+ContactResolver :: struct {
+	position_iterations: u32,
+	velocity_iterations: u32,
+	velocity_epsilon: real,
+	position_epsilon: real,
+	position_iterations_used: u32,
+	velocity_iterations_used: u32,
+	valid_settings: bool,
 }
 
 // make_particle :: proc(position: Vector3={0,0,0}) -> Particle {
