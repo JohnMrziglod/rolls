@@ -449,7 +449,48 @@ contact_calculate_frictionless_impulse :: proc(contact: ^Contact, inverse_inerti
 }
 
 calculate_friction_impulse :: proc(contact: ^Contact, inverse_inertia_tensors: [2]Matrix3) -> Vector3 {
+	impulse_contact := Vector3{}
+
+	inverse_mass := contact.body[0].inverse_mass
+
+	// impulse_to_torque := linalg.cross(contact.relative_contact_position[0], contact.contact_normal)
+    // data[0] = data[4] = data[8] = 0;
+    // data[1] = -vector.z;
+    // data[2] = vector.y;
+    // data[3] = vector.z;
+    // data[5] = -vector.x;
+    // data[6] = -vector.y;
+    // data[7] = vector.x;
+    crcp := contact.relative_contact_position
+    impulse_to_torque := Matrix3{
+    	0, -crcp[0].z, crcp[0].y,
+      	crcp[0].z, 0, -crcp[0].x,
+        -crcp[0].y, crcp[0].x, 0,
+    }
+
+    delta_vel_world := impulse_to_torque * inverse_inertia_tensors[0]
+    delta_vel_world *= impulse_to_torque
+	delta_vel_world *= -1
+
+    if contact.body[1] != nil {
+		inverse_mass += contact.body[1].inverse_mass
+
+		impulse_to_torque = Matrix3{
+	    	0, -crcp[1].z, crcp[1].y,
+	      	crcp[1].z, 0, -crcp[1].x,
+	        -crcp[1].y, crcp[1].x, 0,
+	    }
+
+	    delta_vel_world2 := impulse_to_torque * inverse_inertia_tensors[1] * impulse_to_torque * -1
+		delta_vel_world += delta_vel_world2
+	}
+
+	delta_velocity := linalg.transpose(contact.contact_to_world)
+	delta_velocity *= delta_vel_world
+	delta_velocity *= contact.contact_to_world
 	
+	
+
 }
 
 ContactResolver :: struct {
