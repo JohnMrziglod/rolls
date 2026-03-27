@@ -352,17 +352,104 @@ contact_calculate_local_velocity :: proc(contact: ^Contact, body_index: u32, dur
 }
 
 contact_calculate_desired_delta_velocity :: proc(contact: ^Contact, duration: real) {
+	velocity_from_acceleration := 0.0
+	if contact.body[0].is_awake {
+		velocity_from_acceleration += contact.body[0].last_frame_acceleration * duration * contact.contact_normal;
+	}
+
+	body2 := contact.body[1]
+	if body2 != nil && body2.is_awake {
+		velocity_from_acceleration -= body2.last_frame_acceleration * duration * contact.contact_normal
+	}
+
 	// @TODO: Why? To prevent jittering?
 	velocity_limit := 0.25
-
-	velocity_from_acceleration := 0.0
-	if contact.body[0].is_awake do 
-
-	contact.desired_delta_velocity = -contact.contact_velocity.x
-
-	if math.abs(contact.desired_delta_velocity) < velocity_limit {
-		contact.desired_delta_velocity = 0
+	restitution := contact.restitution
+	if math.abs(contact.contact_velocity.x) < velocity_limit {
+		restitution = 0.
 	}
+
+	contact.desired_delta_velocity = (
+		-contact.contact_velocity.x - restitution*(contact.contact_velocity-velocity_from_acceleration)
+	);
+}
+
+contact_calculate_internals ::proc(contact: ^Contact, duration: real){
+	if contact.body[0] == nil do contact_swap_bodies(contact)
+	assert(contact.body[0] != nil)
+
+	contact_calculate_contact_basis(contact)
+
+	contact.relative_contact_position[0] = contact.contact_point - contact.body[0].position
+	if contact.body[1] != nil {
+		contact.relative_contact_position[1] = contact.contact_point - contact.body[1].position
+	}
+
+	contact.contact_velocity = contact_calculate_local_velocity(contact, 0, duration)
+	if contact.body[1] != nil {
+		contact.contact_velocity -= contact_calculate_local_velocity(contact, 1, duration)
+	}
+
+	contact_calculate_desired_delta_velocity(contact, duration)
+}
+
+contact_apply_velocity_change :: proc(contact: ^Contact, velocity_change, rotation_change: [2]Vector3) {
+	body1 := contact.body[0]
+	body2 := contact.body[1]
+
+	inverse_inertia_tensors := [2]Matrix3{
+		body1.inverse_inertia_tensor_world,
+		(body2 != nil) ? body2.inverse_inertia_tensor_world : Matrix3{},
+	}
+
+	impulse_contact : Vector3
+	if contact.friction == 0.0 {
+		impulse_contact = calculate_frictionless_impulse(contact, inverse_inertia_tensors)
+	} else {
+		impulse_contact = calculate_friction_impulse(contact, inverse_inertia_tensors)
+	}
+
+	impulse := contact.contact_to_world * impulse_contact
+
+	for i in 0..<=2 {
+		if body[i] == nil do continue
+
+		impulsive_torque := linalg.cross(contact.relative_contact_position[i], impulse)
+
+		rotation_change[i] = inverse_inertia_tensors[i] * impulsive_torque
+		velocity_change[i] = impulse * body1.inverse_mass
+
+		body[i].velocity += velocity_change[i]
+		body[i].rotation += rotation_change[i]
+	}
+}
+
+contact_calculate_frictionless_impulse :: proc(contact: ^Contact, inverse_inertia_tensors: [2]Matrix3) -> Vector3 {
+	// Calculate the impulse for each contact axis
+
+	// Calculate the change in velocity per unit impulse for each contact axis
+	delta_vel_world := linalg.cross(contact.relative_contact_position[0], contact.contact_normal)
+	delta_vel_world = inverse_inertia_tensors[0] * delta_vel_world
+	delta_vel_world = linalg.cross(delta_vel_world, contact.relative_contact_position[0])
+
+	delta_velocity := delta_vel_world * contact.contact_normal + contact.body[0].inverse_mass
+
+	if contact.body[1] != nil {
+		delta_vel_world = linalg.cross(contact.relative_contact_position[1], contact.contact_normal)
+		delta_vel_world = inverse_inertia_tensors[1] * delta_vel_world
+		delta_vel_world = linalg.cross(delta_vel_world, contact.relative_contact_position[1])
+
+		delta_velocity += delta_vel_world.x + contact.body[1].inverse_mass
+	}
+
+	assert(delta_velocity != 0.0)
+
+	impulse_contact := Vector3{contact.desired_delta_velocity, 0, 0}
+	return impulse_contact / delta_velocity
+}
+
+calculate_friction_impulse :: proc(contact: ^Contact, inverse_inertia_tensors: [2]Matrix3) -> Vector3 {
+	
 }
 
 ContactResolver :: struct {
