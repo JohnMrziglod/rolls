@@ -23,6 +23,15 @@ only_rot :: proc(m: Matrix4) -> Matrix3 {
 	}
 }
 
+quaternion_add_vector :: proc(q: ^Quaternion, vector: Vector3) {
+	nq :Quaternion= {0, vector.x, vector.y, vector.z}
+	nq *= q^
+	q.w += nq.w * 0.5
+	q.x += nq.x * 0.5
+	q.y += nq.y * 0.5
+	q.z += nq.z * 0.5
+}
+
 random_vector :: proc(min, max: f32) -> Vector3 {
 	return Vector3{
 		rand.float32_range(min, max),

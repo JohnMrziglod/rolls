@@ -6,16 +6,16 @@ import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
 
 AREA_SIZE :: 30.0
-particles := [1000]Particle{}
-firework_rules := []FireworkRule{
-	FireworkRule{
-		type=1,
-		min_age=3, max_age=5,
-		min_velocity={-5, -5, -5},
-		max_velocity={5, 5, 5},
-		damping=0.1
-	},
+
+Card :: struct {
+
 }
+
+Dice :: struct {
+	using body: RigidBody,
+
+}
+dices := [1000]Dice{}
 
 main :: proc() {
 	// Make some particles:
