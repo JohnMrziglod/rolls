@@ -4,6 +4,11 @@ import "core:math"
 import "core:math/linalg"
 
 SLEEP_EPSILON :: 0.1
+VELOCITY_EPSILON: 0.01
+POSITION_EPSILON: 0.01
+FRICTION :: 0.9
+RESITUTION :: 0.1
+TOLERANCE :: 0.1
 
 RigidBody :: struct {
 	inverse_mass: real,
@@ -395,9 +400,9 @@ contact_apply_velocity_change :: proc(contact: ^Contact, velocity_change, rotati
 
 	impulse_contact : Vector3
 	if contact.friction == 0.0 {
-		impulse_contact = calculate_frictionless_impulse(contact, inverse_inertia_tensors)
+		impulse_contact = contact_calculate_frictionless_impulse(contact, inverse_inertia_tensors)
 	} else {
-		impulse_contact = calculate_friction_impulse(contact, inverse_inertia_tensors)
+		impulse_contact = contact_calculate_friction_impulse(contact, inverse_inertia_tensors)
 	}
 
 	impulse := contact.contact_to_world * impulse_contact
@@ -611,15 +616,13 @@ contact_apply_position_change :: proc(contact: ^Contact, linear_change, angular_
 ContactResolver :: struct {
 	position_iterations: u32,
 	velocity_iterations: u32,
-	velocity_epsilon: real,
-	position_epsilon: real,
 	position_iterations_used: u32,
 	velocity_iterations_used: u32,
 	valid_settings: bool,
 }
 
 contact_resolver_is_valid :: proc(resolver: ^ContactResolver) -> bool {
-	return resolver.position_iterations > 0 && resolver.velocity_iterations > 0 && resolver.velocity_epsilon >= 0 && resolver.position_epsilon >= 0
+	return resolver.position_iterations > 0 && resolver.velocity_iterations > 0 && VELOCITY_EPSILON >= 0 && POSITION_EPSILON >= 0
 }
 
 contact_resolver_resolve_contacts :: proc(resolver: ^ContactResolver, contacts: []Contact, duration: real) {
@@ -644,7 +647,7 @@ contact_resolver_adjust_velocities :: proc(resolver: ^ContactResolver, c: []Cont
 	resolver.velocity_iterations_used = 0
 	for resolver.velocity_iterations_used < resolver.velocity_iterations {
 		// Find contact with maximum magnitude of desired velocity change.
-		max := resolver.velocity_epsilon
+		max := VELOCITY_EPSILON
 		max_index := 0
 		for &contact, i in c {
 			if contact.desired_delta_velocity > max {
@@ -680,11 +683,11 @@ contact_resolver_adjust_velocities :: proc(resolver: ^ContactResolver, c: []Cont
 }
 
 contact_resolver_adjust_positions :: proc(resolver: ^ContactResolver, c: []Contact, duration: real) {
-	linear_change, angular_change := [2]Vector3{}
+	linear_change, angular_change := [2]Vector3{}, [2]Vector3{}
 	resolver.position_iterations_used = 0
 	for resolver.position_iterations_used < resolver.position_iterations {
 		// Find biggest penetration
-		max := resolver.position_epsilon
+		max := POSITION_EPSILON
 		max_index := len(c)
 		for &contact, i in c {
 			if contact.penetration > max {
@@ -704,7 +707,7 @@ contact_resolver_adjust_positions :: proc(resolver: ^ContactResolver, c: []Conta
 				for d in 0..=1 {
 					if contact.body[b] == c[max_index].body[d] {
 						delta_position := linear_change[b] + linalg.cross(angular_change[b], contact.relative_contact_position[b])
-						contact.penetration += linalg.dot(delta_position, contact.contact_normal) * (b ? 1 : -1)
+						contact.penetration += linalg.dot(delta_position, contact.contact_normal) * (b==1 ? 1 : -1)
 					}
 				}
 			}

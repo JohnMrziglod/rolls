@@ -7,21 +7,100 @@ import rlgl "vendor:raylib/rlgl"
 
 AREA_SIZE :: 30.0
 
+EntityState :: enum {
+	NOT_USED,
+	DEAD,
+	ALIVE,
+}
+
 Card :: struct {
 
 }
+cards := [1000]Card{}
 
 Dice :: struct {
+	state: State,
 	using body: RigidBody,
-
+	half_size: real, // the size of the dice
+	player: u8,
 }
 dices := [1000]Dice{}
 
-main :: proc() {
-	// Make some particles:
-	for i in 0..<1000 {
-		particles[i] = make_particle(random_vector(-AREA_SIZE / 2.0, AREA_SIZE / 2.0))
+// We use this to limit the throwing area
+Plane :: struct {
+	direction: Vector3,
+	offset: real,
+}
+
+// All contact are stored here:
+contacts := [dynamic]Contact{}
+
+update :: proc(duration: real){
+	for &dice, d in dices{
+		if dice.state != .ALIVE {
+			continue
+		}
+
+		body_integrate(&dice, duration)
+		// this only applies the transform matrix to the offset,
+		// we don't an offset for dices
+		// primitive_calculate_internals(&dice)
 	}
+
+	// ground plane
+	ground := Plane{direction={0.0, 1.0, 0.0}}
+
+	clear(&contacts)
+	for &dice, d in dices{
+		if dice.state != .ALIVE || len(contacts) > 1000 do break
+
+		collision_detect(&dice, ground, &contacts)
+
+		for &other_dice, od in dices{
+			if dice == other_dice || other_dice.state != .ALIVE {
+				continue
+			}
+
+			collision_detect(&dice, &other_dice, &contacts)
+		}
+	}
+
+	resolver := ContactResolver{
+		position_iterations=len(contacts)*8, velocity_iterations=len(contacts)*8
+	}
+	contact_resolver_resolve_contacts(&resolver, contacts, duration)
+}
+
+draw :: proc(camera: rl.Camera3D) {
+	rl.BeginDrawing()
+	defer rl.EndDrawing()
+
+	rl.ClearBackground(rl.BLACK)
+
+	rl.BeginMode3D(camera)
+	// for p, i in particles {
+	// 	rl.DrawCube(p.position, 1.0, 1.0, 1.0, rl.GREEN) // Draw the particle as a cube
+	// }
+	rl.EndMode3D()
+
+	rl.DrawFPS(10, 10)
+}
+
+main :: proc() {
+	// Make some dices:
+	// for i in 0..<10 {
+	// 	dices[i] = Dice{
+	// 		state: .ALIVE,
+	// 		body: RigidBody{
+	// 			position: random_vector(-AREA_SIZE / 2, AREA_SIZE / 2),
+	// 			velocity: random_vector(-5.0, 5.0),
+	// 			rotation: random_vector(-1.0, 1.0),
+	// 			angular_velocity: random_vector(-5.0, 5.0),
+	// 			mass: 1.0,
+	// 		},
+	// 		player: u8(i % 2), // Just for testing, assign the dices to two players
+	// 	}
+	// }
 
 
 
@@ -69,24 +148,9 @@ main :: proc() {
 		dt := rl.GetFrameTime()
 
 		// update physics:
-		update_physics(dt)
+		update(dt)
 
 		// draw everything:
 		draw(camera)
 	}
-}
-
-draw :: proc(camera: rl.Camera3D) {
-	rl.BeginDrawing()
-	defer rl.EndDrawing()
-
-	rl.ClearBackground(rl.BLACK)
-
-	rl.BeginMode3D(camera)
-	for p, i in particles {
-		rl.DrawCube(p.position, 1.0, 1.0, 1.0, rl.GREEN) // Draw the particle as a cube
-	}
-	rl.EndMode3D()
-
-	rl.DrawFPS(10, 10)
 }
