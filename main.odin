@@ -19,9 +19,8 @@ Card :: struct {
 cards := [1000]Card{}
 
 Dice :: struct {
-	state: State,
-	using body: RigidBody,
-	half_size: real, // the size of the dice
+	state: EntityState,
+	using box: Box,
 	player: u8,
 }
 dices := [1000]Dice{}
@@ -54,21 +53,21 @@ update :: proc(duration: real){
 	for &dice, d in dices{
 		if dice.state != .ALIVE || len(contacts) > 1000 do break
 
-		collision_detect(&dice, ground, &contacts)
+		collision_detect_box_plane(&dice, ground, &contacts)
 
-		for &other_dice, od in dices{
+		for other_dice, od in dices{
 			if dice == other_dice || other_dice.state != .ALIVE {
 				continue
 			}
 
-			collision_detect(&dice, &other_dice, &contacts)
+			collision_detect_box_box(dice, other_dice, &contacts)
 		}
 	}
 
 	resolver := ContactResolver{
-		position_iterations=len(contacts)*8, velocity_iterations=len(contacts)*8
+		position_iterations=u32(len(contacts)*8), velocity_iterations=u32(len(contacts)*8)
 	}
-	contact_resolver_resolve_contacts(&resolver, contacts, duration)
+	contact_resolver_resolve_contacts(&resolver, contacts[:], duration)
 }
 
 draw :: proc(camera: rl.Camera3D) {

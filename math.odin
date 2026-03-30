@@ -5,7 +5,7 @@ import "core:math/rand"
 
 
 real :: f32
-REAL_MAX :: math.F32_MAX
+REAL_MAX :: real(math.F32_MAX)
 Vector3 :: [3]real
 Matrix3 :: matrix[3,3]real
 Matrix4 :: matrix[3,4]real // the last row is awlays 0,0,0,1, we don't need to store it
@@ -23,8 +23,28 @@ only_rot :: proc(m: Matrix4) -> Matrix3 {
 	}
 }
 
+matrix3_axis_vector :: proc(m: Matrix3, index: u32) -> Vector3{
+	return Vector3{
+		m[0, index],
+		m[1, index],
+		m[2, index],
+	}
+}
+
+matrix4_axis_vector :: proc(m: Matrix4, index: u32) -> Vector3{
+	return Vector3{
+		m[0, index],
+		m[1, index],
+		m[2, index],
+	}
+}
+
+matrix_axis_vector :: proc{
+	matrix3_axis_vector, matrix4_axis_vector,
+}
+
 quaternion_add_vector :: proc(q: ^Quaternion, vector: Vector3) {
-	nq :Quaternion= {0, vector.x, vector.y, vector.z}
+	nq := quaternion(w=0., x=vector.x, y=vector.y, z=vector.z)
 	nq *= q^
 	q.w += nq.w * 0.5
 	q.x += nq.x * 0.5

@@ -3,12 +3,20 @@ package game
 import "core:math"
 import "core:math/linalg"
 
-SLEEP_EPSILON :: 0.1
-VELOCITY_EPSILON: 0.01
-POSITION_EPSILON: 0.01
-FRICTION :: 0.9
-RESITUTION :: 0.1
-TOLERANCE :: 0.1
+SLEEP_EPSILON :: real(0.1)
+VELOCITY_EPSILON :: real(0.01)
+POSITION_EPSILON :: real(0.01)
+FRICTION :: real(0.9)
+RESITUTION :: real(0.1)
+TOLERANCE :: real(0.1)
+
+ShapeBox :: struct {
+	half_size: real
+}
+
+Shape :: union {
+	ShapeBox,
+}
 
 RigidBody :: struct {
 	inverse_mass: real,
@@ -32,6 +40,14 @@ RigidBody :: struct {
 	torque_accum: Vector3,
 	acceleration: Vector3,
 	last_frame_acceleration: Vector3,
+
+	// Are we a box, a sphere, or something else? This is used for collision detection.
+	shape: Shape
+}
+
+Box :: struct {
+	using body: RigidBody,
+	half_size: real, // the size of the dice
 }
 
 check_inverse_inertia_tensor :: proc(iit: Matrix3) {
@@ -272,6 +288,393 @@ body_add_torque :: proc (body: ^RigidBody, torque: Vector3){
 	body.is_awake = true
 }
 
+body_get_axis :: proc(body: RigidBody, index: u32) -> Vector3 {
+	return matrix_axis_vector(body.transform_matrix, index)
+}
+
+box_transform_to_axis :: proc(body: RigidBody, axis: Vector3) -> real{
+	box := body.shape.(ShapeBox) // we assume the body is a box, we should probably check this
+
+    return (
+        box.half_size * math.abs(linalg.dot(axis, body_get_axis(body, 0))) +
+        box.half_size * math.abs(linalg.dot(axis, body_get_axis(body, 1))) +
+        box.half_size * math.abs(linalg.dot(axis, body_get_axis(body, 2)))
+    )
+}
+
+collision_detect_box_plane :: proc(body: ^RigidBody, plane: Plane, contacts: ^[dynamic]Contact) -> bool{
+	projected_radius := box_transform_to_axis(body^, plane.direction)
+	box_distance := linalg.dot(plane.direction, body_get_axis(body^, 3)) - projected_radius
+
+	if box_distance > plane.offset {
+		return false
+	}
+
+	// We have an intersection, so find the intersection points. We can make
+    // do with only checking vertices. If the box is resting on a plane
+    // or on an edge, it will be reported as four or two contact points.
+    // static real mults[8][3] = {{1,1,1},{-1,1,1},{1,-1,1},{-1,-1,1},
+                                  // {1,1,-1},{-1,1,-1},{1,-1,-1},{-1,-1,-1}};
+
+    mults := []Vector3{
+    	{1, 1, 1},
+		{-1, 1, 1},
+		{1, -1, 1},
+		{-1, -1, 1},
+		{1, 1, -1},
+		{-1, 1, -1},
+		{1, -1, -1},
+		{-1, -1, -1},
+    }
+
+    for i in 0..=7 {
+		vertex_pos := Vector3(body.transform_matrix * homogenous(mults[i] * body.shape.(ShapeBox).half_size))
+
+		vertex_distance := linalg.dot(plane.direction, vertex_pos) - plane.offset
+		if vertex_distance <= 0 {
+			contact := Contact{
+				contact_point= vertex_pos - plane.direction * vertex_distance * 0.5,
+				contact_normal= plane.direction,
+				penetration= -vertex_distance,
+			}
+			contact_set_body_data(&contact, body, nil, FRICTION, RESITUTION)
+			append(contacts, contact)
+		}
+	}
+
+	return true
+}
+
+collision_check_axis :: proc(one, two: RigidBody, axis, to_centre: Vector3, index: u32,
+								smallest_penetration: ^real, smalled_case: ^u32) -> bool {
+	if linalg.length2(axis) < 0.0001 do return true
+
+	axis := linalg.normalize(axis)
+
+	// penetration of the axis:
+	one_project := box_transform_to_axis(one, axis)
+	two_project := box_transform_to_axis(two, axis)
+	distance := math.abs(linalg.dot(to_centre, axis))
+	penetration :=	one_project + two_project - distance
+
+	if penetration < 0 do return false
+	if penetration < smallest_penetration^ {
+		smallest_penetration ^= penetration
+		smalled_case ^= index
+	}
+
+	return true
+}
+
+cross_axes :: proc(one, two: RigidBody, axis_one, axis_two: u32) -> Vector3{
+	return linalg.cross(body_get_axis(one, axis_one), body_get_axis(two, axis_two))
+}
+
+fill_point_face_box_box :: proc(one, two: ^RigidBody, to_centre: Vector3, contacts: ^[dynamic]Contact, best: u32, pen: real) {
+	// we know which axis is the best, we can use this to determine which
+	// of the faces we are colliding with. We also know that the axis is
+	// perpendicular to the face, so we can use this information to determine
+	// which of the vertices we are colliding with.
+	face_normal := body_get_axis(one^, best)
+	if linalg.dot(face_normal, to_centre) > 0 {
+		face_normal *= -1.0
+	}
+
+	// ector3 vertex = two.halfSize;
+	 //    if (two.getAxis(0) * normal < 0) vertex.x = -vertex.x;
+	 //    if (two.getAxis(1) * normal < 0) vertex.y = -vertex.y;
+	 //    if (two.getAxis(2) * normal < 0) vertex.z = -vertex.z;
+	vertex := two.shape.(ShapeBox).half_size
+	if linalg.dot(body_get_axis(two^, 0), face_normal) < 0 do vertex.x *= -1
+	if linalg.dot(body_get_axis(two^, 1), face_normal) < 0 do vertex.y *= -1
+	if linalg.dot(body_get_axis(two^, 2), face_normal) < 0 do vertex.z *= -1
+
+	contact := Contact{
+		contact_normal= face_normal,
+		penetration= pen,
+		contact_point= body_get_point_in_world_space(two^, vertex),
+	}
+	contact_set_body_data(&contact, one, two, FRICTION, RESITUTION)
+	append(contacts, contact)
+}
+
+collision_detect_box_box :: proc(one, two: ^RigidBody, contacts: ^[dynamic]Contact) -> bool{
+	to_centre := body_get_axis(two^, 3) - body_get_axis(one^, 3)
+
+	// we start assuming there is no contact:
+	pen := REAL_MAX
+	best := u32(999999999) // A very high number:
+
+	if !collision_check_axis(one^, two^, body_get_axis(one^, 0), to_centre, 0, &pen, &best) do return false
+	if !collision_check_axis(one^, two^, body_get_axis(one^, 1), to_centre, 1, &pen, &best) do return false
+	if !collision_check_axis(one^, two^, body_get_axis(one^, 2), to_centre, 2, &pen, &best) do return false
+
+	if !collision_check_axis(one^, two^, body_get_axis(two^, 0), to_centre, 3, &pen, &best) do return false
+	if !collision_check_axis(one^, two^, body_get_axis(two^, 1), to_centre, 4, &pen, &best) do return false
+	if !collision_check_axis(one^, two^, body_get_axis(two^, 2), to_centre, 5, &pen, &best) do return false
+
+	// store the best axis major, in case we run into almost parallel edge collisions later:
+	best_single_axis := best
+
+	if !collision_check_axis(one^, two^, cross_axes(one^, two^, 0, 0), to_centre, 6, &pen, &best) do return false
+	if !collision_check_axis(one^, two^, cross_axes(one^, two^, 0, 1), to_centre, 7, &pen, &best) do return false
+	if !collision_check_axis(one^, two^, cross_axes(one^, two^, 0, 2), to_centre, 8, &pen, &best) do return false
+	if !collision_check_axis(one^, two^, cross_axes(one^, two^, 1, 0), to_centre, 9, &pen, &best) do return false
+	if !collision_check_axis(one^, two^, cross_axes(one^, two^, 1, 1), to_centre, 10, &pen, &best) do return false
+	if !collision_check_axis(one^, two^, cross_axes(one^, two^, 1, 2), to_centre, 11, &pen, &best) do return false
+	if !collision_check_axis(one^, two^, cross_axes(one^, two^, 2, 0), to_centre, 12, &pen, &best) do return false
+	if !collision_check_axis(one^, two^, cross_axes(one^, two^, 2, 1), to_centre, 13, &pen, &best) do return false
+	if !collision_check_axis(one^, two^, cross_axes(one^, two^, 2, 2), to_centre, 14, &pen, &best) do return false
+
+	// make sure we got a result:
+	assert(best != 999999999)
+
+	// We now know there's a collision, and we know which
+    // of the axes gave the smallest penetration. We now
+    // can deal with it in different ways depending on
+    // the case.
+    if best < 3 {
+        // We've got a vertex of box two on a face of box one.
+        fill_point_face_box_box(one, two, toCentre, data, best, pen)
+        return true
+    } else if best < 6{
+        // We've got a vertex of box one on a face of box two.
+        // We use the same algorithm as above, but swap around
+        // one and two (and therefore also the vector between their
+        // centres).
+        fill_point_face_box_box(two, one, toCentre*-1.0, data, best-3, pen)
+        return true
+    } else {
+   		// we got  an edge-edge contact. Find out which axes:
+		best -= 6
+		one_axis_index := best / 3
+		two_axis_index := best % 3
+		one_axis := body_get_axis(one^, one_axis_index)
+		two_axis := body_get_axis(two^, two_axis_index)
+		axis := linalg.cross(one_axis, two_axis)
+		axis = linalg.normalize(axis)
+
+		// the axis should point from box one to box two:
+		if linalg.dot(axis, to_centre) > 0 do axis *= -1.0
+
+		// we have the axes, but not the edges: each axis has 4 edges parallel
+		// to it, we need to find which of the 4 for each object. We do
+		// that by finding the point in the centre of the edge. We know
+		// its component in the direction of the box's collision axis is zero
+		// (its a mid-point) and we determine which of the extremes in each
+		// of the other axes is closest.
+		one_half_size := one.shape.(ShapeBox).half_size
+		two_half_size := two.shape.(ShapeBox).half_size
+		pt_on_one_edge := Vector3{one_half_size, one_half_size, one_half_size}
+		pt_on_two_edge := Vector3{two_half_size, two_half_size, two_half_size}
+		for i in 0..=2 {
+			if i == one_axis_index do pt_on_one_edge[i] = 0
+			else if linalg.dot(body_get_axis(one^, i), axis) > 0 do pt_on_one_edge[i] *= -1
+
+			if i == two_axis_index do pt_on_two_edge[i] = 0
+			else if linalg.dot(body_get_axis(two^, i), axis) < 0 do pt_on_two_edge[i] *= -1
+		}
+
+		// move them into world coordinates (they are already oriented
+		// correctly, since they have been derived from the axes):
+		pt_on_one_edge = body_get_point_in_world_space(one^, pt_on_one_edge)
+		pt_on_two_edge = body_get_point_in_world_space(two^, pt_on_two_edge)
+
+		// so we have a point and a direction for the colliding edges.
+		// we need to find out point of closest approach of the two
+		// line-segments:
+		vertex := collision_contact_point(
+			pt_on_one_edge, one_axis, one_half_size,
+			pt_on_two_edge, two_axis, two_half_size,
+			best_single_axis > 2
+		)
+
+		contact := Contact{
+			contact_point= vertex,
+			contact_normal= axis,
+			penetration= pen,
+		}
+		contact_set_body_data(&contact, one, two, FRICTION, RESITUTION)
+
+		return true
+    }
+
+    return false
+}
+
+collision_contact_point :: proc(p_one, d_one: Vector3, one_size: real, p_two, d_two: Vector3, two_size: real, use_one: bool) -> Vector3{
+	sm_one := linalg.length2(d_one)
+	sm_two := linalg.length2(d_two)
+	dp_one_two := linalg.dot(d_two, d_one)
+
+	to_st := p_one - p_two
+	dp_stat_one := linalg.dot(d_one, to_st)
+	dp_stat_two := linalg.dot(d_two, to_st)
+
+	denom := sm_one*sm_two - dp_one_two*dp_one_two
+
+	if math.abs(denom) < 0.0001 do return use_one ? p_one : p_two
+
+	mua := (dp_one_two * dp_stat_two - sm_two * dp_stat_one) / denom
+	mub := (sm_one * dp_stat_two - dp_one_two * dp_stat_one) / denom
+
+	// If either of the edges has the nearest point out
+    // of bounds, then the edges aren't crossed, we have
+    // an edge-face contact. Our point is on the edge, which
+    // we know from the useOne parameter.
+    if mua > one_size || mua < -one_size || mub > two_size || mub < -two_size {
+		return use_one ? p_one : p_two
+	} else {
+		c_one := p_one + d_one * mua
+		c_two := p_two + d_two * mub
+		return (c_one + c_two) * 0.5
+	}
+    // if (mua > oneSize ||
+    //     mua < -oneSize ||
+    //     mub > twoSize ||
+    //     mub < -twoSize)
+    // {
+    //     return useOne?pOne:pTwo;
+    // }
+    // else
+    // {
+    //     cOne = pOne + dOne * mua;
+    //     cTwo = pTwo + dTwo * mub;
+
+    //     return cOne * 0.5 + cTwo * 0.5;
+    // }
+
+}
+
+// This preprocessor definition is only used as a convenience
+// in the boxAndBox contact generation method.
+// #define CHECK_OVERLAP(axis, index) \
+//     if (!tryAxis(one, two, (axis), toCentre, (index), pen, best)) return 0;
+
+// unsigned CollisionDetector::boxAndBox(
+//     const CollisionBox &one,
+//     const CollisionBox &two,
+//     CollisionData *data
+//     )
+// {
+//     //if (!IntersectionTests::boxAndBox(one, two)) return 0;
+
+//     // Find the vector between the two centres
+//     Vector3 toCentre = two.getAxis(3) - one.getAxis(3);
+
+//     // We start assuming there is no contact
+//     real pen = REAL_MAX;
+//     unsigned best = 0xffffff;
+
+//     // Now we check each axes, returning if it gives us
+//     // a separating axis, and keeping track of the axis with
+//     // the smallest penetration otherwise.
+//     CHECK_OVERLAP(one.getAxis(0), 0);
+//     CHECK_OVERLAP(one.getAxis(1), 1);
+//     CHECK_OVERLAP(one.getAxis(2), 2);
+
+//     CHECK_OVERLAP(two.getAxis(0), 3);
+//     CHECK_OVERLAP(two.getAxis(1), 4);
+//     CHECK_OVERLAP(two.getAxis(2), 5);
+
+//     // Store the best axis-major, in case we run into almost
+//     // parallel edge collisions later
+//     unsigned bestSingleAxis = best;
+
+//     CHECK_OVERLAP(one.getAxis(0) % two.getAxis(0), 6);
+//     CHECK_OVERLAP(one.getAxis(0) % two.getAxis(1), 7);
+//     CHECK_OVERLAP(one.getAxis(0) % two.getAxis(2), 8);
+//     CHECK_OVERLAP(one.getAxis(1) % two.getAxis(0), 9);
+//     CHECK_OVERLAP(one.getAxis(1) % two.getAxis(1), 10);
+//     CHECK_OVERLAP(one.getAxis(1) % two.getAxis(2), 11);
+//     CHECK_OVERLAP(one.getAxis(2) % two.getAxis(0), 12);
+//     CHECK_OVERLAP(one.getAxis(2) % two.getAxis(1), 13);
+//     CHECK_OVERLAP(one.getAxis(2) % two.getAxis(2), 14);
+
+//     // Make sure we've got a result.
+//     assert(best != 0xffffff);
+
+//     // We now know there's a collision, and we know which
+//     // of the axes gave the smallest penetration. We now
+//     // can deal with it in different ways depending on
+//     // the case.
+//     if (best < 3)
+//     {
+//         // We've got a vertex of box two on a face of box one.
+//         fillPointFaceBoxBox(one, two, toCentre, data, best, pen);
+//         data->addContacts(1);
+//         return 1;
+//     }
+//     else if (best < 6)
+//     {
+//         // We've got a vertex of box one on a face of box two.
+//         // We use the same algorithm as above, but swap around
+//         // one and two (and therefore also the vector between their
+//         // centres).
+//         fillPointFaceBoxBox(two, one, toCentre*-1.0f, data, best-3, pen);
+//         data->addContacts(1);
+//         return 1;
+//     }
+//     else
+//     {
+//         // We've got an edge-edge contact. Find out which axes
+//         best -= 6;
+//         unsigned oneAxisIndex = best / 3;
+//         unsigned twoAxisIndex = best % 3;
+//         Vector3 oneAxis = one.getAxis(oneAxisIndex);
+//         Vector3 twoAxis = two.getAxis(twoAxisIndex);
+//         Vector3 axis = oneAxis % twoAxis;
+//         axis.normalise();
+
+//         // The axis should point from box one to box two.
+//         if (axis * toCentre > 0) axis = axis * -1.0f;
+
+//         // We have the axes, but not the edges: each axis has 4 edges parallel
+//         // to it, we need to find which of the 4 for each object. We do
+//         // that by finding the point in the centre of the edge. We know
+//         // its component in the direction of the box's collision axis is zero
+//         // (its a mid-point) and we determine which of the extremes in each
+//         // of the other axes is closest.
+//         Vector3 ptOnOneEdge = one.halfSize;
+//         Vector3 ptOnTwoEdge = two.halfSize;
+//         for (unsigned i = 0; i < 3; i++)
+//         {
+//             if (i == oneAxisIndex) ptOnOneEdge[i] = 0;
+//             else if (one.getAxis(i) * axis > 0) ptOnOneEdge[i] = -ptOnOneEdge[i];
+
+//             if (i == twoAxisIndex) ptOnTwoEdge[i] = 0;
+//             else if (two.getAxis(i) * axis < 0) ptOnTwoEdge[i] = -ptOnTwoEdge[i];
+//         }
+
+//         // Move them into world coordinates (they are already oriented
+//         // correctly, since they have been derived from the axes).
+//         ptOnOneEdge = one.transform * ptOnOneEdge;
+//         ptOnTwoEdge = two.transform * ptOnTwoEdge;
+
+//         // So we have a point and a direction for the colliding edges.
+//         // We need to find out point of closest approach of the two
+//         // line-segments.
+//         Vector3 vertex = contactPoint(
+//             ptOnOneEdge, oneAxis, one.halfSize[oneAxisIndex],
+//             ptOnTwoEdge, twoAxis, two.halfSize[twoAxisIndex],
+//             bestSingleAxis > 2
+//             );
+
+//         // We can fill the contact.
+//         Contact* contact = data->contacts;
+
+//         contact->penetration = pen;
+//         contact->contactNormal = axis;
+//         contact->contactPoint = vertex;
+//         contact->setBodyData(one.body, two.body,
+//             data->friction, data->restitution);
+//         data->addContacts(1);
+//         return 1;
+//     }
+//     return 0;
+// }
+// #undef CHECK_OVERLAP
+
 Contact :: struct {
 	body: [2]^RigidBody,
 	friction: real,
@@ -348,25 +751,25 @@ contact_calculate_local_velocity :: proc(contact: ^Contact, body_index: u32, dur
 }
 
 contact_calculate_desired_delta_velocity :: proc(contact: ^Contact, duration: real) {
-	velocity_from_acceleration := 0.0
+	velocity_from_acceleration := real(0.0)
 	if contact.body[0].is_awake {
-		velocity_from_acceleration += contact.body[0].last_frame_acceleration * duration * contact.contact_normal;
+		velocity_from_acceleration += duration * linalg.dot(contact.body[0].last_frame_acceleration, contact.contact_normal)
 	}
 
 	body2 := contact.body[1]
 	if body2 != nil && body2.is_awake {
-		velocity_from_acceleration -= body2.last_frame_acceleration * duration * contact.contact_normal
+		velocity_from_acceleration -= duration * linalg.dot(body2.last_frame_acceleration, contact.contact_normal)
 	}
 
 	// @TODO: Why? To prevent jittering?
-	velocity_limit := 0.25
+	velocity_limit := real(0.25)
 	restitution := contact.restitution
 	if math.abs(contact.contact_velocity.x) < velocity_limit {
 		restitution = 0.
 	}
 
 	contact.desired_delta_velocity = (
-		-contact.contact_velocity.x - restitution*(contact.contact_velocity-velocity_from_acceleration)
+		-contact.contact_velocity.x - restitution*(contact.contact_velocity.x-velocity_from_acceleration)
 	);
 }
 
@@ -389,7 +792,7 @@ contact_calculate_internals ::proc(contact: ^Contact, duration: real){
 	contact_calculate_desired_delta_velocity(contact, duration)
 }
 
-contact_apply_velocity_change :: proc(contact: ^Contact, velocity_change, rotation_change: [2]Vector3) {
+contact_apply_velocity_change :: proc(contact: ^Contact, velocity_change, rotation_change: ^[2]Vector3) {
 	body1 := contact.body[0]
 	body2 := contact.body[1]
 
@@ -408,15 +811,15 @@ contact_apply_velocity_change :: proc(contact: ^Contact, velocity_change, rotati
 	impulse := contact.contact_to_world * impulse_contact
 
 	for i in 0..=1 {
-		if body[i] == nil do continue
+		if contact.body[i] == nil do continue
 
 		impulsive_torque := linalg.cross(contact.relative_contact_position[i], impulse)
 
 		rotation_change[i] = inverse_inertia_tensors[i] * impulsive_torque
 		velocity_change[i] = impulse * body1.inverse_mass
 
-		body[i].velocity += velocity_change[i]
-		body[i].rotation += rotation_change[i]
+		contact.body[i].velocity += velocity_change[i]
+		contact.body[i].rotation += rotation_change[i]
 	}
 }
 
@@ -444,7 +847,7 @@ contact_calculate_frictionless_impulse :: proc(contact: ^Contact, inverse_inerti
 	return impulse_contact / delta_velocity
 }
 
-calculate_friction_impulse :: proc(contact: ^Contact, inverse_inertia_tensors: [2]Matrix3) -> Vector3 {
+contact_calculate_friction_impulse :: proc(contact: ^Contact, inverse_inertia_tensors: [2]Matrix3) -> Vector3 {
 	inverse_mass := contact.body[0].inverse_mass
 
 	// impulse_to_torque := linalg.cross(contact.relative_contact_position[0], contact.contact_normal)
@@ -497,9 +900,9 @@ calculate_friction_impulse :: proc(contact: ^Contact, inverse_inertia_tensors: [
 		impulse_contact.y /= planar_impulse
 		impulse_contact.z /= planar_impulse
 
-		impulse_contact.x = delta_velocity.data[0] +
-			delta_velocity.data[1]*contact.friction*impulse_contact.y +
-			delta_velocity.data[2]*contact.friction*impulse_contact.z
+		impulse_contact.x = delta_velocity[0,0] +
+			delta_velocity[0,1]*contact.friction*impulse_contact.y +
+			delta_velocity[0,2]*contact.friction*impulse_contact.z
 
 		impulse_contact.x = desired_velocity.x / impulse_contact.x
 		impulse_contact.y *= contact.friction * impulse_contact.x
@@ -509,15 +912,15 @@ calculate_friction_impulse :: proc(contact: ^Contact, inverse_inertia_tensors: [
 	return impulse_contact
 }
 
-contact_apply_position_change :: proc(contact: ^Contact, linear_change, angular_change: [2]Vector3, penetration: real) {
+contact_apply_position_change :: proc(contact: ^Contact, linear_change, angular_change: ^[2]Vector3, penetration: real) {
 	body1 := contact.body[0]
 	body2 := contact.body[1]
 
-	angular_limit :: 0.2
+	angular_limit :: real(0.2)
 	angular_move := [2]real{}
 	linear_move := [2]real{}
 
-	total_inertia := 0.0
+	total_inertia := real(0.0)
 	linear_inertia := [2]real{}
 	angular_inertia := [2]real{}
 
@@ -552,7 +955,7 @@ contact_apply_position_change :: proc(contact: ^Contact, linear_change, angular_
 
 		// The linear and angular movements required are in proportion to
 		// the two inverse inertias.
-		sign := (i == 0) ? 1.0 : -1.0
+		sign := (i == 0) ? real(1.0) : real(-1.0)
 		angular_move[i] = sign * penetration * (angular_inertia[i] / total_inertia)
 		linear_move[i] = sign * penetration * (linear_inertia[i] / total_inertia)
 
@@ -564,7 +967,7 @@ contact_apply_position_change :: proc(contact: ^Contact, linear_change, angular_
 		// Use the small angle approximation for the sine of the angle (i.e.
 		// the magnitude would be sine(angularLimit) * projection.magnitude
 		// but we approximate sine(angularLimit) to angularLimit).
-		max_magnitude := angular_limit * linalg.magnitude(projection)
+		max_magnitude := angular_limit * linalg.length(projection)
 
 		if angular_move[i] < -max_magnitude {
 			total_move := angular_move[i] + linear_move[i]
@@ -609,7 +1012,7 @@ contact_apply_position_change :: proc(contact: ^Contact, linear_change, angular_
 		// data. Otherwise the resolution will not change the position
 		// of the object, and the next collision detection round will
 		// have the same penetration.
-		if !contact.body[i].is_awake do body_calculate_derived_data(&contact.body[i])
+		if !contact.body[i].is_awake do body_calculate_derived_data(contact.body[i])
 	}
 }
 
@@ -627,7 +1030,7 @@ contact_resolver_is_valid :: proc(resolver: ^ContactResolver) -> bool {
 
 contact_resolver_resolve_contacts :: proc(resolver: ^ContactResolver, contacts: []Contact, duration: real) {
 	// Make sure we have something to do.
-	if contacts.len == 0 do return
+	if len(contacts) == 0 do return
 	if !contact_resolver_is_valid(resolver)	do return
 
 
@@ -641,8 +1044,9 @@ contact_resolver_resolve_contacts :: proc(resolver: ^ContactResolver, contacts: 
 }
 
 contact_resolver_adjust_velocities :: proc(resolver: ^ContactResolver, c: []Contact, duration: real) {
-	velocity_change, rotation_change := [2]Vector3{}
-	delta_vel := 0.0
+	velocity_change := [2]Vector3{}
+	rotation_change := [2]Vector3{}
+	delta_vel := Vector3{}
 
 	resolver.velocity_iterations_used = 0
 	for resolver.velocity_iterations_used < resolver.velocity_iterations {
@@ -657,7 +1061,7 @@ contact_resolver_adjust_velocities :: proc(resolver: ^ContactResolver, c: []Cont
 		}
 		if max_index == len(contacts) do break
 		contact_match_awake_state(&c[max_index])
-		contact_apply_velocity_change(&c[max_index], velocity_change, rotation_change)
+		contact_apply_velocity_change(&c[max_index], &velocity_change, &rotation_change)
 
 		// With the change in velocity of the two bodies, the update of contact velocities means that some of the relative closing velocities need to be re-calculated.
 		for &contact, i in c {
@@ -671,7 +1075,7 @@ contact_resolver_adjust_velocities :: proc(resolver: ^ContactResolver, c: []Cont
 					if contact.body[b] == c[max_index].body[d] {
 						delta_vel = velocity_change[b] + linalg.cross(rotation_change[b], contact.relative_contact_position[b])
 						contact.contact_velocity += linalg.transpose(contact.contact_to_world) * delta_vel
-						contact.contact_velocity *= b ? -1 : 1
+						contact.contact_velocity *= b == 1 ? -1 : 1
 						contact_calculate_desired_delta_velocity(&contact, duration)
 					}
 				}
@@ -698,7 +1102,7 @@ contact_resolver_adjust_positions :: proc(resolver: ^ContactResolver, c: []Conta
 		if max_index == len(c) do break
 
 		contact_match_awake_state(&c[max_index])
-		contact_apply_position_change(&c[max_index], linear_change, angular_change, max)
+		contact_apply_position_change(&c[max_index], &linear_change, &angular_change, max)
 
 		for &contact, i in c {
 			for b in 0..=1 {
@@ -716,8 +1120,6 @@ contact_resolver_adjust_positions :: proc(resolver: ^ContactResolver, c: []Conta
 		resolver.position_iterations_used += 1
 	}
 }
-
-
 
 // make_particle :: proc(position: Vector3={0,0,0}) -> Particle {
 // 	return Particle{
