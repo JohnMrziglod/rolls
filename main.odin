@@ -55,12 +55,12 @@ update :: proc(duration: real){
 
 		collision_detect_box_plane(&dice, ground, &contacts)
 
-		for other_dice, od in dices{
+		for &other_dice, od in dices{
 			if dice == other_dice || other_dice.state != .ALIVE {
 				continue
 			}
 
-			collision_detect_box_box(dice, other_dice, &contacts)
+			collision_detect_box_box(&dice, &other_dice, &contacts)
 		}
 	}
 

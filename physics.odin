@@ -384,7 +384,8 @@ fill_point_face_box_box :: proc(one, two: ^RigidBody, to_centre: Vector3, contac
 	 //    if (two.getAxis(0) * normal < 0) vertex.x = -vertex.x;
 	 //    if (two.getAxis(1) * normal < 0) vertex.y = -vertex.y;
 	 //    if (two.getAxis(2) * normal < 0) vertex.z = -vertex.z;
-	vertex := two.shape.(ShapeBox).half_size
+	half_size := two.shape.(ShapeBox).half_size
+	vertex := Vector3{half_size, half_size, half_size}
 	if linalg.dot(body_get_axis(two^, 0), face_normal) < 0 do vertex.x *= -1
 	if linalg.dot(body_get_axis(two^, 1), face_normal) < 0 do vertex.y *= -1
 	if linalg.dot(body_get_axis(two^, 2), face_normal) < 0 do vertex.z *= -1
