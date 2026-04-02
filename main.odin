@@ -65,7 +65,7 @@ update :: proc(duration: real){
 	}
 
 	resolver := ContactResolver{
-		position_iterations=u32(len(contacts)*8), velocity_iterations=u32(len(contacts)*8)
+		position_iterations=i32(len(contacts))*8, velocity_iterations=i32(len(contacts))*8
 	}
 	contact_resolver_resolve_contacts(&resolver, contacts[:], duration)
 }
@@ -87,19 +87,15 @@ draw :: proc(camera: rl.Camera3D) {
 
 main :: proc() {
 	// Make some dices:
-	// for i in 0..<10 {
-	// 	dices[i] = Dice{
-	// 		state: .ALIVE,
-	// 		body: RigidBody{
-	// 			position: random_vector(-AREA_SIZE / 2, AREA_SIZE / 2),
-	// 			velocity: random_vector(-5.0, 5.0),
-	// 			rotation: random_vector(-1.0, 1.0),
-	// 			angular_velocity: random_vector(-5.0, 5.0),
-	// 			mass: 1.0,
-	// 		},
-	// 		player: u8(i % 2), // Just for testing, assign the dices to two players
-	// 	}
-	// }
+	for i in 0..<100 {
+		dices[i] = Dice{
+			state=.ALIVE,
+			shape=ShapeBox{half_size=0.5},
+			position=random_vector(-AREA_SIZE/2.0, AREA_SIZE/2.0),
+			velocity=random_vector(-10.0, 10.0),
+			// angular_velocity=random_vector(-10.0, 10.0),
+		}
+	}
 
 
 

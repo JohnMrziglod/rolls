@@ -23,7 +23,7 @@ only_rot :: proc(m: Matrix4) -> Matrix3 {
 	}
 }
 
-matrix3_axis_vector :: proc(m: Matrix3, index: u32) -> Vector3{
+matrix3_axis_vector :: proc(m: Matrix3, index: i32) -> Vector3{
 	return Vector3{
 		m[0, index],
 		m[1, index],
@@ -31,7 +31,7 @@ matrix3_axis_vector :: proc(m: Matrix3, index: u32) -> Vector3{
 	}
 }
 
-matrix4_axis_vector :: proc(m: Matrix4, index: u32) -> Vector3{
+matrix4_axis_vector :: proc(m: Matrix4, index: i32) -> Vector3{
 	return Vector3{
 		m[0, index],
 		m[1, index],

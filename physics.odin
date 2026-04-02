@@ -288,7 +288,7 @@ body_add_torque :: proc (body: ^RigidBody, torque: Vector3){
 	body.is_awake = true
 }
 
-body_get_axis :: proc(body: RigidBody, index: u32) -> Vector3 {
+body_get_axis :: proc(body: RigidBody, index: i32) -> Vector3 {
 	return matrix_axis_vector(body.transform_matrix, index)
 }
 
@@ -345,8 +345,8 @@ collision_detect_box_plane :: proc(body: ^RigidBody, plane: Plane, contacts: ^[d
 	return true
 }
 
-collision_check_axis :: proc(one, two: RigidBody, axis, to_centre: Vector3, index: u32,
-								smallest_penetration: ^real, smalled_case: ^u32) -> bool {
+collision_check_axis :: proc(one, two: RigidBody, axis, to_centre: Vector3, index: i32,
+								smallest_penetration: ^real, smalled_case: ^i32) -> bool {
 	if linalg.length2(axis) < 0.0001 do return true
 
 	axis := linalg.normalize(axis)
@@ -366,11 +366,11 @@ collision_check_axis :: proc(one, two: RigidBody, axis, to_centre: Vector3, inde
 	return true
 }
 
-cross_axes :: proc(one, two: RigidBody, axis_one, axis_two: u32) -> Vector3{
+cross_axes :: proc(one, two: RigidBody, axis_one, axis_two: i32) -> Vector3{
 	return linalg.cross(body_get_axis(one, axis_one), body_get_axis(two, axis_two))
 }
 
-fill_point_face_box_box :: proc(one, two: ^RigidBody, to_centre: Vector3, contacts: ^[dynamic]Contact, best: u32, pen: real) {
+fill_point_face_box_box :: proc(one, two: ^RigidBody, to_centre: Vector3, contacts: ^[dynamic]Contact, best: i32, pen: real) {
 	// we know which axis is the best, we can use this to determine which
 	// of the faces we are colliding with. We also know that the axis is
 	// perpendicular to the face, so we can use this information to determine
@@ -393,7 +393,7 @@ fill_point_face_box_box :: proc(one, two: ^RigidBody, to_centre: Vector3, contac
 	contact := Contact{
 		contact_normal= face_normal,
 		penetration= pen,
-		contact_point= body_get_point_in_world_space(two^, vertex),
+		contact_point= body_get_point_in_world_space(two, vertex),
 	}
 	contact_set_body_data(&contact, one, two, FRICTION, RESITUTION)
 	append(contacts, contact)
@@ -404,7 +404,7 @@ collision_detect_box_box :: proc(one, two: ^RigidBody, contacts: ^[dynamic]Conta
 
 	// we start assuming there is no contact:
 	pen := REAL_MAX
-	best := u32(999999999) // A very high number:
+	best := i32(999999999) // A very high number:
 
 	if !collision_check_axis(one^, two^, body_get_axis(one^, 0), to_centre, 0, &pen, &best) do return false
 	if !collision_check_axis(one^, two^, body_get_axis(one^, 1), to_centre, 1, &pen, &best) do return false
@@ -436,14 +436,14 @@ collision_detect_box_box :: proc(one, two: ^RigidBody, contacts: ^[dynamic]Conta
     // the case.
     if best < 3 {
         // We've got a vertex of box two on a face of box one.
-        fill_point_face_box_box(one, two, toCentre, data, best, pen)
+        fill_point_face_box_box(one, two, to_centre, contacts, best, pen)
         return true
     } else if best < 6{
         // We've got a vertex of box one on a face of box two.
         // We use the same algorithm as above, but swap around
         // one and two (and therefore also the vector between their
         // centres).
-        fill_point_face_box_box(two, one, toCentre*-1.0, data, best-3, pen)
+        fill_point_face_box_box(two, one, to_centre*-1.0, contacts, best-3, pen)
         return true
     } else {
    		// we got  an edge-edge contact. Find out which axes:
@@ -469,17 +469,17 @@ collision_detect_box_box :: proc(one, two: ^RigidBody, contacts: ^[dynamic]Conta
 		pt_on_one_edge := Vector3{one_half_size, one_half_size, one_half_size}
 		pt_on_two_edge := Vector3{two_half_size, two_half_size, two_half_size}
 		for i in 0..=2 {
-			if i == one_axis_index do pt_on_one_edge[i] = 0
-			else if linalg.dot(body_get_axis(one^, i), axis) > 0 do pt_on_one_edge[i] *= -1
+			if i32(i) == one_axis_index do pt_on_one_edge[i] = 0
+			else if linalg.dot(body_get_axis(one^, i32(i)), axis) > 0 do pt_on_one_edge[i] *= -1
 
-			if i == two_axis_index do pt_on_two_edge[i] = 0
-			else if linalg.dot(body_get_axis(two^, i), axis) < 0 do pt_on_two_edge[i] *= -1
+			if i32(i) == two_axis_index do pt_on_two_edge[i] = 0
+			else if linalg.dot(body_get_axis(two^, i32(i)), axis) < 0 do pt_on_two_edge[i] *= -1
 		}
 
 		// move them into world coordinates (they are already oriented
 		// correctly, since they have been derived from the axes):
-		pt_on_one_edge = body_get_point_in_world_space(one^, pt_on_one_edge)
-		pt_on_two_edge = body_get_point_in_world_space(two^, pt_on_two_edge)
+		pt_on_one_edge = body_get_point_in_world_space(one, pt_on_one_edge)
+		pt_on_two_edge = body_get_point_in_world_space(two, pt_on_two_edge)
 
 		// so we have a point and a direction for the colliding edges.
 		// we need to find out point of closest approach of the two
@@ -730,7 +730,7 @@ contact_calculate_contact_basis :: proc(contact: ^Contact) {
 	contact.contact_to_world[2] = linalg.cross(contact.contact_normal, contact.contact_to_world[1])
 }
 
-contact_calculate_local_velocity :: proc(contact: ^Contact, body_index: u32, duration: real) -> Vector3 {
+contact_calculate_local_velocity :: proc(contact: ^Contact, body_index: i32, duration: real) -> Vector3 {
 	body := contact.body[body_index]
 
 	// Velocity of the contact point
@@ -1018,10 +1018,10 @@ contact_apply_position_change :: proc(contact: ^Contact, linear_change, angular_
 }
 
 ContactResolver :: struct {
-	position_iterations: u32,
-	velocity_iterations: u32,
-	position_iterations_used: u32,
-	velocity_iterations_used: u32,
+	position_iterations: i32,
+	velocity_iterations: i32,
+	position_iterations_used: i32,
+	velocity_iterations_used: i32,
 	valid_settings: bool,
 }
 
