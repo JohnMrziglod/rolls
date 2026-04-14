@@ -1,6 +1,7 @@
 package game
 
 import "core:math"
+import "core:math/linalg"
 import "core:math/rand"
 
 
@@ -52,12 +53,27 @@ quaternion_add_vector :: proc(q: ^Quaternion, vector: Vector3) {
 	q.z += nq.z * 0.5
 }
 
-random_vector :: proc(min, max: f32) -> Vector3 {
+random_vector :: proc(min, max: f32, y_min:f32=99999.) -> Vector3 {
+	y_min := y_min
+	if y_min == 99999. {
+		y_min = min
+	}
+
 	return Vector3{
 		rand.float32_range(min, max),
-		rand.float32_range(min, max),
+		rand.float32_range(y_min, max),
 		rand.float32_range(min, max),
 	}
+}
+
+random_orientation :: proc() -> Quaternion {
+	q := quaternion(
+		w= rand.float32_range(-1., 1.),
+		x= rand.float32_range(-1., 1.),
+		y= rand.float32_range(-1., 1.),
+		z= rand.float32_range(-1., 1.),
+	)
+	return linalg.normalize(q)
 }
 
 // transform_direction :: proc(m: Matrix4, v: Vector3) -> Vector3 {

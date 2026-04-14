@@ -4,25 +4,23 @@ import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
 
 draw_dice :: proc(
-	position: rl.Vector3,
-	rotation: rl.Quaternion,
-	color: rl.Color,
-	size: f32,
+	dice: Dice,
 	texture: rl.Texture2D,
 ) {
+	size := dice.shape.(ShapeBox).half_size * 2.
+
 	rlgl.SetTexture(texture.id)
 	t_w: f32 : 1.0 / 6.0 // Texture has 6 columns for the different orientations of the numbers
 	t_h: f32 : 1.0 // Texture has 1 row for the numbers 1-6
 
 	rlgl.PushMatrix()
-	rlgl.Translatef(position.x, position.y, position.z)
 
-	rot_matrix := rl.QuaternionToMatrix(rotation)
-	rlgl.MultMatrixf(&rot_matrix[0, 0])
+	rot_matrix := body_get_gl_transform(dice)
+	rlgl.MultMatrixf(raw_data(&rot_matrix))
 
 	// Draw the numbers on each face of the cube
 	rlgl.Begin(rlgl.QUADS)
-	rlgl.Color4ub(color.r, color.g, color.b, color.a)
+	rlgl.Color4ub(dice.color.r, dice.color.g, dice.color.b, dice.color.a)
 
 	// Front face (1)
 	rlgl.Normal3f(0.0, 0.0, 1.0) // Normal pointing towards viewer
