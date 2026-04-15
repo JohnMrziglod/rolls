@@ -26,6 +26,7 @@ Player :: struct {
 	roll_antennas: sco,
 	roll_kills: i32,
 	is_scoring: bool,
+	gui_score_position: [2]i32,
 }
 players: [N_PLAYERS]Player
 current_player_id: u8 = 0
@@ -36,7 +37,7 @@ State :: enum {
 	ROLLING,
 	BATTLE,
 	SCORING,
-	SCORING_ANIMATION,	// only for the animations (all points are flying in)
+	SCORING_SUMMARY,	// only for the animations (all points are flying in)
 }
 state := State.ROLLING // We start with rolling
 state_countdown: f32 = 0.0
@@ -52,22 +53,18 @@ Card :: struct {
 }
 cards := [1000]Card{}
 
-DiceUpgrade_Antenna :: struct {}
-
-DiceUpgrade :: union{
-	DiceUpgrade_Antenna,
-}
-
 N_DICES :: 12
 Dice :: struct {
 	state: EntityState,
-	using box: Box,
+	using body: RigidBody,
 	player: u8,
 	color: rl.Color,
 	current_number: i32, // which number is shown on top face
 	current_score: sco,
 	already_scored: bool,
 	upgrades: [5]DiceUpgrade,
+	attack: sco,
+	health: sco,
 }
 dices := [dynamic]Dice{}
 
@@ -90,39 +87,51 @@ Particles :: struct{
 particles := [1000]Particles{}
 
 Text :: struct{
-	start: Vector3,
-	end: Vector3,
+	start: Vector2,
+	end: Vector2,
 	text: string,
 	color: rl.Color,
 	visible: bool,
-	lifetime: f32
+	font_size: i32,
+	lifetime: f32,
+	start_lifetime: f32
 }
-scoring_texts := [1000]Text{}
-scoring_texts_arena: string
+texts := [200]Text{}
 
 sounds := []rl.Sound{}
+camera : rl.Camera3D
+
+Opponent :: struct {
+	message: string,
+	speaking: bool
+}
+opponent: Opponent
 
 main :: proc() {
-	// scoring_texts_arena_allocator = vmem.arena_allocator(&arena)
-
-	players = {
-		{color=COLOR_PLAYERS[0], roll_multiplier=1},
-		{color=COLOR_PLAYERS[1], roll_multiplier=1},
-	}
-
-	// Make some dices:
-	dices_reset(first_round=true)
-
 	// Initialize window
 	screen_width := rl.GetScreenWidth()
 	screen_height := rl.GetScreenHeight()
 
 	rl.InitWindow(screen_width, screen_height, "Rolls")
 	rl.ToggleFullscreen() // Start in fullscreen mode
+	rl.SetTargetFPS(60)
 	defer rl.CloseWindow()
 
+	screen_width = rl.GetScreenWidth()
+	screen_height = rl.GetScreenHeight()
+
+	players = {
+		{color=COLOR_PLAYERS[0], roll_multiplier=1,
+			gui_score_position={100, screen_height - 300}},
+		{color=COLOR_PLAYERS[1], roll_multiplier=1,
+			gui_score_position={screen_width-100, screen_height - 300,}},
+	}
+
+	// Make some dices:
+	dices_reset(first_round=true)
+
 	CAMERA_HEIGHT: f32 = 65.0
-	camera := rl.Camera3D{}
+	camera = {}
 	camera.position = rl.Vector3{30, CAMERA_HEIGHT, 0.}
 	camera.target = rl.Vector3{0.0, 0.0, 0.0}
 	camera.up = rl.Vector3{0.0, 1.0, 0.0}
@@ -168,6 +177,11 @@ main :: proc() {
 		}
 	}
 
+	opponent = {
+		message = "Let's see who reaches\n1000 points first!",
+		speaking = true,
+	}
+
 	// Main game loop
 	for !rl.WindowShouldClose() {
 		dt := rl.GetFrameTime()
@@ -187,7 +201,13 @@ main :: proc() {
 				dices_reset(power=power)
 				state_countdown = 0.0
 				state = .ROLLING
-				current_player_id = (current_player_id + 1) % N_PLAYERS
+		}
+
+		if rl.IsKeyPressed(rl.KeyboardKey.S) {
+			for dice, d in dices{
+				if dice.state != .ALIVE do continue
+				if dice.player == current_player_id do fmt.println(d, dice)
+			}
 		}
 
 		// Zoom in and out:
@@ -196,7 +216,7 @@ main :: proc() {
 			camera.position.y += 200. * mouse_wheel * dt
 		}
 
-		// update physics:
+		// update particles:
 		for &particle in particles{
 			if !particle.visible do continue
 
@@ -213,12 +233,33 @@ main :: proc() {
 			}
 		}
 
-		if state == .ROLLING {
-			rolling(dt)
-		} else if state == .BATTLE {
-			battle(dt)
-		} else if state == .SCORING {
-			scoring(dt)
+		// update texts:
+		for &text in texts{
+			if !text.visible do continue
+
+			text.lifetime -= dt
+			if text.lifetime < 0.{
+				text.visible = false
+				delete(text.text)
+			}
+		}
+
+		if opponent.speaking {
+			if rl.IsKeyPressed(rl.KeyboardKey.SPACE) {
+				opponent.speaking = false
+				state_countdown = 0.0
+			}
+		} else {
+			if state == .ROLLING{
+				physics(dt)
+				rolling(dt)
+			} else if state == .BATTLE {
+				battle(dt)
+			} else if state == .SCORING {
+				scoring(dt)
+			} else if state == .SCORING_SUMMARY {
+				scoring_summary(dt)
+			}
 		}
 
 		// draw everything:
@@ -233,19 +274,24 @@ dices_reset :: proc(power:f32=1., first_round:bool=false) {
 	if first_round {
 		clear(&dices)
 		for i in 0..<N_DICES {
-			append(&dices, Dice{})
+			append(&dices, Dice{player=u8((i < N_DICES / 2) ? 0 : 1)})
 		}
 	}
 
 	upgrades := [5]DiceUpgrade{}
-	upgrades[0] = DiceUpgrade_Antenna{}
+	// upgrades[0] = DiceUpgrade_Antenna{}
 
 	for &dice, d in dices {
-		// if dice.player == current_player_id || first_round {
+		half_size :f32= .75
+		mass := math.pow(half_size, 3) * 8.
+		position := dice.position+Vector3{0, 10, 0}
+		velocity := Vector3{0, -5, 0}
+		orientation := dice.orientation
+		rotation := dice.rotation
+		acceleration := dice.acceleration
+
+		if dice.player == current_player_id || first_round
 		{
-			half_size :f32= .75
-			mass := math.pow(half_size, 3) * 8.
-			player := u8((d < N_DICES / 2) ? 0 : 1)
 			position := random_vector(-AREA_SIZE/8.0, AREA_SIZE/8.0)
 			position.z += -AREA_SIZE/2.0
 			position.y += AREA_SIZE/4.0 + 10.
@@ -266,28 +312,26 @@ dices_reset :: proc(power:f32=1., first_round:bool=false) {
 				linear_damping=0.99,
 				angular_damping=0.9,
 				inverse_mass=1./mass,
-				is_awake=true,
 				can_sleep=true,
-				player=player,
-				color=players[player].color,
+				player=dice.player,
+				color=players[dice.player].color,
 				current_number=0,
 				current_score=0,
+				attack=1,
+				health=1,
 				upgrades=upgrades
 			}
 		}
-	 // 	else if dice.player != current_player_id {
-		// 	dice = dice
-		// }
+		body_set_awake(&dice)
 
+		// body_clear_accumulators(&dice)
 		body_set_block_inertia_tensor(&dice, dice.shape.(ShapeBox).half_size, 1./dice.inverse_mass)
 		body_calculate_derived_data(&dice)
 	}
 }
 
-rolling :: proc(duration: real) {
+physics :: proc(duration: real) {
 	for &dice, d in dices{
-		if dice.state != .ALIVE do continue
-
 		body_integrate(&dice, duration)
 	}
 
@@ -302,7 +346,7 @@ rolling :: proc(duration: real) {
 
 	clear(&contacts)
 	for &dice, d in dices{
-		if dice.state != .ALIVE || len(contacts) > 1000 do break
+		if len(contacts) > 1000 do break
 
 		collision_wall := false
 		for wall in walls {
@@ -331,11 +375,17 @@ rolling :: proc(duration: real) {
 	}
 
 	if len(contacts) > 0 {
+		if state != .ROLLING {
+			fmt.println("Resolving", len(contacts), "contacts")
+		}
 		resolver := ContactResolver{
-			position_iterations=i32(len(contacts))*8, velocity_iterations=i32(len(contacts))*8
+			position_iterations=i32(len(contacts))*16, velocity_iterations=i32(len(contacts))*16
 		}
 		contact_resolve_contacts(&resolver, contacts[:], duration)
 	}
+}
+
+rolling :: proc(dt: real){
 
 	for &dice, d in dices{
 		if dice.state != .ALIVE do continue
@@ -368,27 +418,32 @@ rolling :: proc(duration: real) {
 
 	// We move to the next state
 	state = .BATTLE
+	state_countdown = 0.
 }
 
-add_particles :: proc(position: Vector3, color: rl.Color){
-	for &particle in particles{
-		if particle.visible do continue
+add_text :: proc{add_text_vec3, add_text_vec3_vec2, add_text_vec2}
+add_text_vec3_vec2 :: proc (start: Vector3, end: [2]i32, text: string, color: rl.Color, lifetime:f32=2.0, font_size:i32=30) {
+	start_2d := rl.GetWorldToScreen(start, camera)
+	add_text_vec2(start_2d, {f32(end.x), f32(end.y)}, text, color, lifetime, font_size)
+}
+add_text_vec3 :: proc (start: Vector3, text: string, color: rl.Color, lifetime:f32=2.0, font_size:i32=30) {
+	start_2d := rl.GetWorldToScreen(start, camera)
+	add_text_vec2(start_2d, start_2d + Vector2{0, -100}, text, color, lifetime, font_size)
+}
+add_text_vec2 :: proc (start, end: Vector2, text: string, color: rl.Color, lifetime:f32, font_size: i32) {
+	for &t in texts{
+		if t.visible do continue
 
-		for i in 0 ..< len(particle.positions) {
-			particle.positions[i] = position
-			delta := Vector3{}
-			if i / 3 == 0 do delta -= {-0.25, 0, 0}
-			if i / 3 == 2 do delta += {0.25, 0, 0}
-			if i % 3 == 0 do delta -= {0, 0, -0.25}
-			if i % 3 == 2 do delta += {0, 0, 0.25}
-			particle.positions[i] += delta
-			particle.velocities[i] = random_vector(5., 20.) * 4. * delta
-			particle.velocities[i].y = rand.float32_range(5, 20)
+		t = {
+			start = start,
+			end = end,
+			text = text,
+			color = color,
+			start_lifetime = lifetime,
+			lifetime = lifetime,
+			visible = true,
+			font_size=font_size,
 		}
-		particle.color = color
-		particle.visible = true
-		particle.lifetime = 1.0
-
 		return
 	}
 }
@@ -406,19 +461,36 @@ battle :: proc(dt: real) {
 		for &other_dice, o in dices{
 			if d == o || other_dice.state != .ALIVE || dice.player == other_dice.player do continue
 			if dice.current_number == other_dice.current_number {
-				dice.state = .DEAD
-				other_dice.state = .DEAD
+				dice.health = math.max(dice.health-other_dice.attack, 0)
+				other_dice.health = math.max(other_dice.health-dice.attack, 0)
 
-				// add some explosions
-				add_particles(dice.position, dice.color/2.)
-				add_particles(other_dice.position, other_dice.color/2.)
+				if other_dice.health == 0{
+					add_particles(other_dice.position, other_dice.color/2.)
+					add_text(other_dice.position, fmt.aprint("DEAD!"), other_dice.color, 1.5, font_size=40)
 
-				players[dice.player].roll_kills += 1
-				players[other_dice.player].roll_kills += 1
+					other_dice.state = .DEAD
+					other_dice.position.y = 1000.
+
+					players[dice.player].roll_kills += 1
+				} else {
+					add_text(other_dice.position, fmt.aprint("HIT!"), other_dice.color, 1.5, font_size=40)
+				}
+
+				if dice.health == 0{
+					add_particles(dice.position, dice.color/2.)
+					add_text(dice.position, fmt.aprint("DEAD!"), dice.color, 1.5, font_size=40)
+
+					dice.state = .DEAD
+					dice.position.y = 1000.
+
+					players[other_dice.player].roll_kills += 1
+				} else  {
+					add_text(dice.position, fmt.aprint("HIT!"), dice.color, 1.5, font_size=40)
+				}
 
 				sound := sounds[5]
 				rl.SetSoundVolume(sound, rand.float32_range(0.8, 1.)) // Set volume based on bounce speed
-				rl.SetSoundPitch(sound, 0.1+f32(players[dice.player].roll_kills)/f32(N_DICES/2.)) // Add some random pitch variation
+				rl.SetSoundPitch(sound, 0.1+f32(players[dice.player].roll_kills)/f32(len(dices)/2.)) // Add some random pitch variation
 				rl.PlaySound(sound)
 
 				// we make a small dramatic pause...
@@ -430,7 +502,7 @@ battle :: proc(dt: real) {
 
 	// We move to the next state
 	state = .SCORING
-	state_countdown = 0.4
+	state_countdown = 0.0
 }
 
 scoring :: proc(dt: real) {
@@ -439,7 +511,7 @@ scoring :: proc(dt: real) {
 		if dice.state == .ALIVE	do n_dices_alive += 1
 	}
 
-	if state_countdown < 2.0/f32(n_dices_alive) do return	// some pauses for counting
+	if n_dices_alive != 0 && state_countdown < 2.0/f32(n_dices_alive) do return	// some pauses for counting
 	state_countdown = 0.0
 
 	// First round of scoring, every dice calculates its own current score
@@ -459,7 +531,8 @@ scoring :: proc(dt: real) {
 					} else {
 						player.roll_antennas *= dice.current_score
 					}
-					// dice.current_score = 0
+					add_text(dice.position, fmt.aprintf("+%v ANTENNA", dice.current_score), dice.color, 1.5, font_size=40)
+					dice.current_score = 0
 				}
 			}
 
@@ -473,12 +546,23 @@ scoring :: proc(dt: real) {
 			rl.SetSoundPitch(sound, pitch)
 			rl.PlaySound(sound)
 
-			add_particles(dice.position, dice.color)
+			// add_particles(dice.position, dice.color)
+			if dice.current_score != 0 {
+				add_text(dice.position, player.gui_score_position,
+						 fmt.aprintf("+%v", dice.current_score), dice.color, 2.0/f32(n_dices_alive), font_size=60)
+			}
 
 			return
 		}
 		player.is_scoring = false
 	}
+
+	state = .SCORING_SUMMARY
+	state_countdown = 0
+}
+
+scoring_summary :: proc(dt: real) {
+	if state_countdown < 0.4 do return	// some pauses for counting
 
 	for &player, i in players {
 		player.roll_score += player.roll_antennas
@@ -493,17 +577,9 @@ scoring :: proc(dt: real) {
 
 	state = .WAIT_FOR_ROLL
 	state_countdown = 0
+
+	current_player_id = (current_player_id + 1) % N_PLAYERS
 }
-
-// add_text :: proc(message: string, start, end: Vector3, color: rl.Color){
-// 	for &text in scoring_texts{
-// 		if text.visible do continue
-
-// 		text = {
-
-// 		}
-// 	}
-// }
 
 draw :: proc(camera: rl.Camera3D, textures: []rl.Texture2D, power: f32) {
 	rl.BeginDrawing()
@@ -545,95 +621,74 @@ draw :: proc(camera: rl.Camera3D, textures: []rl.Texture2D, power: f32) {
 	for player, i in players{
 		font_size: i32 = 100
 		text := fmt.tprintf("%v", player.total_score)
-		position: [2]i32 = (i == 0) ? {100, screen_height - 200,} : {screen_width-100, screen_height - 200,}
+		position := [2]i32{player.gui_score_position.x, player.gui_score_position.y}
 
 		if i == 1{
 			// Shift the right player's score so it is always 100 pixels from the right side
-			position[0] -= rl.MeasureText(strings.clone_to_cstring(text), font_size)
+			position.x -= rl.MeasureText(strings.clone_to_cstring(text), font_size)
 		}
 
 		rl.DrawText(
 			// strings.clone_to_cstring(text, context.temp_allocator),
 			strings.clone_to_cstring(text),
-			position.x, position.y,
+			position.x, position.y+100,
 			font_size, player.color,
 		)
 
-		player_roll_score := (player.roll_score+player.roll_antennas)*player.roll_multiplier
-		if state == .SCORING && player.is_scoring && player_roll_score != 0.{
-			text = fmt.tprintf("+ (%v+%v) x %v", player.roll_score, player.roll_antennas, player.roll_multiplier)
-			// font_size /= 4
+		if state == .SCORING || state == .SCORING_SUMMARY {
+			text = fmt.tprintf("+%v", player.roll_score)
 
-			font_size += i32(math.max((0.3-state_countdown), 0.1) * 100)
+			player_roll_score := (player.roll_score+player.roll_antennas)*player.roll_multiplier
+			if player.is_scoring && player_roll_score != 0. {
+				font_size += i32(math.max((0.3-state_countdown), 0.1) * 100)
+			}
 
 			if i == 1{
 				// Shift the right player's score so it is always 100 pixels from the right side
-				position[0] = screen_width-100-rl.MeasureText(strings.clone_to_cstring(text), font_size)
+				position.x = screen_width-100-rl.MeasureText(strings.clone_to_cstring(text), font_size)
 			}
 
 			rl.DrawText(
 				// strings.clone_to_cstring(text, context.temp_allocator),
 				strings.clone_to_cstring(text),
-				position.x, position.y-100.,
+				position.x, position.y,
 				font_size, player.color,
 			)
 		}
 	}
 
-	// text = fmt.tprintf("%v", players[1].total_score)
-	// rl.DrawText(
-	// 	strings.clone_to_cstring(text, context.temp_allocator),
-	// 	screen_width - 200, screen_height - 200,
-	// 	font_size,
-	// 	players[1].color,
-	// )
+	text := fmt.tprintf("Current player: %v", current_player_id)
 
-	// rl.DrawFPS(10, 10)
+	rl.DrawText(
+		// strings.clone_to_cstring(text, context.temp_allocator),
+		strings.clone_to_cstring(text),
+		50, 50, 50, rl.RAYWHITE
+	)
 
-	// if state == .SCORING {
-	// 	ratio := state_countdown / 0.5
+	for text in texts{
+		if !text.visible do continue
 
-	// 	if ratio >= 1.0 {
-	// 		// After the SCORING animation is done, add the current score of each dice to the player's total score and reset the current score of each dice
-	// 		for dice, i in dices {
-	// 			players[dice.player].score += dice.current_score
-	// 			dices[i].current_score = 0
-	// 		}
-	// 		state_countdown = 0.0
-	// 		// state = .WAIT_FOR_ROLL
-	// 	} else {
-	// 		for dice in dices {
-	// 			if dice.current_score != 0 {
-	// 				text := fmt.tprintf("+%v", dice.current_score)
-	// 				screen_position := rl.GetWorldToScreen(
-	// 					rl.Vector3{dice.position.x, dice.position.y + 0.5, dice.position.z},
-	// 					camera,
-	// 				)
+		x := i32(math.lerp(text.start.x, text.end.x, 1.-text.lifetime/text.start_lifetime))
+		y := i32(math.lerp(text.start.y, text.end.y, 1.-text.lifetime/text.start_lifetime))
+		rl.DrawText(
+			strings.clone_to_cstring(text.text, context.temp_allocator),
+			x+2, y+2, text.font_size+1, rl.BLACK,
+		)
+		rl.DrawText(
+			strings.clone_to_cstring(text.text, context.temp_allocator),
+			x, y, text.font_size, text.color,
+		)
+	}
 
-	// 				// Move the text towards the player's score display
-	// 				target_x: f32 = dice.player == 0 ? 100. : f32(screen_width) - 200.
-	// 				target_y: f32 = f32(screen_height) - 200.
-	// 				screen_position.x += f32(target_x - screen_position.x) * ratio
-	// 				screen_position.y += f32(target_y - screen_position.y) * ratio
-
-	// 				rl.DrawText(
-	// 					strings.clone_to_cstring(text, context.temp_allocator),
-	// 					i32(screen_position.x + 1),
-	// 					i32(screen_position.y + 1),
-	// 					font_size / 2,
-	// 					rl.BLACK,
-	// 				)
-	// 				rl.DrawText(
-	// 					strings.clone_to_cstring(text, context.temp_allocator),
-	// 					i32(screen_position.x),
-	// 					i32(screen_position.y),
-	// 					font_size / 2,
-	// 					players[dice.player].color,
-	// 				)
-	// 			}
-	// 		}
-	// 	}
-	// }
+	if opponent.speaking {
+		fs :i32= 100
+		width := rl.MeasureText(strings.clone_to_cstring(opponent.message, context.temp_allocator), fs)
+		rl.DrawText(
+			strings.clone_to_cstring(opponent.message, context.temp_allocator),
+			screen_width/2 - width/2, screen_height/2,
+			fs, rl.RAYWHITE
+		)
+	}
 
 	if state == .CHARGING && current_player_id == 0 {
 		// Draw a power bar at the center of the screen

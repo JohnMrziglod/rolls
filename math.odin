@@ -7,6 +7,7 @@ import "core:math/rand"
 
 real :: f32
 REAL_MAX :: real(math.F32_MAX)
+Vector2 :: [2]real
 Vector3 :: [3]real
 Matrix3 :: matrix[3,3]real
 Matrix4 :: matrix[3,4]real // the last row is awlays 0,0,0,1, we don't need to store it

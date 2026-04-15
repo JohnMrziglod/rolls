@@ -11,19 +11,15 @@ FRICTION :: real(0.95)
 RESITUTION :: real(0.4)
 TOLERANCE :: real(0.1)
 
-ShapeBox :: struct {
-	half_size: real
-}
-
-Shape :: union {
-	ShapeBox,
-}
+ShapeBox :: struct {half_size: real,}
+Shape :: union {ShapeBox,}
 
 RigidBody :: struct {
 	inverse_mass: real,
 	inverse_inertia_tensor: Matrix3,
 	linear_damping: real,
 	angular_damping: real,
+	
 	position: Vector3,
 	orientation: Quaternion,
 	velocity: Vector3,
@@ -44,11 +40,6 @@ RigidBody :: struct {
 
 	// Are we a box, a sphere, or something else? This is used for collision detection.
 	shape: Shape
-}
-
-Box :: struct {
-	using body: RigidBody,
-	half_size: real, // the size of the dice
 }
 
 check_inverse_inertia_tensor :: proc(iit: Matrix3) {
@@ -1168,36 +1159,3 @@ contact_resolver_adjust_positions :: proc(resolver: ^ContactResolver, c: []Conta
 		resolver.position_iterations_used += 1
 	}
 }
-
-// make_particle :: proc(position: Vector3={0,0,0}) -> Particle {
-// 	return Particle{
-// 		position=position,
-// 		velocity={0.0, 0.0, 0.0},
-// 		acceleration={0.0, 0.0, 0.0},
-// 		damping=0.99,
-// 		inverse_mass=1.0,
-// 		force_accum={0.0, 0.0, 0.0},
-// 	}
-// }
-
-// update_physics :: proc(dt: f32) {
-// 	for &p, i in particles {
-// 		// INTEGRATE MOVEMENT:
-// 		if p.inverse_mass == 0.0 {
-// 			continue // Infinite mass objects do not move
-// 		}
-
-// 		p.force_accum = Vector3{0.0, -9.81, 0.0} // Clear the accumulated force
-
-// 		p.position += p.velocity * dt
-
-// 		resulting_acceleration := p.acceleration
-// 		resulting_acceleration += p.force_accum * p.inverse_mass
-// 		p.velocity += resulting_acceleration * dt
-// 		p.velocity *= math.pow(p.damping, dt)
-
-// 		// Age fireworks and apply rules:
-// 		p.age -= dt
-
-// 	}
-// }

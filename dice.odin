@@ -1,5 +1,6 @@
 package game
 
+import "core:math/rand"
 import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
 
@@ -20,7 +21,11 @@ draw_dice :: proc(
 
 	// Draw the numbers on each face of the cube
 	rlgl.Begin(rlgl.QUADS)
-	rlgl.Color4ub(dice.color.r, dice.color.g, dice.color.b, dice.color.a)
+	color := dice.color
+	if dice.state != .ALIVE {
+		color /= 2
+	}
+	rlgl.Color4ub(color.r, color.g, color.b, color.a)
 
 	// Front face (1)
 	rlgl.Normal3f(0.0, 0.0, 1.0) // Normal pointing towards viewer
@@ -67,4 +72,27 @@ draw_dice :: proc(
 	rlgl.End()
 
 	rlgl.PopMatrix()
+}
+
+add_particles :: proc(position: Vector3, color: rl.Color){
+	for &particle in particles{
+		if particle.visible do continue
+
+		for i in 0 ..< len(particle.positions) {
+			particle.positions[i] = position
+			delta := Vector3{}
+			if i / 3 == 0 do delta -= {-0.25, 0, 0}
+			if i / 3 == 2 do delta += {0.25, 0, 0}
+			if i % 3 == 0 do delta -= {0, 0, -0.25}
+			if i % 3 == 2 do delta += {0, 0, 0.25}
+			particle.positions[i] += delta
+			particle.velocities[i] = random_vector(5., 20.) * 4. * delta
+			particle.velocities[i].y = rand.float32_range(5, 20)
+		}
+		particle.color = color
+		particle.visible = true
+		particle.lifetime = 1.0
+
+		return
+	}
 }
