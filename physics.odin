@@ -19,7 +19,7 @@ RigidBody :: struct {
 	inverse_inertia_tensor: Matrix3,
 	linear_damping: real,
 	angular_damping: real,
-	
+
 	position: Vector3,
 	orientation: Quaternion,
 	velocity: Vector3,
@@ -40,6 +40,12 @@ RigidBody :: struct {
 
 	// Are we a box, a sphere, or something else? This is used for collision detection.
 	shape: Shape
+}
+
+// We use this to limit the throwing area
+Plane :: struct {
+	direction: Vector3,
+	offset: real,
 }
 
 check_inverse_inertia_tensor :: proc(iit: Matrix3) {
@@ -1099,7 +1105,7 @@ contact_resolver_adjust_velocities :: proc(resolver: ^ContactResolver, c: []Cont
 				max_index = i
 			}
 		}
-		if max_index == len(contacts) do break
+		if max_index == len(c) do break
 		contact_match_awake_state(&c[max_index])
 		contact_apply_velocity_change(&c[max_index], &velocity_change, &rotation_change)
 

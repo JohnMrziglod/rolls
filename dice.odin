@@ -75,7 +75,7 @@ draw_dice :: proc(
 }
 
 add_particles :: proc(position: Vector3, color: rl.Color){
-	for &particle in particles{
+	for &particle in app.particles{
 		if particle.visible do continue
 
 		for i in 0 ..< len(particle.positions) {
