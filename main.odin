@@ -14,17 +14,17 @@ import rl "vendor:raylib"
 sco :: f64
 
 AREA_SIZE :: 30.0
-COLOR_BACKGROUND := rl.Color{203, 161, 53, 255}
-COLOR_TABLE := rl.Color{102, 51, 153, 255}
-COLOR_PLAYERS := [2]rl.Color{
-	rl.Color{203, 161, 53, 255},
-	rl.Color{255, 41, 156, 255},
-}
+// COLOR_BACKGROUND := rl.Color{203, 161, 53, 255}
 CARD_TYPE :: enum {ROLL, UPGRADE, CYCLE}
 COLOR_CARDS := [CARD_TYPE]rl.Color{
-	.ROLL=rl.Color{209, 214, 70, 255},
-	.UPGRADE=rl.Color{249, 112, 104, 255},
-	.CYCLE=rl.Color{87, 196, 229, 255},
+	.ROLL=rl.Color{200, 224, 193, 255},
+	.UPGRADE=rl.Color{245, 105, 96, 255},
+	.CYCLE=rl.Color{106, 168, 168, 255},
+}
+COLOR_TABLE := rl.Color{196, 109, 94, 255}
+COLOR_PLAYERS := [2]rl.Color{
+	rl.Color{243, 201, 139, 255},
+	rl.Color{156, 246, 246, 255},
 }
 
 
@@ -37,6 +37,9 @@ Player :: struct {
 	roll_antennas: sco,
 	roll_kills: i32,
 	is_scoring: bool,
+
+	cards: []Cards,
+
 	gui_score_position: rl.Vector2,
 }
 
@@ -50,7 +53,7 @@ Dice :: struct {
 	current_number: i32, // which number is shown on top face
 	current_score: sco,
 	already_scored: bool,
-	upgrades: [5]DiceUpgrade,
+	upgrades: [5]Cards,
 	attack: sco,
 	health: sco,
 }
@@ -96,7 +99,12 @@ Application :: struct {
 	texts_buffer: string,
 
 	// gui
-	camera: rl.Camera3D,
+	camera3d: rl.Camera3D,
+	camera2d: rl.Camera2D,
+	gui_width: f32,
+	gui_height: f32,
+	font_size1: f32,
+	font_size2: f32,
 	particles: [1000]Particles,
 	text_animations: [200]TextAnimation,
 
@@ -118,21 +126,30 @@ main :: proc() {
 	screen_height := rl.GetScreenHeight()
 
 	rl.InitWindow(screen_width, screen_height, "Rolls")
-	rl.ToggleFullscreen() // Start in fullscreen mode
+	// rl.ToggleFullscreen() // Start in fullscreen mode
 	rl.SetTargetFPS(60)
 	defer rl.CloseWindow()
 
 	screen_width = rl.GetScreenWidth()
 	screen_height = rl.GetScreenHeight()
+	target_ratio := 1080 / f32(screen_height)
 
 	app = {
+		gui_width = f32(screen_width) * target_ratio,
+		gui_height = 1080,
+		font_size1 = 40,
+		font_size2 = 30,
 		font = rl.LoadFont("assets/j_audio_cassette.otf"),
 		state = .ROLLING,
 		players = {
-			{color=COLOR_PLAYERS[0], roll_multiplier=1,
-				gui_score_position={100, f32(screen_height) - 300}},
-			{color=COLOR_PLAYERS[1], roll_multiplier=1,
-				gui_score_position={f32(screen_width)-100, f32(screen_height) - 300,}},
+			{
+				color=COLOR_PLAYERS[0], roll_multiplier=1,
+				cards={CardUpgrade_Antenna{}, CardUpgrade_Journalist{}, },
+			},
+			{
+				color=COLOR_PLAYERS[1], roll_multiplier=1,
+				cards={CardUpgrade_Journalist{}, CardUpgrade_Antenna{},}
+			},
 		},
 		opponent = {
 			message = "Let's see who reaches\n1000 points first!",
@@ -140,17 +157,25 @@ main :: proc() {
 		}
 	}
 	defer rl.UnloadFont(app.font)
+	app.players[0].gui_score_position={100, app.gui_height - 300}
+	app.players[1].gui_score_position={app.gui_width - 100, app.gui_height - 300}
 
 	// Make some app.dices:
 	dices_reset(first_round=true)
 
 	CAMERA_HEIGHT: f32 = 65.0
-	app.camera = {}
-	app.camera.position = rl.Vector3{30, CAMERA_HEIGHT, 0.}
-	app.camera.target = rl.Vector3{0.0, 0.0, 0.0}
-	app.camera.up = rl.Vector3{0.0, 1.0, 0.0}
-	app.camera.fovy = f32(30) // Camera field-of-view Y
-	app.camera.projection = .PERSPECTIVE // Camera mode type
+	app.camera3d = {}
+	app.camera3d.position = rl.Vector3{30, CAMERA_HEIGHT, 0.}
+	app.camera3d.target = rl.Vector3{0.0, 0.0, 0.0}
+	app.camera3d.up = rl.Vector3{0.0, 1.0, 0.0}
+	app.camera3d.fovy = f32(30) // Camera field-of-view Y
+	app.camera3d.projection = .PERSPECTIVE // Camera mode type
+
+	app.camera2d = {}
+    // camera.target = (Vector2){ player.x + 20.0f, player.y + 20.0f };
+    // camera.offset = (Vector2){ screenWidth/2.0f, screenHeight/2.0f };
+    // camera.rotation = 0.0f;
+    app.camera2d.zoom = target_ratio
 
 	{ // Clear everything so we don't get welcomed by a white screen
 		rl.BeginDrawing()
@@ -158,7 +183,7 @@ main :: proc() {
 
 		rl.ClearBackground(rl.BLACK)
 
-		rl.BeginMode3D(app.camera)
+		rl.BeginMode3D(app.camera3d)
 		defer rl.EndMode3D()
 
 		 // Draw a big cube to represent the area where the app.dices can move
@@ -243,7 +268,7 @@ main :: proc() {
 		// Zoom in and out:
 		mouse_wheel := rl.GetMouseWheelMove()
 		if mouse_wheel != 0.0 {
-			app.camera.position.y += 200. * mouse_wheel * dt
+			app.camera3d.position.y += 200. * mouse_wheel * dt
 		}
 
 		// update app.particles:
@@ -308,9 +333,9 @@ dices_reset :: proc(power:f32=1., first_round:bool=false) {
 		}
 	}
 
-	upgrades := [5]DiceUpgrade{}
-	upgrades[0] = DiceUpgrade_Antenna{}
-	upgrades[1] = DiceUpgrade_Journalist{}
+	upgrades := [5]Cards{}
+	upgrades[0] = CardUpgrade_Antenna{}
+	upgrades[1] = CardUpgrade_Journalist{}
 
 	for &dice, d in app.dices {
 		half_size :f32= .75
@@ -454,11 +479,11 @@ rolling :: proc(dt: real){
 
 add_text :: proc{add_text_vec3, add_text_vec3_vec2, add_text_vec2}
 add_text_vec3_vec2 :: proc (start: Vector3, end: rl.Vector2, text: string, color: rl.Color, lifetime:f32=2.0, font_size:f32=30) {
-	start_2d := rl.GetWorldToScreen(start, app.camera)
+	start_2d := rl.GetWorldToScreen(start, app.camera3d)
 	add_text_vec2(start_2d, {f32(end.x), f32(end.y)}, text, color, lifetime, font_size)
 }
 add_text_vec3 :: proc (start: Vector3, text: string, color: rl.Color, lifetime:f32=2.0, font_size:f32=30) {
-	start_2d := rl.GetWorldToScreen(start, app.camera)
+	start_2d := rl.GetWorldToScreen(start, app.camera3d)
 	add_text_vec2(start_2d, start_2d + Vector2{0, -100}, text, color, lifetime, font_size)
 }
 add_text_vec2 :: proc (start, end: Vector2, text: string, color: rl.Color, lifetime:f32, font_size: f32) {
@@ -496,15 +521,15 @@ battle :: proc(dt: real) {
 				other_dice.health = math.max(other_dice.health-dice.attack, 0)
 
 				if other_dice.health == 0{
-					add_particles(other_dice.position, other_dice.color/2.)
-					add_text(other_dice.position, fmt.aprint("DEAD!"), other_dice.color, 1.5, font_size=40)
+					add_particles(other_dice.position, other_dice.color)
+					add_text(other_dice.position, fmt.aprint("DEAD!"), other_dice.color, 1.5, font_size=app.font_size2)
 
 					other_dice.state = .DEAD
 					other_dice.position.y = 1000.
 
 					app.players[dice.player].roll_kills += 1
 				} else {
-					add_text(other_dice.position, fmt.aprint("HIT!"), other_dice.color, 1.5, font_size=40)
+					add_text(other_dice.position, fmt.aprint("HIT!"), other_dice.color, 1.5, font_size=app.font_size2)
 				}
 
 				if dice.health == 0{
@@ -556,7 +581,7 @@ scoring :: proc(dt: real) {
 			// Apply dice card effects
 			for upgrade, i in dice.upgrades{
 				#partial switch u in upgrade {
-				case DiceUpgrade_Antenna:
+				case CardUpgrade_Antenna:
 					if player.roll_antennas == 0 {
 						player.roll_antennas = dice.current_score
 					} else {
@@ -569,9 +594,9 @@ scoring :: proc(dt: real) {
 				if upgrade == nil do continue
 
 				position := dice.position - f32(i) * Vector3{0, 2, 0}
-				title_id := fmt.tprintf("title/%v", typeid_of(type_of(upgrade)))
+				title_id := fmt.tprintf("title/%v", reflect.union_variant_type_info(upgrade))
 				text := fmt.aprintf("%v!", app.texts[title_id])
-				add_text(position, text, dice.color, 1.5, font_size=40)
+				add_text(position, text, dice.color, 1.5, font_size=app.font_size2)
 			}
 
 			app.players[dice.player].roll_score += dice.current_score
@@ -587,7 +612,7 @@ scoring :: proc(dt: real) {
 			// add_particles(dice.position, dice.color)
 			if dice.current_score != 0 {
 				add_text(dice.position, player.gui_score_position,
-						 fmt.aprintf("+%v", dice.current_score), dice.color, 2.0/f32(n_dices_alive), font_size=60)
+						 fmt.aprintf("+%v", dice.current_score), dice.color, 2.0/f32(n_dices_alive), font_size=app.font_size1)
 			}
 
 			return
@@ -631,10 +656,11 @@ draw :: proc(power: f32) {
 		rl.ClearBackground(COLOR_PLAYERS[app.current_player]/2)
 	}
 
-	rl.BeginMode3D(app.camera)
+	rl.BeginMode3D(app.camera3d)
 
 	// Draw a big cube to represent the area where the app.dices can move
 	rl.DrawCube(rl.Vector3{0.0, -.5, 0.0}, AREA_SIZE, 1.0, AREA_SIZE, COLOR_TABLE)
+	rl.DrawCubeWires(rl.Vector3{0.0, -.5, 0.0}, AREA_SIZE, 1.0, AREA_SIZE, rl.BLACK)
 
 	for &dice, d in app.dices{
 		if dice.state != .ALIVE do continue
@@ -657,46 +683,46 @@ draw :: proc(power: f32) {
 	}
 	rl.EndMode3D()
 
+	rl.BeginMode2D(app.camera2d)
+
 	rl.DrawFPS(10, 10)
 
 	screen_height := i32(rl.GetScreenHeight())
 	screen_width := i32(rl.GetScreenWidth())
 
-	for player, i in app.players{
-		font_size: f32 = 100
+	for player, p in app.players{
+		// x :f32= p == 0 ? 100 : f32(screen_width)-500
+		// for card, c in player.cards{
+		// 	draw_card(reflect.union_variant_typeid(card), {x, 100+300*f32(c)}, COLOR_CARDS[.UPGRADE])
+		// }
+
 		text := fmt.tprintf("%v", player.total_score)
 		position := player.gui_score_position
 
-		if i == 1{
+		if p == 1{
 			// Shift the right player's score so it is always 100 pixels from the right side
-			position.x -= f32(rl.MeasureText(strings.clone_to_cstring(text), i32(font_size)))
+			position.x -= f32(rl.MeasureText(strings.clone_to_cstring(text, context.temp_allocator), i32(app.font_size1)))
 		}
 
-		draw_text(
-			// strings.clone_to_cstring(text, context.temp_allocator),
-			text, {position.x, position.y+100},
-			font_size, player.color,
-		)
+		draw_text(text, {position.x, position.y+100}, app.font_size1, player.color)
 
 		if app.state == .SCORING || app.state == .SCORING_SUMMARY {
 
+			font_size := app.font_size1
 			player_roll_score := (player.roll_score+player.roll_antennas)*player.roll_multiplier
 			if player.is_scoring && player_roll_score != 0. {
 				font_size += math.max((0.3-app.state_timer), 0.1) * 100
 			}
 			text = fmt.tprintf("+%v", player_roll_score)
 
-			if i == 1{
+			if p == 1{
 				// Shift the right player's score so it is always 100 pixels from the right side
-				position.x = f32(screen_width-100-rl.MeasureText(strings.clone_to_cstring(text), i32(font_size)))
+				position.x = f32(screen_width-100-rl.MeasureText(strings.clone_to_cstring(text, context.temp_allocator), i32(font_size)))
 			}
 
 			draw_text(text, position, font_size, player.color,)
 		}
 	}
-
-	text := fmt.tprintf("Current player: %v", app.current_player)
-	draw_text(text, {50, 50}, 50, rl.RAYWHITE)
 
 	for text in app.text_animations{
 		if !text.visible do continue
@@ -715,7 +741,7 @@ draw :: proc(power: f32) {
 		)
 	}
 
-	draw_card(DiceUpgrade_Antenna, {10, 10}, COLOR_CARDS[.UPGRADE])
+
 
 	if app.state == .CHARGING && app.current_player == 0 {
 		// Draw a power bar at the center of the screen
@@ -723,7 +749,8 @@ draw :: proc(power: f32) {
 		height: i32 = 80
 		x: i32 = (screen_width - width) / 2
 		y: i32 = (screen_height - height) / 2
-		rl.DrawRectangle(x, y, i32(power * f32(width)), height, rl.GREEN)
+		rl.DrawRectangle(x, y, i32(power * f32(width)), height, app.players[app.current_player].color)
 		rl.DrawRectangleLines(x, y, width, height, rl.BLACK)
 	}
+	rl.EndMode2D()
 }

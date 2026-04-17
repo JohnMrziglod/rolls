@@ -1,18 +1,18 @@
-title/DiceUpgrade_Antenna|ANTENNA
-description/DiceUpgrade_Antenna|Multiply dice's score with other dices with antenna.
-title/DiceUpgrade_Enforcer|ENFORCER #%v
-description/DiceUpgrade_Enforcer|Replace one arbitrary side of this dice with a #%v.
-title/DiceUpgrade_Journalist|JOURNALIST
-description/DiceUpgrade_Journalist|X2 your roll score.
-title/DiceUpgrade_General|GENERAL
-description/DiceUpgrade_General|Create a roll card if it survives.
-title/DiceUpgrade_PowerDice|POWER DICE
-description/DiceUpgrade_PowerDice|Multiply dice's score with its own score again.
-title/DiceUpgrade_ShortSighted|SHORT-SIGHTED
-description/DiceUpgrade_ShortSighted|Attacks farthest opponent's dice regardless of its number.
-title/DiceUpgrade_Blind|BLIND
-description/DiceUpgrade_Blind|Attacks closest opponent's dice regardless of its number.
-title/DiceUpgrade_Historian|HISTORIAN
-description/DiceUpgrade_Historian|Gains +0.1 score for each used roll card.
-title/DiceUpgrade_Librarian|LIBRARIAN
-description/DiceUpgrade_Librarian|Gains +0.1 score for each used dice card.
+title/CardUpgrade_Antenna|ANTENNA
+description/CardUpgrade_Antenna|Multiply dice's score with other dices with antenna.
+title/CardUpgrade_Enforcer|ENFORCER #%v
+description/CardUpgrade_Enforcer|Replace one arbitrary side of this dice with a #%v.
+title/CardUpgrade_Journalist|JOURNALIST
+description/CardUpgrade_Journalist|X2 your roll score.
+title/CardUpgrade_General|GENERAL
+description/CardUpgrade_General|Create a roll card if it survives.
+title/CardUpgrade_PowerDice|POWER DICE
+description/CardUpgrade_PowerDice|Multiply dice's score with its own score again.
+title/CardUpgrade_ShortSighted|SHORT-SIGHTED
+description/CardUpgrade_ShortSighted|Attacks farthest opponent's dice regardless of its number.
+title/CardUpgrade_Blind|BLIND
+description/CardUpgrade_Blind|Attacks closest opponent's dice regardless of its number.
+title/CardUpgrade_Historian|HISTORIAN
+description/CardUpgrade_Historian|Gains +0.1 score for each used roll card.
+title/CardUpgrade_Librarian|LIBRARIAN
+description/CardUpgrade_Librarian|Gains +0.1 score for each used dice card.
