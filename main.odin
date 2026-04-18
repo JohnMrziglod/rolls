@@ -39,8 +39,8 @@ Player :: struct {
 	is_scoring: bool,
 
 	cards: []Cards,
-
-	gui_score_position: rl.Vector2,
+	ghosts: [dynamic]i32,
+	ghosts_max: i32,
 }
 
 N_DICES :: 12
@@ -90,6 +90,18 @@ GameState :: enum {
 	SCORING_SUMMARY,	// only for the animations (all points are flying in)
 }
 
+GUI :: struct {
+	font_size1: f32,
+	font_size2: f32,
+	score_positions: [N_PLAYERS]rl.Vector2,
+	hand_positions: [N_PLAYERS]rl.Vector2,
+	hand_area_height: f32,
+	card_size: rl.Vector2,
+	ghost_positions: [N_PLAYERS]rl.Vector2,
+	width: f32,
+	height: f32,
+}
+
 Application :: struct {
 	// resources
 	font: rl.Font,
@@ -99,12 +111,9 @@ Application :: struct {
 	texts_buffer: string,
 
 	// gui
+	gui: GUI,
 	camera3d: rl.Camera3D,
 	camera2d: rl.Camera2D,
-	gui_width: f32,
-	gui_height: f32,
-	font_size1: f32,
-	font_size2: f32,
 	particles: [1000]Particles,
 	text_animations: [200]TextAnimation,
 
@@ -125,30 +134,40 @@ main :: proc() {
 	screen_width := rl.GetScreenWidth()
 	screen_height := rl.GetScreenHeight()
 
-	rl.InitWindow(screen_width, screen_height, "Rolls")
+	rl.InitWindow(1920, 1080, "Rolls")
 	// rl.ToggleFullscreen() // Start in fullscreen mode
 	rl.SetTargetFPS(60)
 	defer rl.CloseWindow()
 
-	screen_width = rl.GetScreenWidth()
-	screen_height = rl.GetScreenHeight()
+	display := rl.GetCurrentMonitor();
+    // if we are not full screen, set the window size to match the monitor we are on
+    screen_width = rl.GetMonitorWidth(display)
+    screen_height = rl.GetMonitorHeight(display)
+    // rl.SetWindowState({rl.ConfigFlag.WINDOW_UNDECORATED})
+    rl.SetWindowSize(screen_width, screen_height+300)
+
+    // toggle the state
+    // rl.ToggleBorderlessWindowed()
+    // rl.MaximizeWindow()
+    rl.SetWindowPosition(0, 30)
+
+	// screen_width = rl.GetScreenWidth()
+	// screen_height = rl.GetScreenHeight()
 	target_ratio := 1080 / f32(screen_height)
 
 	app = {
-		gui_width = f32(screen_width) * target_ratio,
-		gui_height = 1080,
-		font_size1 = 40,
-		font_size2 = 30,
 		font = rl.LoadFont("assets/j_audio_cassette.otf"),
 		state = .ROLLING,
 		players = {
 			{
 				color=COLOR_PLAYERS[0], roll_multiplier=1,
 				cards={CardUpgrade_Antenna{}, CardUpgrade_Journalist{}, },
+				ghosts_max=10,
 			},
 			{
 				color=COLOR_PLAYERS[1], roll_multiplier=1,
-				cards={CardUpgrade_Journalist{}, CardUpgrade_Antenna{},}
+				cards={CardUpgrade_Journalist{}, CardUpgrade_Antenna{},},
+				ghosts_max=10,
 			},
 		},
 		opponent = {
@@ -157,11 +176,26 @@ main :: proc() {
 		}
 	}
 	defer rl.UnloadFont(app.font)
-	app.players[0].gui_score_position={100, app.gui_height - 300}
-	app.players[1].gui_score_position={app.gui_width - 100, app.gui_height - 300}
-
-	// Make some app.dices:
-	dices_reset(first_round=true)
+	app.gui = {
+		width = f32(screen_width),
+		height = f32(screen_height),
+		font_size1 = 50,
+		font_size2 = 30,
+		score_positions = {
+			{50, f32(screen_height)-150},
+			{f32(screen_width)-50, f32(screen_height)-150},
+		},
+		card_size = {400, 170},
+		hand_positions = {
+			{50, 50},
+			{f32(screen_width)-450, 50},
+		},
+		ghost_positions = {
+			{50, f32(screen_height)-250},
+			{f32(screen_width)-50, f32(screen_height)-250},
+		},
+	}
+	app.gui.hand_area_height = app.gui.score_positions[0].y - 100
 
 	CAMERA_HEIGHT: f32 = 65.0
 	app.camera3d = {}
@@ -172,10 +206,14 @@ main :: proc() {
 	app.camera3d.projection = .PERSPECTIVE // Camera mode type
 
 	app.camera2d = {}
-    // camera.target = (Vector2){ player.x + 20.0f, player.y + 20.0f };
-    // camera.offset = (Vector2){ screenWidth/2.0f, screenHeight/2.0f };
+    app.camera2d.target = {f32(screen_width)/2.0, f32(screen_height)/2.0 }
+    app.camera2d.offset = {f32(screen_width)/2.0, f32(screen_height)/2.0 }
     // camera.rotation = 0.0f;
-    app.camera2d.zoom = target_ratio
+    // app.camera2d.zoom = target_ratio
+
+	// Make some app.dices:
+	dices_reset(first_round=true)
+
 
 	{ // Clear everything so we don't get welcomed by a white screen
 		rl.BeginDrawing()
@@ -522,14 +560,15 @@ battle :: proc(dt: real) {
 
 				if other_dice.health == 0{
 					add_particles(other_dice.position, other_dice.color)
-					add_text(other_dice.position, fmt.aprint("DEAD!"), other_dice.color, 1.5, font_size=app.font_size2)
+					add_text(other_dice.position, fmt.aprint("DEAD!"), other_dice.color, 1.5, font_size=app.gui.font_size2)
 
 					other_dice.state = .DEAD
 					other_dice.position.y = 1000.
+					append(&app.players[other_dice.player].ghosts, other_dice.current_number)
 
 					app.players[dice.player].roll_kills += 1
 				} else {
-					add_text(other_dice.position, fmt.aprint("HIT!"), other_dice.color, 1.5, font_size=app.font_size2)
+					add_text(other_dice.position, fmt.aprint("HIT!"), other_dice.color, 1.5, font_size=app.gui.font_size2)
 				}
 
 				if dice.health == 0{
@@ -538,6 +577,7 @@ battle :: proc(dt: real) {
 
 					dice.state = .DEAD
 					dice.position.y = 1000.
+					append(&app.players[dice.player].ghosts, dice.current_number)
 
 					app.players[other_dice.player].roll_kills += 1
 				} else  {
@@ -571,6 +611,12 @@ scoring :: proc(dt: real) {
 	app.state_timer = 0.0
 
 	// First round of scoring, every dice calculates its own current score
+	// n_dices_player := [N_PLAYERS]i32{}
+	// for &dice, i in app.dices{
+	// 	if dice.state != .ALIVE do continue
+	// 	n_dices_player[dice.player] += 1
+	// }
+
 	for &player, p in app.players{
 		player.is_scoring = true
 		for &dice, i in app.dices {
@@ -596,7 +642,7 @@ scoring :: proc(dt: real) {
 				position := dice.position - f32(i) * Vector3{0, 2, 0}
 				title_id := fmt.tprintf("title/%v", reflect.union_variant_type_info(upgrade))
 				text := fmt.aprintf("%v!", app.texts[title_id])
-				add_text(position, text, dice.color, 1.5, font_size=app.font_size2)
+				add_text(position, text, dice.color, 1.5, font_size=app.gui.font_size2)
 			}
 
 			app.players[dice.player].roll_score += dice.current_score
@@ -611,8 +657,8 @@ scoring :: proc(dt: real) {
 
 			// add_particles(dice.position, dice.color)
 			if dice.current_score != 0 {
-				add_text(dice.position, player.gui_score_position,
-						 fmt.aprintf("+%v", dice.current_score), dice.color, 2.0/f32(n_dices_alive), font_size=app.font_size1)
+				add_text(dice.position, app.gui.score_positions[p],
+						 fmt.aprintf("+%v", dice.current_score), dice.color, 2.0/f32(n_dices_alive), font_size=app.gui.font_size1)
 			}
 
 			return
@@ -683,7 +729,7 @@ draw :: proc(power: f32) {
 	}
 	rl.EndMode3D()
 
-	rl.BeginMode2D(app.camera2d)
+	// rl.BeginMode2D(app.camera2d)
 
 	rl.DrawFPS(10, 10)
 
@@ -691,24 +737,55 @@ draw :: proc(power: f32) {
 	screen_width := i32(rl.GetScreenWidth())
 
 	for player, p in app.players{
-		// x :f32= p == 0 ? 100 : f32(screen_width)-500
-		// for card, c in player.cards{
-		// 	draw_card(reflect.union_variant_typeid(card), {x, 100+300*f32(c)}, COLOR_CARDS[.UPGRADE])
-		// }
-
-		text := fmt.tprintf("%v", player.total_score)
-		position := player.gui_score_position
-
-		if p == 1{
-			// Shift the right player's score so it is always 100 pixels from the right side
-			position.x -= f32(rl.MeasureText(strings.clone_to_cstring(text, context.temp_allocator), i32(app.font_size1)))
+		for card, c in player.cards{
+			position := app.gui.hand_positions[p]
+			if len(player.cards) > 5 {
+				position += {0, app.gui.hand_area_height/f32(len(player.cards))*f32(c)}
+			} else {
+				position += {0, f32(c)*(30+app.gui.card_size.y)}
+			}
+			draw_card(reflect.union_variant_typeid(card), position)
 		}
 
-		draw_text(text, {position.x, position.y+100}, app.font_size1, player.color)
+		ghost_cols := 5 // @TODO: make this dynamic based on the max number of ghosts a player can have
+		for g, i in player.ghosts{
+			if g > 6 do continue	// we only have textures for ghosts 1-6
+
+			row := i / ghost_cols
+			col := i % ghost_cols
+			if p == 1 do col *= -1	// flip the ghosts for the right player
+			position := app.gui.ghost_positions[p] + rl.Vector2{f32(32*col), f32(32*row)}
+			if p == 1 do position.x -= 32	// shift the right player's ghosts to the left
+
+			texture_rect := rl.Rectangle{
+				x = f32((g-1)*app.textures[0].width/6),
+				y = 0,
+				width = f32(app.textures[0].width/6),
+				height = f32(app.textures[0].height),
+			}
+			dest_rect := rl.Rectangle{
+				x = position.x,
+				y = position.y,
+				width = 30,
+				height = 30,
+			}
+			rl.DrawTexturePro(app.textures[0], texture_rect, dest_rect, {}, 0., player.color/2)
+		}
+
+		text := fmt.tprintf("%v", player.total_score)
+		position := app.gui.score_positions[p]
+
+		width := measure_text(text, app.gui.font_size1).x
+		if p == 1{
+			// Shift the right player's score so it is always 100 pixels from the right side
+			position.x -= width
+		}
+
+		draw_text(text, {position.x, position.y+50}, app.gui.font_size1, player.color)
 
 		if app.state == .SCORING || app.state == .SCORING_SUMMARY {
 
-			font_size := app.font_size1
+			font_size := app.gui.font_size1
 			player_roll_score := (player.roll_score+player.roll_antennas)*player.roll_multiplier
 			if player.is_scoring && player_roll_score != 0. {
 				font_size += math.max((0.3-app.state_timer), 0.1) * 100
@@ -717,7 +794,7 @@ draw :: proc(power: f32) {
 
 			if p == 1{
 				// Shift the right player's score so it is always 100 pixels from the right side
-				position.x = f32(screen_width-100-rl.MeasureText(strings.clone_to_cstring(text, context.temp_allocator), i32(font_size)))
+				position.x = f32(screen_width)-measure_text(text, font_size).x- 50
 			}
 
 			draw_text(text, position, font_size, player.color,)
@@ -734,14 +811,12 @@ draw :: proc(power: f32) {
 	}
 
 	if app.opponent.speaking {
-		fs :i32= 100
+		fs :i32= i32(app.gui.font_size1)
 		width := rl.MeasureText(strings.clone_to_cstring(app.opponent.message, context.temp_allocator), fs)
 		draw_text(app.opponent.message,
-			{f32(screen_width/2 - width/2), f32(screen_height/2)}, 100, rl.RAYWHITE
+			{f32(screen_width/2 - width/2), f32(screen_height/2)}, f32(fs), rl.RAYWHITE
 		)
 	}
-
-
 
 	if app.state == .CHARGING && app.current_player == 0 {
 		// Draw a power bar at the center of the screen
@@ -752,5 +827,5 @@ draw :: proc(power: f32) {
 		rl.DrawRectangle(x, y, i32(power * f32(width)), height, app.players[app.current_player].color)
 		rl.DrawRectangleLines(x, y, width, height, rl.BLACK)
 	}
-	rl.EndMode2D()
+	// rl.EndMode2D()
 }

@@ -13,6 +13,32 @@ Cards :: union{
 	CardUpgrade_Journalist,
 }
 
+measure_text :: proc(text: string, font_size: f32, spacing:f32=1.0) -> rl.Vector2 {
+	font := app.font
+	scale_factor := font_size / f32(font.baseSize)
+
+	width :f32= 0.
+	height :f32= 0.
+
+	for r in text{
+		if r == '\n' {
+			height += 1.5 * f32(font.baseSize) * scale_factor
+			width = 0.
+			continue
+		}
+
+		glyph_index := rl.GetGlyphIndex(font, r)
+		if font.glyphs[glyph_index].advanceX == 0 {
+			width += f32(font.recs[glyph_index].width) * scale_factor
+		} else {
+			width += f32(font.glyphs[glyph_index].advanceX) * scale_factor
+		}
+		width += spacing
+	}
+
+	return rl.Vector2{width, height + 1.5 * f32(font.baseSize) * scale_factor}
+}
+
 draw_text :: proc(text: string, position: rl.Vector2, font_size: f32, color: rl.Color=rl.RAYWHITE, spacing:f32=1.0, max_width:f32=-1.){
 	if max_width < 0. {
 		rl.DrawTextEx(app.font,
@@ -76,9 +102,21 @@ draw_text :: proc(text: string, position: rl.Vector2, font_size: f32, color: rl.
 }
 
 
-draw_card :: proc(id: typeid, position: rl.Vector2, color: rl.Color) {
-	font_size :f32= 30
-	size := [2]f32{450, 200}
+draw_card :: proc(id: typeid, position: rl.Vector2, color:rl.Color={1, 1, 1, 0}) {
+	text_id := fmt.tprintf("title/%v", id)
+	color := color
+	if color == {1, 1, 1, 0} {
+		if strings.contains(text_id, "CardUpgrade") {
+			color = COLOR_CARDS[.UPGRADE]
+		} else if strings.contains(text_id, "CardRoll") {
+			color = COLOR_CARDS[.ROLL]
+		} else {
+			color = COLOR_CARDS[.CYCLE]
+		}
+	}
+
+	font_size :f32= app.gui.font_size2
+	size := app.gui.card_size
 	padding :f32= 10
 	line_pos := font_size+2*padding
 	lt :f32= 4. // line_thickness
@@ -93,7 +131,6 @@ draw_card :: proc(id: typeid, position: rl.Vector2, color: rl.Color) {
 
 	// Title
 	text_pos := position + {padding, padding}
-	text_id := fmt.tprintf("title/%v", id)
 	draw_text(app.texts[text_id], text_pos, font_size, rl.RAYWHITE, max_width=size.x-2*padding)
 
 	// Description
