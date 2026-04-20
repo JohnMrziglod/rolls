@@ -8,6 +8,29 @@ import "core:strings"
 import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
 
+button :: proc(text: string, position: rl.Vector2, size:rl.Vector2={1, 1}, color:rl.Color=rl.BLACK, active_color:rl.Color=rl.BLANK,
+		font_size:f32=30, clickable:bool=true) -> bool{
+	position := position
+	text_size := measure_text(text, font_size)
+	// highlight it if the mouse is hovering over it
+	box := rl.Rectangle{
+		x = position.x,
+		y = position.y,
+		width = math.max(size.x, text_size.x + 4), // make sure the button is wide enough to fit the text
+		height = math.max(size.y, text_size.y + 4),
+	}
+	hovered := clickable && rl.CheckCollisionPointRec(rl.GetMousePosition(), box)
+	if hovered do position.y += math.sin(f32(rl.GetTime())*10)*5	// make the button float up and down a bit
+
+	active_color := active_color == rl.BLANK ? rl.ColorBrightness(color, 1.2) : active_color
+
+	text_position := position + {box.width-text_size.x, 0} / 2.
+	draw_box(position-{0, box.height-text_size.y}/2., {box.width, box.height}, rl.BLACK, thickness=2.)
+	draw_text(text, text_position, font_size, rl.WHITE)
+
+	return hovered && rl.IsMouseButtonPressed(.LEFT)
+}
+
 dice_button :: proc(number: i32, position: rl.Vector2, size: f32,
 					 color:rl.Color=rl.WHITE, active_color:rl.Color=rl.BLANK, active:bool=false, clickable:bool=true) -> bool{
 
@@ -152,9 +175,10 @@ measure_text :: proc(text: string, font_size: f32, spacing:f32=1.0) -> rl.Vector
 			width += f32(font.glyphs[glyph_index].advanceX) * scale_factor
 		}
 		width += spacing
+		height = math.max(height, f32(font.baseSize) * scale_factor)
 	}
 
-	return rl.Vector2{width, height + 1.5 * f32(font.baseSize) * scale_factor}
+	return rl.Vector2{width, height}
 }
 
 draw_text :: proc(text: string, position: rl.Vector2, font_size: f32, color: rl.Color=rl.RAYWHITE, spacing:f32=1.0, max_width:f32=-1.){

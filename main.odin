@@ -104,7 +104,10 @@ GUI :: struct {
 	bg_color: rl.Color,
 }
 
-
+Cycle :: struct {
+	current: i32,
+	scored_combinations: bit_set[CombinationType],
+}
 
 Application :: struct {
 	// resources
@@ -565,7 +568,7 @@ add_text_vec2 :: proc (start, end: Vector2, text: string, color: rl.Color, lifet
 
 dice_kills :: proc(killer, victim: ^Dice){
 	add_particles(victim.position, victim.color)
-	add_text(victim.position, fmt.aprint("DEAD!"), victim.color, 1.5, font_size=app.gui.font_size2)
+	add_text(victim.position, fmt.aprint("GHOST!"), victim.color, 1.5, font_size=app.gui.font_size2)
 
 	victim.state = .DEAD
 	victim.position.y = 1000.
@@ -853,7 +856,7 @@ draw :: proc(power: f32) {
 		ghost_cols := 10 // @TODO: make this dynamic based on the max number of ghosts a player can have
 		ghost_size :f32= app.gui.font_size1
 		ghost_padding :f32= 2
-		for ghost_number, ghost_index in app.players[0].ghosts{
+		for ghost_number, ghost_index in player.ghosts{
 			row := ghost_index / ghost_cols
 			col := ghost_index % ghost_cols
 			position := board_position + {20, 60} + (ghost_size+ghost_padding)*rl.Vector2{f32(col), f32(row)}
@@ -886,7 +889,7 @@ draw :: proc(power: f32) {
 		}
 		enough_ghosts := !contains(app.ghosts_selected[:], i32(-1))
 		ghost_size2 :f32= app.gui.font_size2 + 10
-		highest_score :i32= 0
+		highest_score := 0.
 		// highest_combo := CombinationType_None
 		for combo_type, c in CombinationType{
 			position := board_position + rl.Vector2{20, 150 + f32(c)*app.gui.font_size2*1.6}
@@ -897,6 +900,21 @@ draw :: proc(power: f32) {
 
 				for ghost_number, g in ghost_selected_numbers{
 					dice_button(ghost_number, position+{300+f32(g)*(ghost_size2+5), -7}, ghost_size2, player.color/2, active_color=player.color, active=highlighted[g], clickable=false)
+				}
+
+				if button("Score", position+{700, 0}, color=player.color/2, active_color=player.color) {
+					fmt.println("Scored combo", combo_type, "for", score, "points!")
+
+					app.players[0].total_score += score // @TODO: Add it to roll score
+					ghosts_copy := make([dynamic]i32, len(player.ghosts), cap(player.ghosts))
+					defer delete(ghosts_copy)
+					copy(ghosts_copy[:], player.ghosts[:])
+					clear(&app.players[0].ghosts)
+
+					for ghost, index in ghosts_copy{
+						if !contains(app.ghosts_selected[:], i32(index)) do append(&app.players[0].ghosts, ghost)
+					}
+					app.ghosts_selected = {-1, -1, -1, -1, -1}
 				}
 			}
 			highlighted = {}

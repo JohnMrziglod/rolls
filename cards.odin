@@ -31,7 +31,7 @@ Combination :: struct {
 	n_cards: i32,
 }
 
-test_combination :: proc(combination: CombinationType, dices: [5]i32, highlight: ^[5]bool) -> (match:bool=false, score:i32=0) {
+test_combination :: proc(combination: CombinationType, dices: [5]i32, highlight: ^[5]bool) -> (match:bool=false, score:f64=0) {
 
 	counter := [6]i32{}
 	for number, i in dices {
