@@ -1,10 +1,5 @@
 package game
 
-import "core:unicode/utf8"
-import "core:fmt"
-import "core:strings"
-import rl "vendor:raylib"
-
 CardUpgrade_Antenna :: struct {}
 CardUpgrade_Journalist :: struct {}
 
@@ -13,128 +8,150 @@ Cards :: union{
 	CardUpgrade_Journalist,
 }
 
-measure_text :: proc(text: string, font_size: f32, spacing:f32=1.0) -> rl.Vector2 {
-	font := app.font
-	scale_factor := font_size / f32(font.baseSize)
-
-	width :f32= 0.
-	height :f32= 0.
-
-	for r in text{
-		if r == '\n' {
-			height += 1.5 * f32(font.baseSize) * scale_factor
-			width = 0.
-			continue
-		}
-
-		glyph_index := rl.GetGlyphIndex(font, r)
-		if font.glyphs[glyph_index].advanceX == 0 {
-			width += f32(font.recs[glyph_index].width) * scale_factor
-		} else {
-			width += f32(font.glyphs[glyph_index].advanceX) * scale_factor
-		}
-		width += spacing
-	}
-
-	return rl.Vector2{width, height + 1.5 * f32(font.baseSize) * scale_factor}
+CombinationType :: enum {
+	Pair,
+	DoublePair,
+	RollOfThree,
+	RollOfFour,
+	RoyalRoll,
+	FullHouse,
+	LowerStraight,
+	UpperStraight,
+	AllTogether,
+	OnlyOnes,
+	OnlyTwos,
+	OnlyThrees,
+	OnlyFours,
+	OnlyFives,
+	OnlySixes,
+}
+Combination :: struct {
+	type: CombinationType,
+	score: i32,
+	n_cards: i32,
 }
 
-draw_text :: proc(text: string, position: rl.Vector2, font_size: f32, color: rl.Color=rl.RAYWHITE, spacing:f32=1.0, max_width:f32=-1.){
-	if max_width < 0. {
-		rl.DrawTextEx(app.font,
-			strings.clone_to_cstring(text, context.temp_allocator),
-			position, font_size, spacing, color)
+test_combination :: proc(combination: CombinationType, dices: [5]i32, highlight: ^[5]bool) -> (match:bool=false, score:i32=0) {
 
-		return
+	counter := [6]i32{}
+	for number, i in dices {
+		if number < 1 || number > 6 do return // Invalid dice number, return no match
+		counter[number-1] += 1
 	}
 
-	font := app.font
-
-	// We need to wrap the text... below is the c function, we have to refactor it into odin...
-	text_offset_y := f32(0)
-	text_offset_x := f32(0)
-
-	scale_factor := font_size / f32(font.baseSize)
-
-	for r, i in text{
-		if r == '\n' {
-			text_offset_y += 1.5 * f32(font.baseSize) * scale_factor
-			text_offset_x = 0.
-			continue
+	pair, double_pair, three, four, five := false, false, false, false, false
+	for count in counter {
+		if count >= 2 {
+			if pair do double_pair = true
+			pair = true
 		}
+		if count >= 3 do three = true
+		if count >= 4 do four = true
+		if count >= 5 do five = true
+	}
+	full_house := double_pair && three
+	lower_straight := counter == [6]i32{1, 1, 1, 1, 1, 0}
+	upper_straight := counter == [6]i32{0, 1, 1, 1, 1, 1}
 
-		glyph_width :f32= 0.
-		next_word_length :f32= 0.
-		for nr, j in text[i:] {
-			if j != 0 do next_word_length += spacing
+	#partial switch combination {
+	case .Pair:
+		match = pair
+		if !match do return
+		score = 15 // fixed score
+		n_highlighted := 0 // Highlight only two dices
+		#reverse for count, i in counter { // Always take the highest pair
+			if count < 2 do continue
 
-			glyph_index := rl.GetGlyphIndex(font, nr)
-			if font.glyphs[glyph_index].advanceX == 0 {
-				next_word_length += f32(font.recs[glyph_index].width) * scale_factor
-			} else {
-				next_word_length += f32(font.glyphs[glyph_index].advanceX) * scale_factor
-			}
-			if j == 0 do glyph_width = next_word_length
-
-			if text_offset_x + next_word_length > max_width || nr == '\n' {
-				if text_offset_x != 0. {
-					// we draw it onto the next line
-					text_offset_y += 1.5 * f32(font.baseSize) * scale_factor
-					text_offset_x = 0.
+			for number, j in dices {
+				if number == i32(i) + 1 {
+					highlight[j] = true
+					n_highlighted += 1
+					if n_highlighted > 1 do return
 				}
-				break
 			}
-			// if we fit so far and the next rune is white space, we can stop here...
-			if strings.is_space(nr) do break
 		}
 
-		if !strings.is_space(r) {
-			rl.DrawTextCodepoint(
-				font, r,
-				position + rl.Vector2{text_offset_x, text_offset_y},
-				font_size, color)
+	case .DoublePair:
+		match = double_pair
+		if !match do return
+		score = 20 // fixed score
+		for c, i in counter {
+			if c < 2 do continue
+			n_highlighted := 0 // Highlight only four dices
+
+			for number, j in dices {
+				if number == i32(i) + 1 {
+					highlight[j] = true
+					n_highlighted += 1
+					if n_highlighted > 1 do break
+				}
+			}
+			if count(highlight[:], true) >= 4 do break
 		}
 
-		if text_offset_x != 0. || !strings.is_space(r) {
-			text_offset_x += glyph_width
+	case .RollOfThree:
+		match = three
+		if !match do return
+		score = 25 // fixed score
+		n_highlighted := 0 // Highlight only three dices
+		for count, i in counter {
+			if count < 3 do continue
+			for number, j in dices {
+				if number == i32(i) + 1 {
+					highlight[j] = true
+					n_highlighted += 1
+					if n_highlighted > 2 do return
+				}
+			}
+		}
+	case .RollOfFour:
+		match = four
+		if !match do return
+		score = 30 // fixed score
+		n_highlighted := 0 // Highlight only four dices
+		for count, i in counter {
+			if count < 4 do continue
+			for number, j in dices {
+				if number == i32(i) + 1 {
+					highlight[j] = true
+					n_highlighted += 1
+					if n_highlighted > 3 do return
+				}
+			}
+		}
+	case .RoyalRoll:
+		match = five
+		if !match do return
+		score = 50 // fixed score
+		for number, j in dices {
+			highlight[j] = true
+		}
+	case .FullHouse:
+		match = full_house
+		if !match do return
+		score = 40 // fixed score
+		for number, j in dices {
+			highlight[j] = true
+		}
+	case .LowerStraight:
+		match = lower_straight
+		if !match do return
+		score = 40 // fixed score
+		for number, j in dices {
+			if number >= 1 && number <= 5 {
+				highlight[j] = true
+			}
+		}
+	case .UpperStraight:
+		match = upper_straight
+		if !match do return
+		score = 40 // fixed score
+		for number, j in dices {
+			if number >= 2 && number <= 6 {
+				highlight[j] = true
+			}
 		}
 	}
-}
 
-
-draw_card :: proc(id: typeid, position: rl.Vector2, color:rl.Color={1, 1, 1, 0}) {
-	text_id := fmt.tprintf("title/%v", id)
-	color := color
-	if color == {1, 1, 1, 0} {
-		if strings.contains(text_id, "CardUpgrade") {
-			color = COLOR_CARDS[.UPGRADE]
-		} else if strings.contains(text_id, "CardRoll") {
-			color = COLOR_CARDS[.ROLL]
-		} else {
-			color = COLOR_CARDS[.CYCLE]
-		}
-	}
-
-	font_size :f32= app.gui.font_size2
-	size := app.gui.card_size
-	padding :f32= 10
-	line_pos := font_size+2*padding
-	lt :f32= 4. // line_thickness
-	lc := rl.BLACK // color / 2 // line color
-	lc.a = color.a
-	rl.DrawRectangleV(position+{10, 10}, size, rl.BLACK)
-	rl.DrawRectangleV(position, size, color)
-	rl.DrawRectangleV(position, {size.x, line_pos}, rl.BLACK)
-
-	rl.DrawRectangleLinesEx({position.x-4, position.y-4, size.x+2*lt, size.y+2*lt}, lt, lc)
-	// rl.DrawLineEx({position.x+padding, position.y+line_pos}, {position.x+size.x-padding, position.y+line_pos}, lt, lc)
-
-	// Title
-	text_pos := position + {padding, padding}
-	draw_text(app.texts[text_id], text_pos, font_size, rl.RAYWHITE, max_width=size.x-2*padding)
-
-	// Description
-	text_pos += {0, line_pos+padding}
-	text_id = fmt.tprintf("description/%v", id)
-	draw_text(app.texts[text_id], text_pos, font_size, rl.BLACK, max_width=size.x-2*padding)
+	return
 }

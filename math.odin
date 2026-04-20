@@ -3,6 +3,7 @@ package game
 import "core:math"
 import "core:math/linalg"
 import "core:math/rand"
+import "core:slice"
 
 
 real :: f32
@@ -12,6 +13,16 @@ Vector3 :: [3]real
 Matrix3 :: matrix[3,3]real
 Matrix4 :: matrix[3,4]real // the last row is awlays 0,0,0,1, we don't need to store it
 Quaternion :: quaternion128
+
+contains :: proc(array: []$T1, value: $T2) -> bool {
+	for element in array {
+		if element == value do return true
+	}
+	return false
+}
+count :: proc(array: []$T1, value: $T2) -> i32 {
+	return i32(slice.count(array, value))
+}
 
 homogenous :: proc(v: Vector3) -> [4]real {
 	return [4]real{v[0], v[1], v[2], 1.0}
