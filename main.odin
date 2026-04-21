@@ -171,12 +171,12 @@ main :: proc() {
 		players = {
 			{
 				color=COLOR_PLAYERS[0], roll_multiplier=1,
-				cards={CardUpgrade_Antenna{}, CardUpgrade_Journalist{}, },
+				// cards={CardUpgrade_Antenna{}, CardUpgrade_Journalist{}, },
 				ghosts_max=10,
 			},
 			{
 				color=COLOR_PLAYERS[1], roll_multiplier=1,
-				cards={CardUpgrade_Journalist{}, CardUpgrade_Antenna{},},
+				// cards={CardUpgrade_Journalist{}, CardUpgrade_Antenna{},},
 				ghosts_max=10,
 			},
 		},
@@ -396,8 +396,8 @@ dices_reset :: proc(power:f32=1., first_round:bool=false) {
 	}
 
 	upgrades := [5]Cards{}
-	upgrades[0] = CardUpgrade_Antenna{}
-	upgrades[1] = CardUpgrade_Journalist{}
+	// upgrades[0] = CardUpgrade_Antenna{}
+	// upgrades[1] = CardUpgrade_Journalist{}
 
 	for &dice, d in app.dices {
 		half_size :f32= .75

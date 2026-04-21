@@ -272,7 +272,7 @@ draw_card :: proc(id: typeid, position: rl.Vector2, color:rl.Color={1, 1, 1, 0})
 	lt :f32= 4. // line_thickness
 	lc := rl.BLACK // color / 2 // line color
 	lc.a = color.a
-	rl.DrawRectangleV(position+{10, 10}, size, rl.BLACK)
+	// rl.DrawRectangleV(position+{10, 10}, size, rl.BLACK)
 	rl.DrawRectangleV(position, size, color)
 	rl.DrawRectangleV(position, {size.x, line_pos}, rl.BLACK)
 

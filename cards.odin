@@ -13,7 +13,7 @@ CombinationType :: enum {
 	DoublePair,
 	RollOfThree,
 	RollOfFour,
-	RoyalRoll,
+	RollRoyal,
 	FullHouse,
 	LowerStraight,
 	UpperStraight,
@@ -107,7 +107,7 @@ test_combination :: proc(combination: CombinationType, dices: [5]i32, highlight:
 	case .RollOfFour:
 		match = four
 		if !match do return
-		score = 30 // fixed score
+		score = 40 // fixed score
 		n_highlighted := 0 // Highlight only four dices
 		for count, i in counter {
 			if count < 4 do continue
@@ -119,10 +119,10 @@ test_combination :: proc(combination: CombinationType, dices: [5]i32, highlight:
 				}
 			}
 		}
-	case .RoyalRoll:
+	case .RollRoyal:
 		match = five
 		if !match do return
-		score = 50 // fixed score
+		score = 60 // fixed score
 		for number, j in dices {
 			highlight[j] = true
 		}
@@ -136,7 +136,7 @@ test_combination :: proc(combination: CombinationType, dices: [5]i32, highlight:
 	case .LowerStraight:
 		match = lower_straight
 		if !match do return
-		score = 40 // fixed score
+		score = 50 // fixed score
 		for number, j in dices {
 			if number >= 1 && number <= 5 {
 				highlight[j] = true
@@ -145,7 +145,7 @@ test_combination :: proc(combination: CombinationType, dices: [5]i32, highlight:
 	case .UpperStraight:
 		match = upper_straight
 		if !match do return
-		score = 40 // fixed score
+		score = 50 // fixed score
 		for number, j in dices {
 			if number >= 2 && number <= 6 {
 				highlight[j] = true
