@@ -41,6 +41,7 @@ Player :: struct {
 	cards: []Cards,
 	ghosts: [dynamic]i32,
 	ghosts_max: i32,
+	cycle: Cycle,
 }
 
 N_DICES :: 12
@@ -83,12 +84,13 @@ Opponent :: struct {
 
 GameState :: enum {
 	WAIT_FOR_ROLL,
-	GHOST_BOARD,
 	CHARGING,
 	ROLLING,
 	BATTLE,
 	SCORING,
 	SCORING_SUMMARY,	// only for the animations (all points are flying in)
+	WAIT_FOR_AI,
+	GHOST_BOARD,
 }
 
 GUI :: struct {
@@ -133,7 +135,6 @@ Application :: struct {
 	dices: [dynamic]Dice,
 	contacts: [dynamic]Contact,
 	opponent: Opponent,
-	cycle: Cycle,
 
 }
 app: Application
@@ -376,6 +377,8 @@ main :: proc() {
 				scoring(dt)
 			} else if app.state == .SCORING_SUMMARY {
 				scoring_summary(dt)
+			} else if app.state == .WAIT_FOR_AI {
+				wait_for_ai()
 			}
 		}
 
@@ -708,10 +711,60 @@ scoring_summary :: proc(dt: real) {
 		player.roll_kills = 0
 	}
 
-	app.state = .WAIT_FOR_ROLL
-	app.state_timer = 0
-
 	app.current_player = (app.current_player + 1) % N_PLAYERS
+
+	app.state = .WAIT_FOR_AI
+	app.state_timer = 0
+}
+
+wait_for_ai :: proc(){
+    // Some actions that the AI could do...
+    ai := &app.players[1]
+
+    if len(ai.ghosts) < 5 {
+		app.state = .WAIT_FOR_ROLL
+		app.state_timer = 0
+		return
+    }
+
+     // @TODO: how do we find the best selection of dices?
+    indices := [dynamic]i32{}
+    for i in 0..<len(ai.ghosts) do append(&indices, i32(i))
+    rand.shuffle(indices[:])
+    best_dices := [5]i32{}
+    for index, i in indices[:5] do best_dices[i] = ai.ghosts[index]
+
+    best_score := 0.
+    best_combo :CombinationType= .None
+    highlighted := [5]bool{}
+
+	for combo_type, c in CombinationType{
+		if combo_type == .None do continue
+
+		match, score := test_combination(combo_type, best_dices[:], &highlighted)
+		if match && score > best_score {
+			best_score = score
+			best_combo = combo_type
+		}
+	}
+
+	// Only use ghosts if we expect a high score or if we might lose our ghosts...
+	if best_score > 0. && (best_score > 20 || len(ai.ghosts) > 7){
+		ai.roll_score += best_score // @TODO: Add it to roll score
+		ghosts_copy := make([dynamic]i32, len(ai.ghosts), cap(ai.ghosts))
+		defer delete(ghosts_copy)
+		copy(ghosts_copy[:], ai.ghosts[:])
+		clear(&ai.ghosts)
+
+		for ghost, index in ghosts_copy{
+			if !contains(indices[:5], i32(index)) do append(&ai.ghosts, ghost)
+		}
+	}
+
+	delete(indices)
+
+    app.state = .WAIT_FOR_ROLL
+	app.state_timer = 0
 }
 
 draw :: proc(power: f32) {
@@ -798,7 +851,7 @@ draw :: proc(power: f32) {
 
 		draw_text(text, {position.x, position.y+50}, app.gui.font_size1, player.color)
 
-		if app.state == .SCORING || app.state == .SCORING_SUMMARY {
+		if app.state == .SCORING || app.state == .SCORING_SUMMARY || player.roll_score > 0. {
 
 			font_size := app.gui.font_size1
 			player_roll_score := (player.roll_score+player.roll_antennas)*player.roll_multiplier
@@ -835,12 +888,12 @@ draw :: proc(power: f32) {
 
 	if app.state == .CHARGING && app.current_player == 0 {
 		// Draw a power bar at the center of the screen
-		// width: f32 = 800.
-		// height: f32 = 80.
-		// x: i32 = (screen_width - width) / 2
-		// y: i32 = (screen_height - height) / 2
-		// rl.DrawRectangle(x, y, i32(power * width), i32(height), app.players[app.current_player].color)
-		// rl.DrawRectangleLines(x, y, i32(width), i32(height), rl.BLACK)
+		width: f32 = 800.
+		height: f32 = 80.
+		x := (f32(screen_width) - width) / 2.
+		y := (f32(screen_height) - height) / 2.
+		rl.DrawRectangleV({x, y}, {power * width, height}, app.players[0].color)
+		rl.DrawRectangleLinesEx({x, y, width, height}, 2., rl.BLACK)
 	}
 
 	if app.state == .GHOST_BOARD {
@@ -892,10 +945,13 @@ draw :: proc(power: f32) {
 		highest_score := 0.
 		// highest_combo := CombinationType_None
 		for combo_type, c in CombinationType{
+			if combo_type == .None do continue
+
 			position := board_position + rl.Vector2{20, 150 + f32(c)*app.gui.font_size2*1.6}
-			match, score := test_combination(combo_type, ghost_selected_numbers, &highlighted)
-			draw_text(fmt.tprintf("%v", combo_type), position, app.gui.font_size2, match ? rl.RAYWHITE : rl.GRAY)
-			if match && enough_ghosts {
+			match, score := test_combination(combo_type, ghost_selected_numbers[:], &highlighted)
+			already_scored := combo_type in player.cycle.scored_combinations
+			draw_text(fmt.tprintf("%v", combo_type), position, app.gui.font_size2, (match && !already_scored) ? rl.RAYWHITE : rl.GRAY, strikethrough=already_scored)
+			if !already_scored && match && enough_ghosts {
 				draw_text(fmt.tprintf("+%v", score), position+{600, 0}, app.gui.font_size2, rl.RAYWHITE)
 
 				for ghost_number, g in ghost_selected_numbers{
@@ -903,9 +959,11 @@ draw :: proc(power: f32) {
 				}
 
 				if button("Score", position+{700, 0}, color=player.color/2, active_color=player.color) {
-					fmt.println("Scored combo", combo_type, "for", score, "points!")
+					app.players[0].cycle.scored_combinations += {combo_type}
+					fmt.println("Scored combination", combo_type, "for", score, "points!")
+					fmt.println(app.players[0].cycle.scored_combinations)
 
-					app.players[0].total_score += score // @TODO: Add it to roll score
+					app.players[0].roll_score += score // @TODO: Add it to roll score
 					ghosts_copy := make([dynamic]i32, len(player.ghosts), cap(player.ghosts))
 					defer delete(ghosts_copy)
 					copy(ghosts_copy[:], player.ghosts[:])
@@ -914,14 +972,13 @@ draw :: proc(power: f32) {
 					for ghost, index in ghosts_copy{
 						if !contains(app.ghosts_selected[:], i32(index)) do append(&app.players[0].ghosts, ghost)
 					}
-					app.ghosts_selected = {-1, -1, -1, -1, -1}
+					app.ghosts_selected = {-1, -1, -1, -1, -1} // deselect everything
+				}
+				if match && score > highest_score {
+					highest_score = score
 				}
 			}
 			highlighted = {}
-			if match && score > highest_score {
-				highest_score = score
-				// highest_combo = combo_type
-			}
 		}
 
 		text := "There is no matching combination"

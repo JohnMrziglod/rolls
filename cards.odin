@@ -9,6 +9,7 @@ Cards :: union{
 }
 
 CombinationType :: enum {
+	None,
 	Pair,
 	DoublePair,
 	RollOfThree,
@@ -31,7 +32,8 @@ Combination :: struct {
 	n_cards: i32,
 }
 
-test_combination :: proc(combination: CombinationType, dices: [5]i32, highlight: ^[5]bool) -> (match:bool=false, score:f64=0) {
+test_combination :: proc(combination: CombinationType, dices: []i32, highlight: ^[5]bool) -> (match:bool=false, score:f64=0) {
+	if combination == .None do return
 
 	counter := [6]i32{}
 	for number, i in dices {

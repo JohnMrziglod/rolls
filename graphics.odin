@@ -181,11 +181,20 @@ measure_text :: proc(text: string, font_size: f32, spacing:f32=1.0) -> rl.Vector
 	return rl.Vector2{width, height}
 }
 
-draw_text :: proc(text: string, position: rl.Vector2, font_size: f32, color: rl.Color=rl.RAYWHITE, spacing:f32=1.0, max_width:f32=-1.){
+draw_text :: proc(text: string, position: rl.Vector2, font_size: f32, color: rl.Color=rl.RAYWHITE, spacing:f32=1.0, max_width:f32=-1., strikethrough:bool=false){
 	if max_width < 0. {
 		rl.DrawTextEx(app.font,
 			strings.clone_to_cstring(text, context.temp_allocator),
 			position, font_size, spacing, color)
+
+		text_size := measure_text(text, font_size)
+
+		if strikethrough {
+			rl.DrawLineEx(
+				position + rl.Vector2{0,  text_size.y / 2.},
+				position + rl.Vector2{text_size.x,  text_size.y / 2.},
+				font_size / 10., color)
+		}
 
 		return
 	}
