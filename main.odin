@@ -196,8 +196,8 @@ main :: proc() {
 		font_size2 = 30,
 		bg_color = COLOR_PLAYERS[app.current_player]/2,
 		score_positions = {
-			{50, f32(screen_height)-150},
-			{f32(screen_width)-50, f32(screen_height)-150},
+			{50, f32(screen_height)-200},
+			{f32(screen_width)-50, f32(screen_height)-200},
 		},
 		card_size = {400, 170},
 		hand_positions = {
@@ -205,8 +205,8 @@ main :: proc() {
 			{f32(screen_width)-450, 50},
 		},
 		ghost_positions = {
-			{50, f32(screen_height)-270},
-			{f32(screen_width)-50, f32(screen_height)-270},
+			{50, f32(screen_height)-320},
+			{f32(screen_width)-50, f32(screen_height)-320},
 		},
 	}
 	app.gui.hand_area_height = app.gui.score_positions[0].y - 100
@@ -580,6 +580,8 @@ dice_kills :: proc(killer, victim: ^Dice){
 	player := &app.players[victim.player]
 	if i32(len(player.ghosts)) >= player.ghosts_max do clear(&player.ghosts)
 	append(&player.ghosts, victim.current_number)
+	// Sort the ghost dices (makes other things easier later on also for the human player)
+	slice.sort(player.ghosts[:])
 
 	app.players[killer.player].roll_kills += 1
 }
@@ -623,9 +625,6 @@ battle :: proc(dt: real) {
 			}
 		}
 	}
-
-	// Sort the ghost dices (makes other things easier later on also for the human player)
-	for &player, p in app.players do slice.sort(player.ghosts[:])
 
 	// We move to the next app.state
 	app.state = .SCORING
@@ -736,8 +735,8 @@ wait_for_ai :: proc(){
     for ghost_number, i in ai.ghosts{
     	counter[ghost_number-1] += 1
     }
-    lower_straight := math.min(..counter[:5]) > 1
-    upper_straight := math.min(..counter[1:]) > 1
+    lower_straight := slice.min(counter[:5]) > 1
+    upper_straight := slice.min(counter[1:]) > 1
 
     best_indices := [dynamic]i32{}
     defer delete(best_indices)
@@ -863,19 +862,17 @@ draw :: proc(power: f32) {
 			clickable := app.state == .WAIT_FOR_ROLL && p == 0
 			if dice_button(ghost_number, position, ghost_size, player.color/2, active_color=player.color, clickable=clickable) {
 				app.state = .GHOST_BOARD
+				app.ghosts_selected[0] = i32(i)
 			}
 		}
 
 		text := fmt.tprintf("%v", player.total_score)
 		position := app.gui.score_positions[p]
 
-		width := measure_text(text, app.gui.font_size1).x
-		if p == 1{
-			// Shift the right player's score so it is always 100 pixels from the right side
-			position.x -= width
-		}
+		draw_text(text, {position.x, position.y+40}, app.gui.font_size1, player.color, anchor=(p == 1) ? .RIGHT : .LEFT)
 
-		draw_text(text, {position.x, position.y+50}, app.gui.font_size1, player.color)
+		text = (p == 0) ? "YOU" : "ANTAGONIST"
+		draw_text(text, {position.x, position.y+100}, app.gui.font_size2, player.color, anchor=(p == 1) ? .RIGHT : .LEFT, overline=true)
 
 		if app.state == .SCORING || app.state == .SCORING_SUMMARY || player.roll_score > 0. {
 
@@ -928,17 +925,26 @@ draw :: proc(power: f32) {
 		board_color := COLOR_PLAYERS[0]/2
 		board_color.a = 255
 		// rl.DrawRectangleV(board_position, board_size, app.gui.bg_color)
-		player := app.players[0]
+		player := &app.players[0]
 
 		draw_box(board_position, board_size, fill=board_color)
 
-		ghost_cols := 10 // @TODO: make this dynamic based on the max number of ghosts a player can have
+		ghost_cols :i32= 10 // @TODO: make this dynamic based on the max number of ghosts a player can have
 		ghost_size :f32= app.gui.font_size1 + 10
 		ghost_padding :f32= 5
-		for ghost_number, ghost_index in player.ghosts{
+		for i in 0..<player.ghosts_max {
+			ghost_index := i32(i)
 			row := ghost_index / ghost_cols
 			col := ghost_index % ghost_cols
 			position := board_position + {20, 60} + (ghost_size+ghost_padding)*rl.Vector2{f32(col), f32(row)}
+
+			if ghost_index >= i32(len(player.ghosts)) {
+				thickness :f32= 2
+				draw_box(position+{0, 2}, {ghost_size, ghost_size-2}-thickness, fill=board_color/2, thickness=thickness)
+				continue
+			}
+
+			ghost_number := player.ghosts[ghost_index]
 			active := contains(app.ghosts_selected[:], i32(ghost_index))
 
 			if dice_button(ghost_number, position, ghost_size, player.color/2, active_color=player.color, active=active, clickable=true) {
@@ -956,7 +962,6 @@ draw :: proc(power: f32) {
 				if free_index != -1 {
 					app.ghosts_selected[free_index] = i32(ghost_index)
 				}
-
 			}
 		}
 		highlighted := [5]bool{}
@@ -998,7 +1003,7 @@ draw :: proc(power: f32) {
 					for ghost, index in ghosts_copy{
 						if !contains(app.ghosts_selected[:], i32(index)) do append(&app.players[0].ghosts, ghost)
 					}
-					app.ghosts_selected = {-1, -1, -1, -1, -1} // deselect everything
+					app.ghosts_selected = {}-1 // deselect everything
 				}
 				if match && score > highest_score {
 					highest_score = score
@@ -1016,7 +1021,7 @@ draw :: proc(power: f32) {
 			text = fmt.tprintf("Your best combination is worth %v points", highest_score)
 		}
 		draw_text(text, board_position + rl.Vector2{20, 20}, app.gui.font_size2, rl.RAYWHITE)
-		if button("X", board_position + rl.Vector2{board_size.x - 50, 20}, app.gui.font_size2) {
+		if button("ESC", board_position + rl.Vector2{board_size.x - 80, 20}, app.gui.font_size2) {
 			app.state = .WAIT_FOR_ROLL
 			app.state_timer = 0.
 			app.ghosts_selected = {-1, -1, -1, -1, -1}
