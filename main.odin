@@ -8,6 +8,7 @@ import "core:math/linalg"
 import "core:os"
 import "core:reflect"
 import vmem "core:mem/virtual"
+import "core:slice"
 import "core:strings"
 import rl "vendor:raylib"
 
@@ -623,6 +624,9 @@ battle :: proc(dt: real) {
 		}
 	}
 
+	// Sort the ghost dices (makes other things easier later on also for the human player)
+	for &player, p in app.players do slice.sort(player.ghosts[:])
+
 	// We move to the next app.state
 	app.state = .SCORING
 	app.state_timer = 0.0
@@ -727,12 +731,35 @@ wait_for_ai :: proc(){
 		return
     }
 
-     // @TODO: how do we find the best selection of dices?
-    indices := [dynamic]i32{}
-    for i in 0..<len(ai.ghosts) do append(&indices, i32(i))
-    rand.shuffle(indices[:])
-    best_dices := [5]i32{}
-    for index, i in indices[:5] do best_dices[i] = ai.ghosts[index]
+    // @TODO: how do we find the best selection of dices?
+    counter := [6]i32{}	// dice number -> count
+    for ghost_number, i in ai.ghosts{
+    	counter[ghost_number-1] += 1
+    }
+    lower_straight := math.min(..counter[:5]) > 1
+    upper_straight := math.min(..counter[1:]) > 1
+
+    best_indices := [dynamic]i32{}
+    defer delete(best_indices)
+
+    if lower_straight || upper_straight {
+		// If we have a straight, we want to keep all the numbers that are part
+		// of the straight and get rid of the others
+		last_number :i32= 0
+		for ghost_number, i in ai.ghosts{
+			if ghost_number > last_number {
+				append(&best_indices, i32(i))
+				last_number = ghost_number
+			}
+		}
+    } else {
+    	// Choose random dices...
+	    for i in 0..<len(ai.ghosts) do append(&best_indices, i32(i))
+	    rand.shuffle(best_indices[:])
+    }
+
+    best_numbers := [5]i32{}
+    for index, i in best_indices[:5] do best_numbers[i] = ai.ghosts[index]
 
     best_score := 0.
     best_combo :CombinationType= .None
@@ -741,7 +768,7 @@ wait_for_ai :: proc(){
 	for combo_type, c in CombinationType{
 		if combo_type == .None do continue
 
-		match, score := test_combination(combo_type, best_dices[:], &highlighted)
+		match, score := test_combination(combo_type, best_numbers[:], &highlighted)
 		if match && score > best_score {
 			best_score = score
 			best_combo = combo_type
@@ -757,11 +784,10 @@ wait_for_ai :: proc(){
 		clear(&ai.ghosts)
 
 		for ghost, index in ghosts_copy{
-			if !contains(indices[:5], i32(index)) do append(&ai.ghosts, ghost)
+			if !contains(best_indices[:5], i32(index)) do append(&ai.ghosts, ghost)
 		}
 	}
 
-	delete(indices)
 
     app.state = .WAIT_FOR_ROLL
 	app.state_timer = 0
@@ -826,7 +852,7 @@ draw :: proc(power: f32) {
 
 		ghost_cols := 5 // @TODO: make this dynamic based on the max number of ghosts a player can have
 		ghost_size :f32= app.gui.font_size1
-		ghost_padding :f32= 2
+		ghost_padding :f32= 4
 		for ghost_number, i in player.ghosts{
 			row := i / ghost_cols
 			col := i % ghost_cols
@@ -907,8 +933,8 @@ draw :: proc(power: f32) {
 		draw_box(board_position, board_size, fill=board_color)
 
 		ghost_cols := 10 // @TODO: make this dynamic based on the max number of ghosts a player can have
-		ghost_size :f32= app.gui.font_size1
-		ghost_padding :f32= 2
+		ghost_size :f32= app.gui.font_size1 + 10
+		ghost_padding :f32= 5
 		for ghost_number, ghost_index in player.ghosts{
 			row := ghost_index / ghost_cols
 			col := ghost_index % ghost_cols
@@ -983,12 +1009,17 @@ draw :: proc(power: f32) {
 
 		text := "There is no matching combination"
 		if len(player.ghosts) < 5 {
-			text = "You need at least 5 ghost dices to score combinations"
+			text = fmt.tprint("Wait for at least 5 ghost dices to score combinations")
 		} else if contains(app.ghosts_selected[:], i32(-1)) {
-			text = fmt.tprintf("Select %v ghost dices to score combinations", count(app.ghosts_selected[:], i32(-1)))
+			text = fmt.tprintf("Select %v more ghost dices to score combinations", count(app.ghosts_selected[:], i32(-1)))
 		} else if highest_score > 0 {
 			text = fmt.tprintf("Your best combination is worth %v points", highest_score)
 		}
 		draw_text(text, board_position + rl.Vector2{20, 20}, app.gui.font_size2, rl.RAYWHITE)
+		if button("X", board_position + rl.Vector2{board_size.x - 50, 20}, app.gui.font_size2) {
+			app.state = .WAIT_FOR_ROLL
+			app.state_timer = 0.
+			app.ghosts_selected = {-1, -1, -1, -1, -1}
+		}
 	}
 }
