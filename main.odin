@@ -16,33 +16,16 @@ sco :: f64
 
 AREA_SIZE :: 30.0
 // COLOR_BACKGROUND := rl.Color{203, 161, 53, 255}
-CARD_TYPE :: enum {ROLL, UPGRADE, CYCLE}
-COLOR_CARDS := [CARD_TYPE]rl.Color{
+COLOR_CARDS := [CardCategory]rl.Color{
+	.NONE=rl.BLACK,
 	.ROLL=rl.Color{200, 224, 193, 255},
-	.UPGRADE=rl.Color{245, 105, 96, 255},
+	.DICE=rl.Color{245, 105, 96, 255},
 	.CYCLE=rl.Color{106, 168, 168, 255},
 }
 COLOR_TABLE := rl.Color{196, 109, 94, 255}
 COLOR_PLAYERS := [2]rl.Color{
 	rl.Color{243, 201, 139, 255},
 	rl.Color{156, 246, 246, 255},
-}
-
-
-N_PLAYERS :: 2
-Player :: struct {
-	color: rl.Color,
-	total_score: sco,
-	roll_score: sco,
-	roll_multiplier: sco,
-	roll_antennas: sco,
-	roll_kills: i32,
-	is_scoring: bool,
-
-	cards: []Cards,
-	ghosts: [dynamic]i32,
-	ghosts_max: i32,
-	cycle: Cycle,
 }
 
 N_DICES :: 12
@@ -55,7 +38,7 @@ Dice :: struct {
 	current_number: i32, // which number is shown on top face
 	current_score: sco,
 	already_scored: bool,
-	upgrades: [5]Cards,
+	upgrades: [5]Card,
 	attack: sco,
 	health: sco,
 }
@@ -92,6 +75,8 @@ GameState :: enum {
 	SCORING_SUMMARY,	// only for the animations (all points are flying in)
 	WAIT_FOR_AI,
 	GHOST_BOARD,
+	CARDS_OFFER,
+	CARD_ASSIGN,
 }
 
 GUI :: struct {
@@ -105,6 +90,22 @@ GUI :: struct {
 	width: f32,
 	height: f32,
 	bg_color: rl.Color,
+}
+
+N_PLAYERS :: 2
+Player :: struct {
+	color: rl.Color,
+	total_score: sco,
+	roll_score: sco,
+	roll_multiplier: sco,
+	roll_antennas: sco,
+	roll_kills: i32,
+	is_scoring: bool,
+
+	cards: [dynamic]Card,
+	ghosts: [dynamic]i32,
+	ghosts_max: i32,
+	cycle: Cycle,
 }
 
 Cycle :: struct {
@@ -136,9 +137,20 @@ Application :: struct {
 	dices: [dynamic]Dice,
 	contacts: [dynamic]Contact,
 	opponent: Opponent,
-
+	cards_offer: [5]Card, // Up to five cards can be selected
 }
 app: Application
+
+cards_offer :: proc(n_cards: i32,  end_of_cycle:bool=false){
+	app.cards_offer = {}
+	for i in 0..<n_cards {
+		lower_bound := end_of_cycle ? i32(CardType.CardDices)+1 : i32(CardType.CardNone)+1
+		upper_bound := end_of_cycle ? i32(CardType.CardCycles) : i32(CardType.CardDices)
+		card_type := CardType(rand.int32_range(lower_bound, upper_bound))
+		if card_type == .CardRolls do card_type = CardType(i32(card_type)-1)
+		app.cards_offer[i] = Card{type=card_type}
+	}
+}
 
 main :: proc() {
 	// Initialize window
@@ -173,12 +185,10 @@ main :: proc() {
 		players = {
 			{
 				color=COLOR_PLAYERS[0], roll_multiplier=1,
-				// cards={CardUpgrade_Antenna{}, CardUpgrade_Journalist{}, },
 				ghosts_max=10,
 			},
 			{
 				color=COLOR_PLAYERS[1], roll_multiplier=1,
-				// cards={CardUpgrade_Journalist{}, CardUpgrade_Antenna{},},
 				ghosts_max=10,
 			},
 		},
@@ -194,12 +204,12 @@ main :: proc() {
 		height = f32(screen_height),
 		font_size1 = 50,
 		font_size2 = 30,
-		bg_color = COLOR_PLAYERS[app.current_player]/2,
+		bg_color = COLOR_PLAYERS[(app.current_player+1)%N_PLAYERS]/2,
 		score_positions = {
 			{50, f32(screen_height)-200},
 			{f32(screen_width)-50, f32(screen_height)-200},
 		},
-		card_size = {400, 170},
+		card_size = {500, 200},
 		hand_positions = {
 			{50, 50},
 			{f32(screen_width)-450, 50},
@@ -315,7 +325,7 @@ main :: proc() {
 		power := f32(math.min(1.0, app.state_timer / 0.25))
 
 		if app.state == .CHARGING &&
-			((app.current_player == 0 && rl.IsKeyReleased(rl.KeyboardKey.SPACE)) ||
+			((app.current_player == 0 && (rl.IsKeyReleased(rl.KeyboardKey.SPACE) || rl.IsMouseButtonReleased(.LEFT))) ||
 			(app.current_player == 1 && power >= 1.0)) {
 				dices_reset(power=power)
 				app.state_timer = 0.0
@@ -399,10 +409,6 @@ dices_reset :: proc(power:f32=1., first_round:bool=false) {
 		}
 	}
 
-	upgrades := [5]Cards{}
-	// upgrades[0] = CardUpgrade_Antenna{}
-	// upgrades[1] = CardUpgrade_Journalist{}
-
 	for &dice, d in app.dices {
 		half_size :f32= .75
 		mass := math.pow(half_size, 3) * 8.
@@ -441,7 +447,7 @@ dices_reset :: proc(power:f32=1., first_round:bool=false) {
 				current_score=0,
 				attack=1,
 				health=1,
-				upgrades=upgrades
+				upgrades=dice.upgrades
 			}
 		}
 		body_set_awake(&dice)
@@ -656,8 +662,8 @@ scoring :: proc(dt: real) {
 
 			// Apply dice card effects
 			for upgrade, i in dice.upgrades{
-				#partial switch u in upgrade {
-				case CardUpgrade_Antenna:
+				#partial switch upgrade.type {
+				case .CardDice_Antenna:
 					if player.roll_antennas == 0 {
 						player.roll_antennas = dice.current_score
 					} else {
@@ -667,7 +673,7 @@ scoring :: proc(dt: real) {
 					dice.current_score = 0
 				}
 
-				if upgrade == nil do continue
+				if upgrade.type == .CardNone do continue
 
 				position := dice.position - f32(i) * Vector3{0, 2, 0}
 				title_id := fmt.tprintf("title/%v", reflect.union_variant_type_info(upgrade))
@@ -798,7 +804,8 @@ draw :: proc(power: f32) {
 
 	if app.state == .WAIT_FOR_ROLL{
 		ratio := app.state_timer / 3.
-		color1, color2 := COLOR_PLAYERS[app.current_player], COLOR_PLAYERS[(app.current_player+1)%N_PLAYERS]
+		color1 := COLOR_PLAYERS[app.current_player]
+		color2 := COLOR_PLAYERS[(app.current_player+1)%N_PLAYERS]
 		app.gui.bg_color = rl.ColorLerp(color2/2, color1/2, ratio)
 	}
 	rl.ClearBackground(app.gui.bg_color)
@@ -846,7 +853,7 @@ draw :: proc(power: f32) {
 			} else {
 				position += {0, f32(c)*(30+app.gui.card_size.y)}
 			}
-			draw_card(reflect.union_variant_typeid(card), position)
+			draw_card(card.type, position)
 		}
 
 		ghost_cols := 5 // @TODO: make this dynamic based on the max number of ghosts a player can have
@@ -989,7 +996,7 @@ draw :: proc(power: f32) {
 					dice_button(ghost_number, position+{300+f32(g)*(ghost_size2+5), -7}, ghost_size2, player.color/2, active_color=player.color, active=highlighted[g], clickable=false)
 				}
 
-				if button("Score", position+{700, 0}, color=player.color/2, active_color=player.color) {
+				if button("Score", position+{700, 0}) {
 					app.players[0].cycle.scored_combinations += {combo_type}
 					fmt.println("Scored combination", combo_type, "for", score, "points!")
 					fmt.println(app.players[0].cycle.scored_combinations)
@@ -1004,6 +1011,9 @@ draw :: proc(power: f32) {
 						if !contains(app.ghosts_selected[:], i32(index)) do append(&app.players[0].ghosts, ghost)
 					}
 					app.ghosts_selected = {}-1 // deselect everything
+					cards_offer(3, )
+					app.state = .CARDS_OFFER
+					app.state_timer = 0.
 				}
 				if match && score > highest_score {
 					highest_score = score
@@ -1027,4 +1037,46 @@ draw :: proc(power: f32) {
 			app.ghosts_selected = {-1, -1, -1, -1, -1}
 		}
 	}
+
+	// if app.state == .WAIT_FOR_AI {
+	// 	text := "The antagonist is thinking..."
+	// 	draw_text(text, {screen_width/2. - measure_text(text, app.gui.font_size1).x/2., screen_height/2.}, app.gui.font_size1, rl.RAYWHITE)
+	// }
+	if app.state == .WAIT_FOR_ROLL {
+		// A button named "ROLL!" in the bottom, lower part of the screen
+		text := "Press <SPACE> to continue" //app.current_player == 0 ? "ROLL!" : "ANTAGONIST ROLLS"
+		if button(text, {screen_width/2., screen_height - 150}, size={300, 80}, font_size=app.gui.font_size1,
+				color=app.gui.bg_color, anchor=.CENTER) {
+			app.state = .CHARGING
+			app.state_timer = 0.
+		}
+	}
+
+	if app.state == .CARDS_OFFER {
+		text := "Choose one of these cards:"
+		draw_text(text, rl.Vector2{app.gui.width/2., 200}, app.gui.font_size1, rl.RAYWHITE, anchor=.CENTER)
+
+		for card, c in app.cards_offer{
+			if card.type == .CardNone do continue
+
+			position := rl.Vector2{(app.gui.width-app.gui.card_size.x)/2., 300}
+			position += {0, f32(c)*(30+app.gui.card_size.y)}
+			action := draw_card(card.type, position, actions={"ASSIGN", "KEEP"})
+			if action == 0 {
+				state_switch(.CARD_ASSIGN)
+			} else if action == 1{
+				append(&app.players[0].cards, card)
+				state_switch(.GHOST_BOARD)
+			}
+		}
+	}
+
+	if app.state == .CARD_ASSIGN {
+
+	}
+}
+
+state_switch :: proc(new_state: GameState) {
+	app.state = new_state
+	app.state_timer = 0.
 }

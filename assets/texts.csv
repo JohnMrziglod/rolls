@@ -1,18 +1,22 @@
-title/CardUpgrade_Antenna|ANTENNA
-description/CardUpgrade_Antenna|Multiply dice's score with other dices with antenna.
-title/CardUpgrade_Enforcer|ENFORCER #%v
-description/CardUpgrade_Enforcer|Replace one arbitrary side of this dice with a #%v.
-title/CardUpgrade_Journalist|JOURNALIST
-description/CardUpgrade_Journalist|X2 your roll score.
-title/CardUpgrade_General|GENERAL
-description/CardUpgrade_General|Create a roll card if it survives.
-title/CardUpgrade_PowerDice|POWER DICE
-description/CardUpgrade_PowerDice|Multiply dice's score with its own score again.
-title/CardUpgrade_ShortSighted|SHORT-SIGHTED
-description/CardUpgrade_ShortSighted|Attacks farthest opponent's dice regardless of its number.
-title/CardUpgrade_Blind|BLIND
-description/CardUpgrade_Blind|Attacks closest opponent's dice regardless of its number.
-title/CardUpgrade_Historian|HISTORIAN
-description/CardUpgrade_Historian|Gains +0.1 score for each used roll card.
-title/CardUpgrade_Librarian|LIBRARIAN
-description/CardUpgrade_Librarian|Gains +0.1 score for each used dice card.
+title/CardRoll_HappyHour|HAPPY HOUR
+description/CardRoll_HappyHour|X3 your roll score
+title/CardDice_Antenna|ANTENNA DICE
+description/CardDice_Antenna|Multiply dice's score with other dices with antenna.
+title/CardDice_Enforcer|ENFORCER #%v
+description/CardDice_Enforcer|Replace one arbitrary side of this dice with a #%v.
+title/CardDice_Journalist|JOURNALIST DICE
+description/CardDice_Journalist|X2 your roll score.
+title/CardDice_General|GENERAL DICE
+description/CardDice_General|Create a roll card if it survives.
+title/CardDice_PowerDice|POWER DICE
+description/CardDice_PowerDice|Multiply dice's score with its own score again.
+title/CardDice_ShortSighted|SHORT-SIGHTED DICE
+description/CardDice_ShortSighted|Attacks farthest antagonist's dice regardless of its number.
+title/CardDice_Blind|BLIND DICE
+description/CardDice_Blind|Attacks closest antagonist's dice regardless of its number.
+title/CardDice_Historian|HISTORIAN DICE
+description/CardDice_Historian|Gains +0.1 score for each used roll card.
+title/CardDice_Librarian|LIBRARIAN DICE
+description/CardDice_Librarian|Gains +0.1 score for each used upgrade card.
+title/CardCycle_ExtraDice|EXTRA DICE
+description/CardCycle_ExtraDice|Add +1 Dice to your army.

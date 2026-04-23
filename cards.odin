@@ -1,14 +1,39 @@
 package game
 
-CardUpgrade_Antenna :: struct {}
-CardUpgrade_Journalist :: struct {}
+import "core:math"
+import "core:slice"
 
-Cards :: union{
-	CardUpgrade_Antenna,
-	CardUpgrade_Journalist,
+CardCategory :: enum {NONE, ROLL, DICE, CYCLE}
+CardType :: enum i32{
+		CardNone,
+	CardRoll_HappyHour,
+		CardRolls,				// <- Until here we got roll cards
+	CardDice_Antenna,
+	CardDice_Journalist,
+	CardDice_General,
+	CardDice_PowerDice,
+	CardDice_ShortSighted,
+	CardDice_Blind,
+	CardDice_Historian,
+	CardDice_Librarian,
+		CardDices,				// <- Until we got upgrade cards
+	CardCycle_ExtraDice,
+		CardCycles,				// <- Until we got cycle cards
+}
+Card :: struct{
+	type: CardType,
+	var1: f64,				// One can use these variables as they want...
+	var2: f64,
 }
 
-CombinationType :: enum {
+card_category :: proc(type: CardType) -> CardCategory{
+	if type > .CardNone && type < .CardRolls do return .ROLL
+	if type > .CardRolls && type < .CardDices do return .DICE
+	if type > .CardDices && type < .CardCycles do return .CYCLE
+	return .NONE // Invalid card type, return default category
+}
+
+CombinationType :: enum u8 {
 	None,
 	Pair,
 	DoublePair,
@@ -153,7 +178,21 @@ test_combination :: proc(combination: CombinationType, dices: []i32, highlight: 
 				highlight[j] = true
 			}
 		}
+	case .AllTogether:
+		match = true
+		if !match do return
+		score = f64(math.sum(dices[:]))
+		for number, j in dices do highlight[j] = true
+	case .OnlyOnes, .OnlyTwos, .OnlyThrees, .OnlyFours, .OnlyFives, .OnlySixes:
+		target_number := i32(combination) - i32(CombinationType.OnlyOnes) + 1
+		match = counter[target_number-1] > 0
+		if !match do return
+		score = f64(counter[target_number-1] * target_number)
+		for number, j in dices {
+			if number == target_number do highlight[j] = true
+		}
 	}
+
 
 	return
 }

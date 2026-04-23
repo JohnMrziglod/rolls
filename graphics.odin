@@ -8,25 +8,39 @@ import "core:strings"
 import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
 
+TextAnchor :: enum {
+	LEFT,
+	RIGHT,
+	CENTER,
+}
+
 button :: proc(text: string, position: rl.Vector2, size:rl.Vector2={1, 1}, color:rl.Color=rl.BLACK, active_color:rl.Color=rl.BLANK,
-		font_size:f32=30, clickable:bool=true) -> bool{
-	position := position
-	text_size := measure_text(text, font_size)
+		font_size:f32=30, clickable:bool=true, padding:f32=10., anchor:TextAnchor=.LEFT, hover_motion:bool=true) -> bool{
+	text_size := measure_text(text, font_size) + padding
+
 	// highlight it if the mouse is hovering over it
 	box := rl.Rectangle{
 		x = position.x,
 		y = position.y,
-		width = math.max(size.x, text_size.x + 4), // make sure the button is wide enough to fit the text
-		height = math.max(size.y, text_size.y + 4),
+		width = math.max(size.x, text_size.x), // make sure the button is wide enough to fit the text
+		height = math.max(size.y, text_size.y),
 	}
+
+	if anchor == .RIGHT do box.x -= box.width
+	if anchor == .CENTER do box.x -= box.width / 2.
+
 	hovered := clickable && rl.CheckCollisionPointRec(rl.GetMousePosition(), box)
-	if hovered do position.y += math.sin(f32(rl.GetTime())*10)*5	// make the button float up and down a bit
+	if hovered && hover_motion do box.y += math.sin(f32(rl.GetTime())*10)*5	// make the button float up and down a bit
 
 	active_color := active_color == rl.BLANK ? rl.ColorBrightness(color, 1.2) : active_color
 
-	text_position := position + {box.width-text_size.x, 0} / 2.
-	draw_box(position-{0, box.height-text_size.y}/2., {box.width, box.height}, rl.BLACK, thickness=2.)
+	position := rl.Vector2{box.x, box.y}
+	draw_box(position-{0, box.height-text_size.y}/2., {box.width, box.height}, color, thickness=0.)
+	text_position := position + {box.width-text_size.x, 0} / 2. + padding/2.
+	// Debug box for text position
+	// rl.DrawRectangleV(text_position, text_size, rl.RED)
 	draw_text(text, text_position, font_size, rl.WHITE)
+
 
 	return hovered && rl.IsMouseButtonPressed(.LEFT)
 }
@@ -163,28 +177,26 @@ measure_text :: proc(text: string, font_size: f32, spacing:f32=1.0) -> rl.Vector
 
 	for r in text{
 		if r == '\n' {
-			height += 1.5 * f32(font.baseSize) * scale_factor
+			height += 1.5 * f32(font_size)
 			width = 0.
 			continue
 		}
 
 		glyph_index := rl.GetGlyphIndex(font, r)
-		if font.glyphs[glyph_index].advanceX == 0 {
-			width += f32(font.recs[glyph_index].width) * scale_factor
+		glyph := font.glyphs[glyph_index]
+		rec := font.recs[glyph_index]
+		if glyph.advanceX == 0 {
+			width += f32(rec.width) * scale_factor
 		} else {
-			width += f32(font.glyphs[glyph_index].advanceX) * scale_factor
+			width += f32(glyph.advanceX) * scale_factor
 		}
 		width += spacing
-		height = math.max(height, f32(font.baseSize) * scale_factor)
+		height = math.max(height, f32(glyph.offsetY) + rec.height*scale_factor)
 	}
 
 	return rl.Vector2{width, height}
 }
 
-TextAnchor :: enum {
-	LEFT,
-	RIGHT,
-}
 draw_text :: proc(text: string, position: rl.Vector2, font_size: f32,
 		color: rl.Color=rl.RAYWHITE, spacing:f32=1.0, max_width:f32=-1.,
 		strikethrough:bool=false, overline:bool=false,
@@ -192,6 +204,7 @@ draw_text :: proc(text: string, position: rl.Vector2, font_size: f32,
 
 	position := position
 	if anchor == .RIGHT do position.x -= measure_text(text, font_size).x
+	if anchor == .CENTER do position.x -= measure_text(text, font_size).x / 2.
 
 	if max_width < 0. {
 		rl.DrawTextEx(app.font,
@@ -279,27 +292,36 @@ draw_box :: proc(position: rl.Vector2, size: rl.Vector2,
 		{position.x-thickness, position.y-thickness, size.x+2*thickness, size.y+2*thickness}, thickness, outline)
 }
 
-draw_card :: proc(id: typeid, position: rl.Vector2, color:rl.Color={1, 1, 1, 0}) {
-	text_id := fmt.tprintf("title/%v", id)
+color_brighten :: proc(color: rl.Color, factor: f32) -> rl.Color {
+	return rl.Color{
+		u8(math.min(f32(color.r) * factor, 255)),
+		u8(math.min(f32(color.g) * factor, 255)),
+		u8(math.min(f32(color.b) * factor, 255)),
+		color.a,
+	}
+}
+
+draw_card :: proc(id: CardType, position: rl.Vector2, color:rl.Color=rl.BLANK, actions:[]string={}) -> i32{
+	size := app.gui.card_size
+	hovered := rl.CheckCollisionPointRec(rl.GetMousePosition(), {x=position.x, y=position.y, width=f32(size.x), height=f32(size.y)})
+
 	color := color
-	if color == {1, 1, 1, 0} {
-		if strings.contains(text_id, "CardUpgrade") {
-			color = COLOR_CARDS[.UPGRADE]
-		} else if strings.contains(text_id, "CardRoll") {
-			color = COLOR_CARDS[.ROLL]
-		} else {
-			color = COLOR_CARDS[.CYCLE]
-		}
+	category := card_category(id)
+	if color == rl.BLANK do color = COLOR_CARDS[category]
+
+	position := position
+	if hovered {
+		color = rl.ColorBrightness(color, math.sin(f32(rl.GetTime())*2)/5.+0.3)
+		position.y += -10. //math.sin(f32(rl.GetTime())*10)*5	// make the button float up and down a bit
 	}
 
 	font_size :f32= app.gui.font_size2
-	size := app.gui.card_size
 	padding :f32= 10
 	line_pos := font_size+2*padding
 	lt :f32= 4. // line_thickness
 	lc := rl.BLACK // color / 2 // line color
 	lc.a = color.a
-	// rl.DrawRectangleV(position+{10, 10}, size, rl.BLACK)
+
 	rl.DrawRectangleV(position, size, color)
 	rl.DrawRectangleV(position, {size.x, line_pos}, rl.BLACK)
 
@@ -308,10 +330,22 @@ draw_card :: proc(id: typeid, position: rl.Vector2, color:rl.Color={1, 1, 1, 0})
 
 	// Title
 	text_pos := position + {padding, padding}
+	text_id := fmt.tprintf("title/%v", id)
 	draw_text(app.texts[text_id], text_pos, font_size, rl.RAYWHITE, max_width=size.x-2*padding)
 
 	// Description
 	text_pos += {0, line_pos+padding}
 	text_id = fmt.tprintf("description/%v", id)
 	draw_text(app.texts[text_id], text_pos, font_size, rl.BLACK, max_width=size.x-2*padding)
+
+	if hovered {
+		button_pos := position + size + {-10, -35}
+		for action, i in actions {
+			if button(action, button_pos, font_size=20, anchor=.RIGHT) do return i32(i)
+			button_pos += {-130, 0}
+		}
+		// if button("ASSIGN", button_pos+{-10, 0}, font_size=20, anchor=.RIGHT) do return 1
+	}
+
+	return -1
 }
