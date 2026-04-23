@@ -936,7 +936,7 @@ draw :: proc(power: f32) {
 			ghost_index := i32(i)
 			row := ghost_index / ghost_cols
 			col := ghost_index % ghost_cols
-			position := board_position + {20, 60} + (ghost_size+ghost_padding)*rl.Vector2{f32(col), f32(row)}
+			position := board_position + {20, 70} + (ghost_size+ghost_padding)*rl.Vector2{f32(col), f32(row)}
 
 			if ghost_index >= i32(len(player.ghosts)) {
 				thickness :f32= 2
