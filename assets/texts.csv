@@ -1,22 +1,22 @@
 title/CardRoll_HappyHour|HAPPY HOUR
 description/CardRoll_HappyHour|X3 your roll score
-title/CardDice_Antenna|ANTENNA DICE
+title/CardDice_Antenna|ANTENNA
 description/CardDice_Antenna|Multiply dice's score with other dices with antenna.
 title/CardDice_Enforcer|ENFORCER #%v
 description/CardDice_Enforcer|Replace one arbitrary side of this dice with a #%v.
-title/CardDice_Journalist|JOURNALIST DICE
+title/CardDice_Journalist|JOURNALIST
 description/CardDice_Journalist|X2 your roll score.
-title/CardDice_General|GENERAL DICE
-description/CardDice_General|Create a roll card if it survives.
+title/CardDice_General|GENERAL
+description/CardDice_General|Create a roll card if it survives and shows a 6.
 title/CardDice_PowerDice|POWER DICE
 description/CardDice_PowerDice|Multiply dice's score with its own score again.
-title/CardDice_ShortSighted|SHORT-SIGHTED DICE
+title/CardDice_ShortSighted|SHORT-SIGHTED
 description/CardDice_ShortSighted|Attacks farthest antagonist's dice regardless of its number.
-title/CardDice_Blind|BLIND DICE
+title/CardDice_Blind|BLIND
 description/CardDice_Blind|Attacks closest antagonist's dice regardless of its number.
-title/CardDice_Historian|HISTORIAN DICE
+title/CardDice_Historian|HISTORIAN
 description/CardDice_Historian|Gains +0.1 score for each used roll card.
-title/CardDice_Librarian|LIBRARIAN DICE
-description/CardDice_Librarian|Gains +0.1 score for each used upgrade card.
+title/CardDice_Librarian|LIBRARIAN
+description/CardDice_Librarian|Gains +0.1 score for each used dice card.
 title/CardCycle_ExtraDice|EXTRA DICE
 description/CardCycle_ExtraDice|Add +1 Dice to your army.

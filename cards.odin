@@ -1,7 +1,7 @@
 package game
 
 import "core:math"
-import "core:slice"
+import rl "vendor:raylib"
 
 CardCategory :: enum {NONE, ROLL, DICE, CYCLE}
 CardType :: enum i32{
@@ -22,8 +22,13 @@ CardType :: enum i32{
 }
 Card :: struct{
 	type: CardType,
+	category: CardCategory,
 	var1: f64,				// One can use these variables as they want...
 	var2: f64,
+	already_scored: bool,
+	active: bool,
+	active_since: i32,	// Number of rolls since activation, used for cards that have a duration
+	triggered: f32,		// How long it should be displayed as triggered in seconds
 }
 
 card_category :: proc(type: CardType) -> CardCategory{
@@ -31,6 +36,31 @@ card_category :: proc(type: CardType) -> CardCategory{
 	if type > .CardRolls && type < .CardDices do return .DICE
 	if type > .CardDices && type < .CardCycles do return .CYCLE
 	return .NONE // Invalid card type, return default category
+}
+
+card_discard :: proc(player: ^Player, index: i32, silent:bool=false){
+	if index < 0 || index >= i32(len(player.cards)) do return // Invalid index, do nothing
+	ordered_remove(&player.cards, index)
+
+	sound := app.sounds[11]
+	rl.SetSoundVolume(sound, 1.)
+	rl.PlaySound(sound)
+}
+
+card_activate :: proc(card: ^Card){
+	card.active = true
+	card.triggered = 1.0
+
+	sound := app.sounds[10]
+	rl.SetSoundVolume(sound, 1.)
+	rl.PlaySound(sound)
+}
+
+card_in_hand :: proc(player: Player, card_type: CardType, start_index:i32=0, only_active:=false) -> Card{
+	for i in start_index..<i32(len(player.cards)) {
+		if player.cards[i].type == card_type && (!only_active || player.cards[i].active) do return player.cards[i]
+	}
+	return Card{} // Return default card if not found
 }
 
 CombinationType :: enum u8 {

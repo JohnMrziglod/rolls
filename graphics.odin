@@ -42,7 +42,15 @@ button :: proc(text: string, position: rl.Vector2, size:rl.Vector2={1, 1}, color
 	draw_text(text, text_position, font_size, rl.WHITE)
 
 
-	return hovered && rl.IsMouseButtonPressed(.LEFT)
+	clicked := hovered && rl.IsMouseButtonPressed(.LEFT)
+
+	if clicked {
+		sound := app.sounds[12]
+		rl.SetSoundVolume(sound, 1.)
+		rl.PlaySound(sound)
+	}
+
+	return clicked
 }
 
 dice_button :: proc(number: i32, position: rl.Vector2, size: f32,
@@ -75,11 +83,13 @@ dice_button :: proc(number: i32, position: rl.Vector2, size: f32,
 	return hovered && rl.IsMouseButtonPressed(.LEFT)
 }
 
-draw_dice :: proc(
-	dice: Dice,
-	texture: rl.Texture2D,
-) {
+draw_dice :: proc(dice: Dice, texture: rl.Texture2D, hoverable:bool=false) -> bool {
 	size := dice.shape.(ShapeBox).half_size * 2.
+
+	ray := rl.GetScreenToWorldRay(rl.GetMousePosition(), app.camera3d)
+
+    // Check collision between ray and box
+    collision := rl.GetRayCollisionBox(ray, {min=dice.position-size/2, max=dice.position+size/2.})
 
 	rlgl.SetTexture(texture.id)
 	t_w: f32 : 1.0 / 6.0 // Texture has 6 columns for the different orientations of the numbers
@@ -93,9 +103,8 @@ draw_dice :: proc(
 	// Draw the numbers on each face of the cube
 	rlgl.Begin(rlgl.QUADS)
 	color := dice.color
-	if dice.state != .ALIVE {
-		color /= 2
-	}
+	if dice.state != .ALIVE do color /= 2
+	if hoverable && collision.hit do color = rl.ColorBrightness(color, -0.5)
 	rlgl.Color4ub(color.r, color.g, color.b, color.a)
 
 	// Front face (1)
@@ -143,6 +152,8 @@ draw_dice :: proc(
 	rlgl.End()
 
 	rlgl.PopMatrix()
+
+	return hoverable && collision.hit
 }
 
 add_particles :: proc(position: Vector3, color: rl.Color){
@@ -164,6 +175,36 @@ add_particles :: proc(position: Vector3, color: rl.Color){
 		particle.visible = true
 		particle.lifetime = 1.0
 
+		return
+	}
+}
+
+add_text :: proc{add_text_vec3, add_text_vec3_vec2, add_text_vec2, add_text_vec2_vec2}
+add_text_vec3_vec2 :: proc (start: Vector3, end: rl.Vector2, text: string, color: rl.Color, lifetime:f32=2.0, font_size:f32=30) {
+	start_2d := rl.GetWorldToScreen(start, app.camera3d)
+	add_text_vec2_vec2(start_2d, {f32(end.x), f32(end.y)}, text, color, lifetime, font_size)
+}
+add_text_vec3 :: proc (start: Vector3, text: string, color: rl.Color, lifetime:f32=2.0, font_size:f32=30) {
+	start_2d := rl.GetWorldToScreen(start, app.camera3d)
+	add_text_vec2_vec2(start_2d, start_2d + Vector2{0, -100}, text, color, lifetime, font_size)
+}
+add_text_vec2 :: proc (start: Vector2, text: string, color: rl.Color, lifetime:f32=2.0, font_size: f32=30) {
+	add_text_vec2_vec2(start, start + Vector2{0, -100}, text, color, lifetime, font_size)
+}
+add_text_vec2_vec2 :: proc (start, end: Vector2, text: string, color: rl.Color, lifetime:f32=2.0, font_size: f32=30) {
+	for &t in app.text_animations{
+		if t.visible do continue
+
+		t = {
+			start = start,
+			end = end,
+			text = text,
+			color = color,
+			start_lifetime = lifetime,
+			lifetime = lifetime,
+			visible = true,
+			font_size=font_size,
+		}
 		return
 	}
 }
@@ -301,18 +342,27 @@ color_brighten :: proc(color: rl.Color, factor: f32) -> rl.Color {
 	}
 }
 
-draw_card :: proc(id: CardType, position: rl.Vector2, color:rl.Color=rl.BLANK, actions:[]string={}) -> i32{
+draw_card :: proc(card: Card, position: rl.Vector2, color:rl.Color=rl.BLANK, actions:[]string={}) -> i32{
 	size := app.gui.card_size
 	hovered := rl.CheckCollisionPointRec(rl.GetMousePosition(), {x=position.x, y=position.y, width=f32(size.x), height=f32(size.y)})
 
 	color := color
-	category := card_category(id)
-	if color == rl.BLANK do color = COLOR_CARDS[category]
+	if color == rl.BLANK do color = COLOR_CARDS[card.category]
 
 	position := position
 	if hovered {
-		color = rl.ColorBrightness(color, math.sin(f32(rl.GetTime())*2)/5.+0.3)
+		color = rl.ColorBrightness(color, 0.1)
 		position.y += -10. //math.sin(f32(rl.GetTime())*10)*5	// make the button float up and down a bit
+	}
+
+	if card.active {
+		color = rl.ColorBrightness(color, 0.15)
+	} else if !hovered && card.triggered == 0.{
+		color = rl.ColorBrightness(color, -0.3)
+	}
+
+	if card.triggered > 0.{
+		position.y += math.sin(f32(rl.GetTime())*20)*10
 	}
 
 	font_size :f32= app.gui.font_size2
@@ -330,21 +380,21 @@ draw_card :: proc(id: CardType, position: rl.Vector2, color:rl.Color=rl.BLANK, a
 
 	// Title
 	text_pos := position + {padding, padding}
-	text_id := fmt.tprintf("title/%v", id)
+	text_id := fmt.tprintf("title/%v", card.type)
 	draw_text(app.texts[text_id], text_pos, font_size, rl.RAYWHITE, max_width=size.x-2*padding)
 
 	// Description
 	text_pos += {0, line_pos+padding}
-	text_id = fmt.tprintf("description/%v", id)
+	text_id = fmt.tprintf("description/%v", card.type)
 	draw_text(app.texts[text_id], text_pos, font_size, rl.BLACK, max_width=size.x-2*padding)
 
 	if hovered {
 		button_pos := position + size + {-10, -35}
+
 		for action, i in actions {
 			if button(action, button_pos, font_size=20, anchor=.RIGHT) do return i32(i)
-			button_pos += {-130, 0}
+			button_pos += {-100, 0}
 		}
-		// if button("ASSIGN", button_pos+{-10, 0}, font_size=20, anchor=.RIGHT) do return 1
 	}
 
 	return -1
