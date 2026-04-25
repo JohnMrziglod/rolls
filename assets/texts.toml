@@ -48,10 +48,10 @@ CardDice_Blind
 /description="Attacks closest antagonist's dice regardless of its number."
 CardDice_Historian
 /title="HISTORIAN"
-/description="Gains +0.1 SCORE when witnessing an activated roll card."
+/description="Gains +0.25 SCORE when witnessing an activated roll card."
 CardDice_Librarian
 /title="LIBRARIAN"
-/description="Gains +0.2 SCORE when witnessing an assigned dice card."
+/description="Gains +0.5 SCORE when witnessing an assigned dice card."
 CardCycle_ExtraDice
 /title="EXTRA DICE"
 /description="Add +1 Dice to your army."

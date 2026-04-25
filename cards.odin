@@ -1,5 +1,6 @@
 package game
 
+import "core:fmt"
 import "core:math"
 import rl "vendor:raylib"
 
@@ -57,27 +58,38 @@ card_discard :: proc(player: ^Player, index: i32, silent:bool=false){
 	rl.PlaySound(sound)
 }
 
-card_activate :: proc(card: ^Card){
+card_activate :: proc(player: ^Player, card: ^Card){
 	card.active = true
 	card.triggered = 1.0
 
 	sound := app.sounds[10]
 	rl.SetSoundVolume(sound, 1.)
 	rl.PlaySound(sound)
-}
 
-card_activate_cycle_card :: proc(player_id: i32, card: ^Card){
-	player := &app.players[player_id]
 	#partial switch card.type {
 	case .CardCycle_EternalRoll:
 		player.roll_cards_lifetime += 1
 	case .CardCycle_ExtraDice:
 		// player.n_dices += 1
-		append(&app.dices, Dice{player=u8(player_id), position={0, 1000, 0}, state=.DEAD})
+		append(&app.dices, Dice{player=player.id, position={0, 1000, 0}, state=.DEAD})
 	case .CardCycle_Graveyard:
 		player.ghosts_max += 1
 	}
-	card_activate(card)
+
+	for &dice, d in app.dices{
+		if dice.player != player.id || dice.state != .ALIVE do continue
+
+		for &upgrade in dice.upgrades{
+			#partial switch upgrade.type {
+			case .CardDice_Historian:
+				upgrade.var1 += 0.25
+				add_text(dice.position, fmt.aprint("HISTORIAN: +0.25 SCORE!"), dice.color, 0.5)
+			case .CardDice_Librarian:
+				upgrade.var1 += 0.5
+				add_text(dice.position, fmt.aprint("LIBRARIAN: +0.5 SCORE!"), dice.color, 0.5)
+			}
+		}
+	}
 }
 
 card_in_hand :: proc(player: Player, card_type: CardType, start_index:i32=0, only_active:=false) -> Card{

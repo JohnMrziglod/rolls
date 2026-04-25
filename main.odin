@@ -42,25 +42,6 @@ Dice :: struct {
 	attack: sco,
 	health: sco,
 }
-
-Particles :: struct{
-	positions: [9]Vector3,
-	velocities: [9]Vector3,
-	color: rl.Color,
-	visible: bool,
-	lifetime: f32
-}
-
-TextAnimation :: struct{
-	start: Vector2,
-	end: Vector2,
-	text: string,
-	color: rl.Color,
-	visible: bool,
-	font_size: f32,
-	lifetime: f32,
-	start_lifetime: f32
-}
 Opponent :: struct {
 	message: string,
 	speaking: bool
@@ -104,6 +85,7 @@ RollState :: struct{
 
 N_PLAYERS :: 2
 Player :: struct {
+	id: u8,
 	color: rl.Color,
 	total_score: sco,
 	roll: RollState,
@@ -206,11 +188,11 @@ main :: proc() {
 		state = .ROLLING,
 		players = {
 			{
-				color=COLOR_PLAYERS[0],
+				color=COLOR_PLAYERS[0], id=0,
 				ghosts_max=10, roll_cards_lifetime=3,
 			},
 			{
-				color=COLOR_PLAYERS[1],
+				color=COLOR_PLAYERS[1], id=1,
 				ghosts_max=10, roll_cards_lifetime=3,
 			},
 		},
@@ -742,13 +724,6 @@ dices_scoring :: proc(dt: real) {
 	if n_dices_alive != 0 && app.state_timer < wait_time do return	// some pauses for counting
 	app.state_timer = 0.0
 
-	// First round of scoring, every dice calculates its own current score
-	// n_dices_player := [N_PLAYERS]i32{}
-	// for &dice, i in app.dices{
-	// 	if dice.state != .ALIVE do continue
-	// 	n_dices_player[dice.player] += 1
-	// }
-
 	for &player, p in app.players{
 		player.is_scoring = true
 
@@ -758,8 +733,8 @@ dices_scoring :: proc(dt: real) {
 			dice.current_score = sco(dice.current_number)
 
 			// Apply dice card effects
-			for upgrade, i in dice.upgrades{
-				position := dice.position - f32(i) * Vector3{0, 2, 0}
+			for &upgrade, u in dice.upgrades{
+				position := dice.position - f32(u) * Vector3{0, 2, 0}
 				text: string
 
 				#partial switch upgrade.type {
@@ -769,7 +744,7 @@ dices_scoring :: proc(dt: real) {
 					} else {
 						player.roll.antennas *= dice.current_score
 					}
-					text = fmt.aprint("ANTENNA NETWORK X%v", dice.current_score)
+					text = fmt.aprintf("ANTENNA NETWORK X%v!", dice.current_score)
 
 					dice.current_score = 0
 				case .CardDice_Journalist:
@@ -779,11 +754,28 @@ dices_scoring :: proc(dt: real) {
 					if dice.current_number == 6 {
 						append(&player.cards, Card{})
 						cards_generate(player.cards[len(player.cards)-1:], .RollCards)
-						text = fmt.aprint("GENERAL +1 ROLL CARD")
+						text = fmt.aprint("INFLUENCER: +1 ROLL CARD")
 					}
+				case .CardDice_Investor:
+					if dice.current_number == 1 {
+						text = fmt.aprintf("PAYOUT +%v", math.floor(upgrade.var1))
+						dice.current_score += math.floor(upgrade.var1)
+						upgrade.var1 = 0.
+					} else {
+						upgrade.var1 += dice.current_score
+						upgrade.var1 *= 1.1
+						dice.current_score = 0
+						text = fmt.aprintf("INVESTING +%v", math.floor(upgrade.var1))
+					}
+				case .CardDice_Historian:
+					text = fmt.aprintf("HISTORIAN: +%v!", math.ceil(upgrade.var1))
+					dice.current_score += math.ceil(upgrade.var1)
+				case .CardDice_Librarian:
+					text = fmt.aprintf("LIBRARIAN: +%v!", math.ceil(upgrade.var1))
+					dice.current_score += math.ceil(upgrade.var1)
 				case .CardDice_PowerDice:
-					dice.current_score *= dice.current_score
 					text = fmt.aprintf("POWER UP: %v X %v!", dice.current_score, dice.current_score)
+					dice.current_score *= dice.current_score
 				case:
 					continue
 				}
@@ -1030,16 +1022,17 @@ draw :: proc(power: f32) {
 				position += {0, f32(c)*(30+app.gui.card_size.y)}
 			}
 			actions := []string{}
-			if card.category == .ROLL do actions = card.active ? {"DISCARD"} : {"DISCARD", "ACTIVATE"}
-			else if card.category == .DICE do actions = {"DISCARD", "ASSIGN"}
-			else if card.category == .CYCLE do actions = {"DISCARD", "ACTIVATE"}
+			if app.state == .WAIT_FOR_ROLL {
+				if card.category == .ROLL do actions = card.active ? {"DISCARD"} : {"DISCARD", "ACTIVATE"}
+				else if card.category == .DICE do actions = {"DISCARD", "ASSIGN"}
+				else if card.category == .CYCLE do actions = {"DISCARD", "ACTIVATE"}
+			}
 
 			action := draw_card(card, position, actions=actions)
 			if app.state == .WAIT_FOR_ROLL && action == 1 {
 				if card.category == .ROLL{
-					card_activate(&card)
+					card_activate(&player, &card)
 				} else if card.category == .DICE {
-					card_activate(&card)
 					app.card_selected = card
 					discard_card = c
 					discard_silent = true
@@ -1122,7 +1115,7 @@ draw :: proc(power: f32) {
 		y := math.lerp(text.start.y, text.end.y, 1.-text.lifetime/text.start_lifetime)
 		text_size := measure_text(text.text, text.font_size)
 		rl.DrawRectangleV({x-10, y-10}, {text_size.x+20, text_size.y+20}, text.color/2.)
-		draw_text(text.text, {x, y}, text.font_size, text.color)
+		draw_text(text.text, {x, y}, text.font_size, text.color, anchor=text.anchor)
 	}
 
 	if app.opponent.speaking {
@@ -1197,12 +1190,14 @@ draw :: proc(power: f32) {
 		ghost_size2 :f32= app.gui.font_size2 + 10
 		highest_score := 0.
 		// highest_combo := CombinationType_None
+		n_scored_combos := 0
 		for combo_type, c in CombinationType{
 			if combo_type == .None do continue
 
 			position := board_position + rl.Vector2{20, 150 + f32(c)*app.gui.font_size2*1.6}
 			match, score := test_combination(combo_type, ghost_selected_numbers[:], &highlighted)
 			already_scored := combo_type in human.cycle.scored_combinations
+			if already_scored do n_scored_combos += 1
 			draw_text(fmt.tprintf("%v", combo_type), position, app.gui.font_size2, (match && !already_scored) ? rl.RAYWHITE : rl.GRAY, strikethrough=already_scored)
 			if !already_scored && match && enough_ghosts {
 				draw_text(fmt.tprintf("+%v", score), position+{600, 0}, app.gui.font_size2, rl.RAYWHITE)
@@ -1246,9 +1241,28 @@ draw :: proc(power: f32) {
 		}
 		draw_text(text, board_position + rl.Vector2{20, 20}, app.gui.font_size2, rl.RAYWHITE)
 		if button("ESC", board_position + rl.Vector2{board_size.x - 80, 20}, app.gui.font_size2) {
-			app.state = .WAIT_FOR_ROLL
-			app.state_timer = 0.
+			state_switch(.WAIT_FOR_ROLL)
 			app.ghosts_selected = {-1, -1, -1, -1, -1}
+		}
+		if n_scored_combos == 15 {
+			if button("FINISH CYCLE", board_position+board_size+{-80, 50}, app.gui.font_size2, anchor=.RIGHT) {
+				add_text(board_position+board_size/2., fmt.aprint("CYCLE COMPLETE!"), human.color, 2., font_size=app.gui.font_size1, anchor=.CENTER)
+				human.roll.score += math.floor(human.score) / 10.
+				app.ghosts_selected = {}-1 // deselect everything
+				app.cards_offer = {}
+				cards_generate(app.cards_offer[:3], .CycleCards)
+				human.cycle.scored_combinations = {}
+				state_switch(.CARDS_OFFER)
+			}
+		} else if n_scored_combos > 10{
+			if button("RUSH CYCLE", board_position+board_size+{-80, 50}, app.gui.font_size2, anchor=.RIGHT) {
+				add_text(board_position+board_size/2., fmt.aprint("CYCLE COMPLETE BY RUSHING!"), human.color, 2., font_size=app.gui.font_size1, anchor=.CENTER)
+				app.ghosts_selected = {}-1 // deselect everything
+				app.cards_offer = {}
+				cards_generate(app.cards_offer[:2], .CycleCards)
+				human.cycle.scored_combinations = {}
+				state_switch(.CARDS_OFFER)
+			}
 		}
 	}
 
@@ -1281,7 +1295,7 @@ draw :: proc(power: f32) {
 			action := draw_card(card, position, actions=actions)
 			if action == 1 {
 				if card.category == .ROLL{
-					card_activate(&card)
+					card_activate(human, &card)
 					append(&human.cards, card)
 					card = {}
 					state_switch(.WAIT_FOR_ROLL)
@@ -1312,6 +1326,7 @@ draw :: proc(power: f32) {
 			for &upgrade, i in dice.upgrades{
 				if upgrade.type == .CardNone {
 					upgrade = app.card_selected
+					card_activate(human, &upgrade)
 					app.card_selected = {}
 					could_upgrade = true
 					add_text(dice.position, fmt.aprintf("Upgraded to %v!", get_text(upgrade.type, "title")), dice.color, 1.5)

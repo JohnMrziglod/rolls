@@ -14,6 +14,26 @@ TextAnchor :: enum {
 	CENTER,
 }
 
+Particles :: struct{
+	positions: [9]Vector3,
+	velocities: [9]Vector3,
+	color: rl.Color,
+	visible: bool,
+	lifetime: f32
+}
+
+TextAnimation :: struct{
+	start: Vector2,
+	end: Vector2,
+	text: string,
+	color: rl.Color,
+	visible: bool,
+	font_size: f32,
+	lifetime: f32,
+	start_lifetime: f32,
+	anchor: TextAnchor,
+}
+
 button :: proc(text: string, position: rl.Vector2, size:rl.Vector2={1, 1}, color:rl.Color=rl.BLACK, active_color:rl.Color=rl.BLANK,
 		font_size:f32=30, clickable:bool=true, padding:f32=10., anchor:TextAnchor=.LEFT, hover_motion:bool=true) -> bool{
 	text_size := measure_text(text, font_size) + padding
@@ -180,18 +200,18 @@ add_particles :: proc(position: Vector3, color: rl.Color){
 }
 
 add_text :: proc{add_text_vec3, add_text_vec3_vec2, add_text_vec2, add_text_vec2_vec2}
-add_text_vec3_vec2 :: proc (start: Vector3, end: rl.Vector2, text: string, color: rl.Color, lifetime:f32=2.0, font_size:f32=30) {
+add_text_vec3_vec2 :: proc (start: Vector3, end: rl.Vector2, text: string, color: rl.Color, lifetime:f32=2.0, font_size:f32=30, anchor:TextAnchor=.LEFT) {
 	start_2d := rl.GetWorldToScreen(start, app.camera3d)
-	add_text_vec2_vec2(start_2d, {f32(end.x), f32(end.y)}, text, color, lifetime, font_size)
+	add_text_vec2_vec2(start_2d, {f32(end.x), f32(end.y)}, text, color, lifetime, font_size, anchor)
 }
-add_text_vec3 :: proc (start: Vector3, text: string, color: rl.Color, lifetime:f32=2.0, font_size:f32=30) {
+add_text_vec3 :: proc (start: Vector3, text: string, color: rl.Color, lifetime:f32=2.0, font_size:f32=30, anchor:TextAnchor=.LEFT) {
 	start_2d := rl.GetWorldToScreen(start, app.camera3d)
-	add_text_vec2_vec2(start_2d, start_2d + Vector2{0, -100}, text, color, lifetime, font_size)
+	add_text_vec2_vec2(start_2d, start_2d + Vector2{0, -100}, text, color, lifetime, font_size, anchor)
 }
-add_text_vec2 :: proc (start: Vector2, text: string, color: rl.Color, lifetime:f32=2.0, font_size: f32=30) {
-	add_text_vec2_vec2(start, start + Vector2{0, -100}, text, color, lifetime, font_size)
+add_text_vec2 :: proc (start: Vector2, text: string, color: rl.Color, lifetime:f32=2.0, font_size: f32=30, anchor:TextAnchor=.LEFT) {
+	add_text_vec2_vec2(start, start + Vector2{0, -100}, text, color, lifetime, font_size, anchor)
 }
-add_text_vec2_vec2 :: proc (start, end: Vector2, text: string, color: rl.Color, lifetime:f32=2.0, font_size: f32=30) {
+add_text_vec2_vec2 :: proc (start, end: Vector2, text: string, color: rl.Color, lifetime:f32=2.0, font_size: f32=30, anchor:TextAnchor=.LEFT) {
 	for &t in app.text_animations{
 		if t.visible do continue
 
@@ -204,6 +224,7 @@ add_text_vec2_vec2 :: proc (start, end: Vector2, text: string, color: rl.Color, 
 			lifetime = lifetime,
 			visible = true,
 			font_size=font_size,
+			anchor=anchor,
 		}
 		return
 	}
