@@ -1,0 +1,83 @@
+CardRoll_Attack
+/title="FULL ATTACK!"
+/description="All your dices get +1 ATTACK."
+
+CardRoll_Defense
+/title="DEFENSE! DEFENSE!"
+/description="All your dices get +1 HEALTH."
+
+CardRoll_GhostHour
+/title="GHOST HOUR"
+/description="Your GHOST DICES' numbers add to your ROLL SCORE."
+
+CardRoll_HappyHour
+/title="HAPPY HOUR"
+/description="X3 your ROLL SCORE."
+
+CardRoll_TombRaider
+/title="TOMB RAIDER"
+/description="Steal one of your antagonist's GHOST DICES."
+
+CardDice_Assassin
+/title="ASSASSIN"
+/description="Gets +2 ATTACK at start of each ROLL."
+
+CardDice_Defender
+/title="TANK"
+/description="Gets +2 HEALTH at start of each ROLL."
+
+CardDice_Antenna
+/title="ANTENNA"
+/description="Multiply dice's SCORE with the SCORE of other dices with ANTENNA."
+
+CardDice_Optimist
+/title="OPTIMIST"
+/description="All sides of this dices show one number higher (max. 6)."
+
+CardDice_Pessimist
+/title="PESSIMIST"
+/description="All sides of this dices show one number lower (min. 1)."
+
+CardDice_Journalist
+/title="JOURNALIST"
+/description="X2 your ROLL SCORE."
+
+CardDice_Influencer
+/title="INFLUENCER"
+/description="Create a roll card if it survives and shows a 6."
+
+CardDice_Investor
+/title="INVESTOR"
+/description="Saves its own SCORE when surviving with 10% interest. Pay out when showing a 1."
+
+CardDice_PowerDice
+/title="POWER UP"
+/description="Multiply dice's score with its own score again."
+
+CardDice_ShortSighted
+/title="SHORT-SIGHTED"
+/description="Attacks farthest antagonist's dice regardless of its number."
+
+CardDice_Blind
+/title="BLIND"
+/description="Attacks closest antagonist's dice regardless of its number."
+
+CardDice_Historian
+/title="HISTORIAN"
+/description="Gains +0.1 SCORE when witnessing an activated roll card."
+
+CardDice_Librarian
+/title="LIBRARIAN"
+/description="Gains +0.2 SCORE when witnessing an assigned dice card."
+
+CardCycle_ExtraDice
+/title="EXTRA DICE"
+/description="Add +1 Dice to your army."
+
+CardCycle_EternalRoll
+/title="ETERNAL ROLL"
+/description="Your ROLL CARDS' lifetime increases by 1 ROLL."
+
+CardCycle_Graveyard
+/title="GRAVEYARD"
+/description="+1 SPACE for GHOST DICES."

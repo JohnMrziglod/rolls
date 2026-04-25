@@ -380,13 +380,11 @@ draw_card :: proc(card: Card, position: rl.Vector2, color:rl.Color=rl.BLANK, act
 
 	// Title
 	text_pos := position + {padding, padding}
-	text_id := fmt.tprintf("title/%v", card.type)
-	draw_text(app.texts[text_id], text_pos, font_size, rl.RAYWHITE, max_width=size.x-2*padding)
+	draw_text(get_text(card.type, "title"), text_pos, font_size, rl.RAYWHITE, max_width=size.x-2*padding)
 
 	// Description
 	text_pos += {0, line_pos+padding}
-	text_id = fmt.tprintf("description/%v", card.type)
-	draw_text(app.texts[text_id], text_pos, font_size, rl.BLACK, max_width=size.x-2*padding)
+	draw_text(get_text(card.type, "description"), text_pos, font_size, rl.BLACK, max_width=size.x-2*padding)
 
 	if hovered {
 		button_pos := position + size + {-10, -35}

@@ -20,8 +20,8 @@ title/CardDice_Pessimist|PESSIMIST
 description/CardDice_Pessimist|All sides of this dices show one number lower (min. 1).
 title/CardDice_Journalist|JOURNALIST
 description/CardDice_Journalist|X2 your ROLL SCORE.
-title/CardDice_General|GENERAL
-description/CardDice_General|Create a roll card if it survives and shows a 6.
+title/CardDice_Influencer|INFLUENCER
+description/CardDice_Influencer|Create a roll card if it survives and shows a 6.
 title/CardDice_Investor|INVESTOR
 description/CardDice_Investor|Saves its own SCORE when surviving with 10%% interest. Pay out when showing a 1.
 title/CardDice_PowerDice|POWER UP

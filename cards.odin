@@ -15,7 +15,8 @@ CardType :: enum i32{
 	CardDice_Antenna,
 	CardDice_Assassin,
 	CardDice_Journalist,
-	CardDice_General,
+	// CardDice_General,
+	CardDice_Influencer,
 	CardDice_Investor,
 	CardDice_PowerDice,
 	// CardDice_ShortSighted,
@@ -71,7 +72,7 @@ card_activate_cycle_card :: proc(player_id: i32, card: ^Card){
 	case .CardCycle_EternalRoll:
 		player.roll_cards_lifetime += 1
 	case .CardCycle_ExtraDice:
-		player.n_dices += 1
+		// player.n_dices += 1
 		append(&app.dices, Dice{player=u8(player_id), position={0, 1000, 0}, state=.DEAD})
 	case .CardCycle_Graveyard:
 		player.ghosts_max += 1

@@ -127,7 +127,6 @@ Application :: struct {
 	textures: []rl.Texture2D,
 	sounds: []rl.Sound,
 	texts: map[string]string,
-	texts_buffer: string,
 
 	// gui
 	gui: GUI,
@@ -306,25 +305,46 @@ main :: proc() {
 			rl.UnloadTexture(texture)
 		}
 	}
-	file, file_ok := os.read_entire_file("assets/texts.csv")
+	file, file_ok := os.read_entire_file("assets/texts.toml")
 	if !file_ok{
 		fmt.println("Error loading texts!")
 		os.exit(1)
 	}
-	app.texts_buffer = string(file)
-	defer delete(app.texts_buffer)
-	parsing_key := true
+	texts_buffer := string(file)
+	defer delete(texts_buffer)
+
+	Token :: enum{Root, Section, Key, Value}
+	token: Token
+	expect_section_or_key := true
+	section_start, section_end := 0, 0
 	key_start, key_end := 0, 0
-	for r, i in app.texts_buffer {
-		if parsing_key && r == '|' {
-			key_end = i
-			parsing_key = false
-		} else if !parsing_key && r == '\n' {
-			key := app.texts_buffer[key_start:key_end]
-			value := app.texts_buffer[key_end+1:i-1] // -1 to remove the \r before \n
+	for r, i in texts_buffer {
+		if token == .Root && r == '/' {
+			key_start = i
+			token = .Key
+		} else if token == .Key && r == '=' {
+			key_end = i-1
+			token = .Value
+		} else if token == .Value && r == '\n' {
+			key := strings.join(
+				{texts_buffer[section_start:section_end],
+				 texts_buffer[key_start:key_end]}, ""
+			)
+			value := texts_buffer[key_end+2:i-2] // +2 for =", -2 to remove " and the \r before \n
 			app.texts[key] = value
-			key_start = i+1
-			parsing_key = true
+			token = .Root
+		} else if token == .Section && r == '\n'{
+			section_end = i-1
+			token = .Root
+		} else if token == .Root && !strings.is_space(r) {
+			section_start = i
+			token = .Section
+		}
+	}
+	defer {
+		for key, value in app.texts {
+			delete(key)
+			delete(value)
 		}
 	}
 
@@ -585,28 +605,51 @@ rolling :: proc(dt: real){
 	}
 
 	// We move to the next app.state
-	app.state = .BATTLE
-	app.state_timer = 0.
-}
-
-dice_kills :: proc(killer, victim: ^Dice){
-	add_particles(victim.position, victim.color)
-	add_text(victim.position, fmt.aprint("GHOST!"), victim.color, 1.5, font_size=app.gui.font_size2)
-
-	victim.state = .DEAD
-	victim.position.y = 1000.
-
-	player := &app.players[victim.player]
-	if i32(len(player.ghosts)) >= player.ghosts_max do clear(&player.ghosts)
-	append(&player.ghosts, victim.current_number)
-	// Sort the ghost dices (makes other things easier later on also for the human player)
-	slice.sort(player.ghosts[:])
-
-	app.players[killer.player].roll.kills += 1
+	state_switch(.CARDS_BATTLE)
 }
 
 cards_battle :: proc (dt: real) {
+	if app.state_timer < 0.4 do return	// some pauses for counting
+	app.state_timer = 0.0
 
+	for &player, p in app.players {
+		for &card, c in player.cards{
+			if !card.active || card.already_scored do continue
+
+			#partial switch card.type {
+			case .CardRoll_HappyHour:
+				player.roll.multiplier += 3
+				position := app.gui.hand_positions[p]
+				if len(player.cards) > 5 {
+					position += {0, app.gui.hand_area_height/f32(len(player.cards))*f32(c)}
+				} else {
+					position += {0, f32(c)*(30+app.gui.card_size.y)}
+				}
+
+				add_text(position, app.gui.score_positions[p], fmt.aprint("X3"), COLOR_CARDS[card.category], lifetime=0.4)
+				card.triggered = 1.0
+			}
+
+			player.roll.score_counter += 1
+
+			sound := app.sounds[6]
+			rl.StopSound(sound)
+			rl.SetSoundVolume(sound, 1.)
+			pitch :f32= 1.0 + ((p == 0) ? 0.1 : -0.1) * f32(player.roll.score_counter)
+			rl.SetSoundPitch(sound, pitch)
+			rl.PlaySound(sound)
+
+			card.already_scored = true
+			card.active_since += 1
+			if card.active_since > player.roll_cards_lifetime {
+				card_discard(&player, i32(c))
+				// It is import that we return afterwards, otherwise we might get in trouble with the indices...
+			}
+			return
+		}
+	}
+
+	state_switch(.DICES_BATTLE)
 }
 
 dices_battle :: proc(dt: real) {
@@ -654,6 +697,10 @@ dices_battle :: proc(dt: real) {
 	app.state_timer = 0.0
 }
 
+get_text :: proc(id: any, key: string) -> string{
+	return app.texts[fmt.tprintf("%v/%v", id, key)]
+}
+
 dices_scoring :: proc(dt: real) {
 	n_dices_alive := 0
 	for dice in app.dices {
@@ -681,6 +728,9 @@ dices_scoring :: proc(dt: real) {
 
 			// Apply dice card effects
 			for upgrade, i in dice.upgrades{
+				position := dice.position - f32(i) * Vector3{0, 2, 0}
+				text: string
+
 				#partial switch upgrade.type {
 				case .CardDice_Antenna:
 					if player.roll.antennas == 0 {
@@ -688,34 +738,35 @@ dices_scoring :: proc(dt: real) {
 					} else {
 						player.roll.antennas *= dice.current_score
 					}
+					text = fmt.aprint("ANTENNA NETWORK X%v", dice.current_score)
 
 					dice.current_score = 0
 				case .CardDice_Journalist:
 					player.roll.multiplier += 2
-				case .CardDice_General:
+					text = fmt.aprint("JOURNALIST: X2!")
+				case .CardDice_Influencer:
 					if dice.current_number == 6 {
 						append(&player.cards, Card{})
 						cards_generate(player.cards[len(player.cards)-1:], .RollCards)
+						text = fmt.aprint("GENERAL +1 ROLL CARD")
 					}
 				case .CardDice_PowerDice:
 					dice.current_score *= dice.current_score
+					text = fmt.aprintf("POWER UP: %v X %v!", dice.current_score, dice.current_score)
+				case:
+					continue
 				}
-
-				if upgrade.type == .CardNone do continue
-
-				position := dice.position - f32(i) * Vector3{0, 2, 0}
-				title_id := fmt.tprintf("title/%v", upgrade.type)
-				text := fmt.aprintf("%v!", app.texts[title_id])
 				add_text(position, text, dice.color, 2.0, font_size=app.gui.font_size2)
 			}
 
 			app.players[dice.player].roll.score += dice.current_score
 			dice.already_scored = true
-			player.score_counter += 1
+			player.roll.score_counter += 1
 
-			sound := rand.choice(app.sounds[6:10])
+			sound := app.sounds[6]
+			rl.StopSound(sound)
 			rl.SetSoundVolume(sound, 1.)
-			pitch :f32= 1.0 + ((p == 0) ? 0.1 : -0.1) * f32(player.score_counter)
+			pitch :f32= 1.0 + ((p == 0) ? 0.1 : -0.1) * f32(player.roll.score_counter)
 			rl.SetSoundPitch(sound, pitch)
 			rl.PlaySound(sound)
 
@@ -744,7 +795,6 @@ cards_scoring :: proc(dt: real) {
 	app.state_timer = 0.0
 
 	for &player, p in app.players {
-
 		for &card, c in player.cards{
 			if !card.active || card.already_scored do continue
 
@@ -762,11 +812,11 @@ cards_scoring :: proc(dt: real) {
 				card.triggered = 1.0
 			}
 
-			player.score_counter += 1
+			player.roll.score_counter += 1
 
 			sound := rand.choice(app.sounds[6:10])
 			rl.SetSoundVolume(sound, 1.)
-			pitch :f32= 1.0 + ((p == 0) ? 0.1 : -0.1) * f32(player.score_counter)
+			pitch :f32= 1.0 + ((p == 0) ? 0.1 : -0.1) * f32(player.roll.score_counter)
 			rl.SetSoundPitch(sound, pitch)
 			rl.PlaySound(sound)
 
@@ -883,6 +933,8 @@ wait_for_ai :: proc(){
 }
 
 draw :: proc(power: f32) {
+	human := &app.players[0]
+
 	rl.BeginDrawing()
 	defer rl.EndDrawing()
 
@@ -1022,7 +1074,7 @@ draw :: proc(power: f32) {
 		count := 0
 		for upgrade, i in dice.upgrades{
 			if upgrade.type == .CardNone do continue
-			upgrades[i] = app.texts[fmt.tprintf("title/%v", upgrade.type)]
+			upgrades[i] = get_text(upgrade.type, "title")
 			count += 1
 		}
 		position := rl.GetMousePosition() + Vector2{10, 10}
@@ -1056,7 +1108,7 @@ draw :: proc(power: f32) {
 		height: f32 = 80.
 		x := (f32(screen_width) - width) / 2.
 		y := (f32(screen_height) - height) / 2.
-		rl.DrawRectangleV({x, y}, {power * width, height}, app.players[0].color)
+		rl.DrawRectangleV({x, y}, {power * width, height}, human.color)
 		rl.DrawRectangleLinesEx({x, y, width, height}, 2., rl.BLACK)
 	}
 
@@ -1065,30 +1117,28 @@ draw :: proc(power: f32) {
 		board_position := rl.Vector2{(screen_width-board_size.x)/2., 50}
 		board_color := COLOR_PLAYERS[0]/2
 		board_color.a = 255
-		// rl.DrawRectangleV(board_position, board_size, app.gui.bg_color)
-		player := &app.players[0]
 
 		draw_box(board_position, board_size, fill=board_color)
 
 		ghost_cols :i32= 10 // @TODO: make this dynamic based on the max number of ghosts a player can have
 		ghost_size :f32= app.gui.font_size1 + 10
 		ghost_padding :f32= 5
-		for i in 0..<player.ghosts_max {
+		for i in 0..<human.ghosts_max {
 			ghost_index := i32(i)
 			row := ghost_index / ghost_cols
 			col := ghost_index % ghost_cols
 			position := board_position + {20, 70} + (ghost_size+ghost_padding)*rl.Vector2{f32(col), f32(row)}
 
-			if ghost_index >= i32(len(player.ghosts)) {
+			if ghost_index >= i32(len(human.ghosts)) {
 				thickness :f32= 2
 				draw_box(position+{0, 2}, {ghost_size, ghost_size-2}-thickness, fill=board_color/2, thickness=thickness)
 				continue
 			}
 
-			ghost_number := player.ghosts[ghost_index]
+			ghost_number := human.ghosts[ghost_index]
 			active := contains(app.ghosts_selected[:], i32(ghost_index))
 
-			if dice_button(ghost_number, position, ghost_size, player.color/2, active_color=player.color, active=active, clickable=true) {
+			if dice_button(ghost_number, position, ghost_size, human.color/2, active_color=human.color, active=active, clickable=true) {
 				free_index := -1
 				for &slot, s in app.ghosts_selected{
 					if slot == -1 && free_index == -1 {
@@ -1110,7 +1160,7 @@ draw :: proc(power: f32) {
 		for i, ghost_index in app.ghosts_selected{
 			if i == -1 do break
 
-			ghost_selected_numbers[ghost_index] = app.players[0].ghosts[i]
+			ghost_selected_numbers[ghost_index] = human.ghosts[i]
 		}
 		enough_ghosts := !contains(app.ghosts_selected[:], i32(-1))
 		ghost_size2 :f32= app.gui.font_size2 + 10
@@ -1121,28 +1171,27 @@ draw :: proc(power: f32) {
 
 			position := board_position + rl.Vector2{20, 150 + f32(c)*app.gui.font_size2*1.6}
 			match, score := test_combination(combo_type, ghost_selected_numbers[:], &highlighted)
-			already_scored := combo_type in player.cycle.scored_combinations
+			already_scored := combo_type in human.cycle.scored_combinations
 			draw_text(fmt.tprintf("%v", combo_type), position, app.gui.font_size2, (match && !already_scored) ? rl.RAYWHITE : rl.GRAY, strikethrough=already_scored)
 			if !already_scored && match && enough_ghosts {
 				draw_text(fmt.tprintf("+%v", score), position+{600, 0}, app.gui.font_size2, rl.RAYWHITE)
 
 				for ghost_number, g in ghost_selected_numbers{
-					dice_button(ghost_number, position+{300+f32(g)*(ghost_size2+5), -7}, ghost_size2, player.color/2, active_color=player.color, active=highlighted[g], clickable=false)
+					dice_button(ghost_number, position+{300+f32(g)*(ghost_size2+5), -7},
+								ghost_size2, human.color/2, active_color=human.color,
+								active=highlighted[g], clickable=false)
 				}
 
 				if button("Score", position+{700, 0}) {
-					app.players[0].cycle.scored_combinations += {combo_type}
-					fmt.println("Scored combination", combo_type, "for", score, "points!")
-					fmt.println(app.players[0].cycle.scored_combinations)
-
-					app.players[0].roll.score += score // @TODO: Add it to roll score
-					ghosts_copy := make([dynamic]i32, len(player.ghosts), cap(player.ghosts))
+					human.cycle.scored_combinations += {combo_type}
+					human.roll.score += score // @TODO: Add it to roll score
+					ghosts_copy := make([dynamic]i32, len(human.ghosts), cap(human.ghosts))
 					defer delete(ghosts_copy)
-					copy(ghosts_copy[:], player.ghosts[:])
-					clear(&app.players[0].ghosts)
+					copy(ghosts_copy[:], human.ghosts[:])
+					clear(&human.ghosts)
 
 					for ghost, index in ghosts_copy{
-						if !contains(app.ghosts_selected[:], i32(index)) do append(&app.players[0].ghosts, ghost)
+						if !contains(app.ghosts_selected[:], i32(index)) do append(&human.ghosts, ghost)
 					}
 					app.ghosts_selected = {}-1 // deselect everything
 					app.cards_offer = {}
@@ -1158,7 +1207,7 @@ draw :: proc(power: f32) {
 		}
 
 		text := "There is no matching combination"
-		if len(player.ghosts) < 5 {
+		if len(human.ghosts) < 5 {
 			text = fmt.tprint("Wait for at least 5 ghost dices to score combinations")
 		} else if contains(app.ghosts_selected[:], i32(-1)) {
 			text = fmt.tprintf("Select %v more ghost dices to score combinations", count(app.ghosts_selected[:], i32(-1)))
@@ -1203,7 +1252,7 @@ draw :: proc(power: f32) {
 			if action == 1 {
 				if card.category == .ROLL{
 					card_activate(&card)
-					append(&app.players[0].cards, card)
+					append(&human.cards, card)
 					card = {}
 					state_switch(.WAIT_FOR_ROLL)
 				} else if card.category == .DICE {
@@ -1213,7 +1262,7 @@ draw :: proc(power: f32) {
 
 				}
 			} else if action == 0{
-				append(&app.players[0].cards, card)
+				append(&human.cards, card)
 				card = {}
 				state_switch(.WAIT_FOR_ROLL)
 			}
@@ -1246,7 +1295,7 @@ draw :: proc(power: f32) {
 			}
 		} else if rl.IsMouseButtonPressed(.RIGHT) {
 			app.card_selected.triggered = 0.
-			append(&app.players[0].cards, app.card_selected)
+			append(&human.cards, app.card_selected)
 			app.card_selected = {}
 			add_text(mouse_pos, fmt.aprint("Keep card in hand!"), rl.RAYWHITE, 1.5)
 			state_switch(.WAIT_FOR_ROLL)
@@ -1254,7 +1303,7 @@ draw :: proc(power: f32) {
 	}
 }
 
-state_switch :: proc(new_state: GameState) {
+state_switch :: proc(new_state: GameState, timer: f32=0.) {
 	app.state = new_state
-	app.state_timer = 0.
+	app.state_timer = timer
 }
