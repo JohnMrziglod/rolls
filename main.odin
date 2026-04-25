@@ -323,7 +323,7 @@ main :: proc() {
 			key_start = i
 			token = .Key
 		} else if token == .Key && r == '=' {
-			key_end = i-1
+			key_end = i // we don't need the =
 			token = .Value
 		} else if token == .Value && r == '\n' {
 			key := strings.join(
@@ -341,12 +341,13 @@ main :: proc() {
 			token = .Section
 		}
 	}
-	defer {
-		for key, value in app.texts {
-			delete(key)
-			delete(value)
-		}
-	}
+	fmt.println(app.texts)
+	// defer {
+	// 	for key, value in app.texts {
+	// 		delete(key)
+	// 		delete(value)
+	// 	}
+	// }
 
 	// Main game loop
 
@@ -616,18 +617,46 @@ cards_battle :: proc (dt: real) {
 		for &card, c in player.cards{
 			if !card.active || card.already_scored do continue
 
+			position := app.gui.hand_positions[p]
+			if len(player.cards) > 5 {
+				position += {0, app.gui.hand_area_height/f32(len(player.cards))*f32(c)}
+			} else {
+				position += {0, f32(c)*(30+app.gui.card_size.y)}
+			}
 			#partial switch card.type {
+			case .CardRoll_Attack:
+				for &dice, d in app.dices{
+					if dice.state != .ALIVE || dice.player != u8(p) do continue
+					dice.attack += 2
+					add_text(dice.position, fmt.aprint("+2 ATTACK"), player.color, lifetime=0.4)
+				}
+			case .CardRoll_Defense:
+				for &dice, d in app.dices{
+					if dice.state != .ALIVE || dice.player != u8(p) do continue
+					dice.health += 2
+					add_text(dice.position, fmt.aprint("+2 HEALTH"), player.color, lifetime=0.4)
+				}
+			case .CardRoll_GhostHour:
+				ghost_score: sco
+				for ghost in player.ghosts do ghost_score += sco(ghost)
+				player.roll.score += ghost_score
+				add_text(position, app.gui.score_positions[p], fmt.aprintf("+%v FROM GHOSTS!", ghost_score), player.color, lifetime=0.4)
 			case .CardRoll_HappyHour:
 				player.roll.multiplier += 3
-				position := app.gui.hand_positions[p]
-				if len(player.cards) > 5 {
-					position += {0, app.gui.hand_area_height/f32(len(player.cards))*f32(c)}
+				add_text(position, app.gui.score_positions[p], fmt.aprint("X3"), player.color, lifetime=0.4)
+			case .CardRoll_TombRaider:
+				victim := app.players[(p+1)%N_PLAYERS]
+				if len(victim.ghosts) == 0 {
+					add_text(position, fmt.aprint("NO GHOSTS TO STEAL"), player.color, lifetime=0.4)
 				} else {
-					position += {0, f32(c)*(30+app.gui.card_size.y)}
+					if i32(len(player.ghosts)) >= player.ghosts_max do clear(&player.ghosts)
+					append(&player.ghosts, pop(&victim.ghosts))
 				}
-
-				add_text(position, app.gui.score_positions[p], fmt.aprint("X3"), COLOR_CARDS[card.category], lifetime=0.4)
-				card.triggered = 1.0
+				// Sort the ghost dices (makes other things easier later on also for the human player)
+				slice.sort(player.ghosts[:])
+				add_text(position, fmt.aprint("STEALING GHOSTS!"), player.color, lifetime=0.4)
+			case:
+				continue
 			}
 
 			player.roll.score_counter += 1
@@ -641,6 +670,7 @@ cards_battle :: proc (dt: real) {
 
 			card.already_scored = true
 			card.active_since += 1
+			card.triggered = 1.0
 			if card.active_since > player.roll_cards_lifetime {
 				card_discard(&player, i32(c))
 				// It is import that we return afterwards, otherwise we might get in trouble with the indices...
@@ -698,6 +728,7 @@ dices_battle :: proc(dt: real) {
 }
 
 get_text :: proc(id: any, key: string) -> string{
+	// fmt.println("%v%v", id, key)
 	return app.texts[fmt.tprintf("%v/%v", id, key)]
 }
 
@@ -958,7 +989,7 @@ draw :: proc(power: f32) {
 	dice_hovered := -1
 	for &dice, d in app.dices{
 		if dice.state != .ALIVE do continue
-		hoverable := app.state != .ASSIGN_CARD || dice.player == 0
+		hoverable := app.state != .ROLLING && (app.state != .ASSIGN_CARD || dice.player == 0)
 		if draw_dice(dice, app.textures[0], hoverable=hoverable) {
 			dice_hovered = d
 			if rl.IsMouseButtonPressed(.LEFT) do dice_selected = d
@@ -1079,8 +1110,8 @@ draw :: proc(power: f32) {
 		}
 		position := rl.GetMousePosition() + Vector2{10, 10}
 		if count > 0 {
-			text := fmt.tprintf("Roles:\n%v", strings.join(upgrades[:count], ", ", context.temp_allocator))
-			draw_text(text, position, app.gui.font_size1, dice.color)
+			text := strings.join(upgrades[:count], ", ", context.temp_allocator)
+			draw_text(text, position, app.gui.font_size2, dice.color)
 		}
 	}
 
@@ -1196,8 +1227,7 @@ draw :: proc(power: f32) {
 					app.ghosts_selected = {}-1 // deselect everything
 					app.cards_offer = {}
 					cards_generate(app.cards_offer[:3], .RollAndDiceCards)
-					app.state = .CARDS_OFFER
-					app.state_timer = 0.
+					state_switch(.CARDS_OFFER)
 				}
 				if match && score > highest_score {
 					highest_score = score
@@ -1284,7 +1314,7 @@ draw :: proc(power: f32) {
 					upgrade = app.card_selected
 					app.card_selected = {}
 					could_upgrade = true
-					add_text(dice.position, fmt.aprintf("Upgraded to %v!", upgrade.type), dice.color, 1.5)
+					add_text(dice.position, fmt.aprintf("Upgraded to %v!", get_text(upgrade.type, "title")), dice.color, 1.5)
 					state_switch(.WAIT_FOR_ROLL)
 					break
 				}
