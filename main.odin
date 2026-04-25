@@ -70,7 +70,8 @@ GameState :: enum {
 	WAIT_FOR_ROLL,
 	CHARGING,
 	ROLLING,
-	BATTLE,
+	CARDS_BATTLE,
+	DICES_BATTLE,
 	DICES_SCORING,
 	CARDS_SCORING,
 	SCORING_SUMMARY,	// only for the animations (all points are flying in)
@@ -93,16 +94,20 @@ GUI :: struct {
 	bg_color: rl.Color,
 }
 
+RollState :: struct{
+	score: sco,
+	score_counter: i32,
+	multiplier: sco,
+	antennas: sco,
+	kills: i32,
+}
+
 N_PLAYERS :: 2
 Player :: struct {
 	color: rl.Color,
 	total_score: sco,
-	roll_score: sco,
-	roll_multiplier: sco,
-	roll_antennas: sco,
-	roll_kills: i32,
+	roll: RollState,
 	is_scoring: bool,
-	score_counter: i32,
 
 	cards: [dynamic]Card,
 	roll_cards_lifetime: i32,
@@ -413,8 +418,10 @@ main :: proc() {
 			if app.state == .ROLLING{
 				physics(dt)
 				rolling(dt)
-			} else if app.state == .BATTLE {
-				battle(dt)
+			} else if app.state == .CARDS_BATTLE {
+				cards_battle(dt)
+			} else if app.state == .DICES_BATTLE {
+				dices_battle(dt)
 			} else if app.state == .DICES_SCORING {
 				dices_scoring(dt)
 			} else if app.state == .CARDS_SCORING {
@@ -595,10 +602,14 @@ dice_kills :: proc(killer, victim: ^Dice){
 	// Sort the ghost dices (makes other things easier later on also for the human player)
 	slice.sort(player.ghosts[:])
 
-	app.players[killer.player].roll_kills += 1
+	app.players[killer.player].roll.kills += 1
 }
 
-battle :: proc(dt: real) {
+cards_battle :: proc (dt: real) {
+
+}
+
+dices_battle :: proc(dt: real) {
 	if app.state_timer < 0.3 do return
 
 	// We eliminate all app.dices from each player that show the same numbers.
@@ -628,7 +639,7 @@ battle :: proc(dt: real) {
 
 				sound := app.sounds[5]
 				rl.SetSoundVolume(sound, rand.float32_range(0.8, 1.)) // Set volume based on bounce speed
-				rl.SetSoundPitch(sound, 0.1+f32(app.players[dice.player].roll_kills)/f32(len(app.dices)/2.)) // Add some random pitch variation
+				rl.SetSoundPitch(sound, 0.1+f32(app.players[dice.player].roll.kills)/f32(len(app.dices)/2.)) // Add some random pitch variation
 				rl.PlaySound(sound)
 
 				// we make a small dramatic pause...
@@ -672,15 +683,15 @@ dices_scoring :: proc(dt: real) {
 			for upgrade, i in dice.upgrades{
 				#partial switch upgrade.type {
 				case .CardDice_Antenna:
-					if player.roll_antennas == 0 {
-						player.roll_antennas = dice.current_score
+					if player.roll.antennas == 0 {
+						player.roll.antennas = dice.current_score
 					} else {
-						player.roll_antennas *= dice.current_score
+						player.roll.antennas *= dice.current_score
 					}
 
 					dice.current_score = 0
 				case .CardDice_Journalist:
-					player.roll_multiplier += 2
+					player.roll.multiplier += 2
 				case .CardDice_General:
 					if dice.current_number == 6 {
 						append(&player.cards, Card{})
@@ -698,7 +709,7 @@ dices_scoring :: proc(dt: real) {
 				add_text(position, text, dice.color, 2.0, font_size=app.gui.font_size2)
 			}
 
-			app.players[dice.player].roll_score += dice.current_score
+			app.players[dice.player].roll.score += dice.current_score
 			dice.already_scored = true
 			player.score_counter += 1
 
@@ -739,7 +750,7 @@ cards_scoring :: proc(dt: real) {
 
 			#partial switch card.type {
 			case .CardRoll_HappyHour:
-				player.roll_multiplier += 3
+				player.roll.multiplier += 3
 				position := app.gui.hand_positions[p]
 				if len(player.cards) > 5 {
 					position += {0, app.gui.hand_area_height/f32(len(player.cards))*f32(c)}
@@ -780,17 +791,13 @@ scoring_summary :: proc(dt: real) {
 	if app.state_timer < 0.4 do return	// some pauses for counting
 
 	for &player, i in app.players {
-		player.roll_score += player.roll_antennas
-		if player.roll_multiplier > 0. {
-			player.roll_score *= player.roll_multiplier
+		player.roll.score += player.roll.antennas
+		if player.roll.multiplier > 0. {
+			player.roll.score *= player.roll.multiplier
 		}
 
-		player.total_score += player.roll_score
-		player.roll_score = 0
-		player.roll_multiplier = 0
-		player.roll_antennas = 0
-		player.roll_kills = 0
-		player.score_counter = 0
+		player.total_score += player.roll.score
+		player.roll = {}
 
 		for &card, c in player.cards{
 			card.already_scored = false
@@ -859,7 +866,7 @@ wait_for_ai :: proc(){
 
 	// Only use ghosts if we expect a high score or if we might lose our ghosts...
 	if best_score > 0. && (best_score > 20 || len(ai.ghosts) > 7){
-		ai.roll_score += best_score // @TODO: Add it to roll score
+		ai.roll.score += best_score // @TODO: Add it to roll score
 		ghosts_copy := make([dynamic]i32, len(ai.ghosts), cap(ai.ghosts))
 		defer delete(ghosts_copy)
 		copy(ghosts_copy[:], ai.ghosts[:])
@@ -988,16 +995,16 @@ draw :: proc(power: f32) {
 		text = (p == 0) ? "YOU" : "ANTAGONIST"
 		draw_text(text, {position.x, position.y+100}, app.gui.font_size2, player.color, anchor=(p == 1) ? .RIGHT : .LEFT, overline=true)
 
-		if app.state == .DICES_SCORING || app.state == .SCORING_SUMMARY || player.roll_score > 0. {
+		if app.state == .DICES_SCORING || app.state == .SCORING_SUMMARY || player.roll.score > 0. {
 
 			font_size := app.gui.font_size1
-			if player.is_scoring && player.roll_score+player.roll_antennas > 0. {
+			if player.is_scoring && player.roll.score+player.roll.antennas > 0. {
 				font_size += math.max((0.3-app.state_timer), 0.1) * 100
 			}
-			if player.roll_multiplier > 0 {
-				text = fmt.tprintf("+ %v X %v", player.roll_score+player.roll_antennas, player.roll_multiplier)
+			if player.roll.multiplier > 0 {
+				text = fmt.tprintf("+ %v X %v", player.roll.score+player.roll.antennas, player.roll.multiplier)
 			} else {
-				text = fmt.tprintf("+ %v", player.roll_score+player.roll_antennas)
+				text = fmt.tprintf("+ %v", player.roll.score+player.roll.antennas)
 			}
 
 			if p == 1{
@@ -1128,7 +1135,7 @@ draw :: proc(power: f32) {
 					fmt.println("Scored combination", combo_type, "for", score, "points!")
 					fmt.println(app.players[0].cycle.scored_combinations)
 
-					app.players[0].roll_score += score // @TODO: Add it to roll score
+					app.players[0].roll.score += score // @TODO: Add it to roll score
 					ghosts_copy := make([dynamic]i32, len(player.ghosts), cap(player.ghosts))
 					defer delete(ghosts_copy)
 					copy(ghosts_copy[:], player.ghosts[:])
