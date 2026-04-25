@@ -16,7 +16,7 @@ CardRoll_TombRaider
 CardDice_Assassin
 /title="ASSASSIN"
 /description="Gets +2 ATTACK at start of each ROLL."
-CardDice_Defender
+CardDice_Tank
 /title="TANK"
 /description="Gets +2 HEALTH at start of each ROLL."
 CardDice_Antenna

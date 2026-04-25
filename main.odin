@@ -96,6 +96,7 @@ Player :: struct {
 	ghosts: [dynamic]i32,
 	ghosts_max: i32,
 	cycle: Cycle,
+	n_dices: i32,
 }
 
 Cycle :: struct {
@@ -188,11 +189,11 @@ main :: proc() {
 		state = .ROLLING,
 		players = {
 			{
-				color=COLOR_PLAYERS[0], id=0,
+				color=COLOR_PLAYERS[0], id=0, n_dices=6,
 				ghosts_max=10, roll_cards_lifetime=3,
 			},
 			{
-				color=COLOR_PLAYERS[1], id=1,
+				color=COLOR_PLAYERS[1], id=1, n_dices=6,
 				ghosts_max=10, roll_cards_lifetime=3,
 			},
 		},
@@ -444,11 +445,42 @@ main :: proc() {
 	}
 }
 
+dice_init :: proc(dice: ^Dice, position:=Vector3{0, 1000, 0}){
+	half_size :f32= .75
+	mass := math.pow(half_size, 3) * 8.
+	orientation := dice.orientation
+	rotation := dice.rotation
+	acceleration := dice.acceleration
+
+	dice ^= {
+		state=.DEAD,
+		shape=ShapeBox{half_size=half_size},
+		position=position,
+		velocity=dice.velocity,
+		orientation=random_orientation(),
+		rotation=random_vector(-20.0, 20.0),
+		acceleration=Vector3{0.0, -50.0, 0.0},
+		linear_damping=0.99,
+		angular_damping=0.9,
+		inverse_mass=1./mass,
+		can_sleep=true,
+		player=dice.player,
+		color=app.players[dice.player].color,
+		current_number=0,
+		current_score=0,
+		attack=1,
+		health=1,
+		upgrades=dice.upgrades
+	}
+}
+
 dices_reset :: proc(power:f32=1., first_round:bool=false) {
 	if first_round {
 		clear(&app.dices)
-		for i in 0..<N_DICES {
-			append(&app.dices, Dice{player=u8((i < N_DICES / 2) ? 0 : 1)})
+		for player, p in app.players{
+			for i in 0..<player.n_dices {
+				append(&app.dices, Dice{player=player.id})
+			}
 		}
 	}
 
@@ -471,6 +503,8 @@ dices_reset :: proc(power:f32=1., first_round:bool=false) {
 				rand.float32_range(-20, -10),
 				rand.float32_range(-1, 100),
 			}
+
+			dice_init(&dice, position)
 
 			dice = {
 				state=.ALIVE,
@@ -710,7 +744,7 @@ dices_battle :: proc(dt: real) {
 }
 
 get_text :: proc(id: any, key: string) -> string{
-	// fmt.println("%v%v", id, key)
+	fmt.printfln("%v/%v", id, key)
 	return app.texts[fmt.tprintf("%v/%v", id, key)]
 }
 
@@ -1244,19 +1278,23 @@ draw :: proc(power: f32) {
 			state_switch(.WAIT_FOR_ROLL)
 			app.ghosts_selected = {-1, -1, -1, -1, -1}
 		}
-		if n_scored_combos == 15 {
-			if button("FINISH CYCLE", board_position+board_size+{-80, 50}, app.gui.font_size2, anchor=.RIGHT) {
-				add_text(board_position+board_size/2., fmt.aprint("CYCLE COMPLETE!"), human.color, 2., font_size=app.gui.font_size1, anchor=.CENTER)
-				human.roll.score += math.floor(human.score) / 10.
+		if n_scored_combos == 2 {
+			if button("FINISH CYCLE", board_position+board_size-{80, 70}, app.gui.font_size2, anchor=.RIGHT) {
+				add_text(board_position+board_size/2.,
+					fmt.aprint("CYCLE COMPLETE!"), human.color, 2.,
+					font_size=app.gui.font_size1, anchor=TextAnchor.CENTER)
+				human.roll.score += math.floor(human.total_score) / 10.
 				app.ghosts_selected = {}-1 // deselect everything
 				app.cards_offer = {}
 				cards_generate(app.cards_offer[:3], .CycleCards)
 				human.cycle.scored_combinations = {}
 				state_switch(.CARDS_OFFER)
 			}
-		} else if n_scored_combos > 10{
-			if button("RUSH CYCLE", board_position+board_size+{-80, 50}, app.gui.font_size2, anchor=.RIGHT) {
-				add_text(board_position+board_size/2., fmt.aprint("CYCLE COMPLETE BY RUSHING!"), human.color, 2., font_size=app.gui.font_size1, anchor=.CENTER)
+		} else if n_scored_combos > 0{
+			if button("RUSH CYCLE", board_position+board_size-{80, 70}, app.gui.font_size2, anchor=.RIGHT) {
+				add_text(board_position+board_size/2.,
+					fmt.aprint("CYCLE COMPLETE BY RUSHING!"), human.color, 2.,
+					font_size=app.gui.font_size1, anchor=TextAnchor.CENTER)
 				app.ghosts_selected = {}-1 // deselect everything
 				app.cards_offer = {}
 				cards_generate(app.cards_offer[:2], .CycleCards)
@@ -1302,11 +1340,13 @@ draw :: proc(power: f32) {
 				} else if card.category == .DICE {
 					app.card_selected = card
 					state_switch(.ASSIGN_CARD)
-				} else if card.category == .CYCLE {
-
 				}
 			} else if action == 0{
-				append(&human.cards, card)
+				if card.category == .CYCLE {
+					card_activate(human, &card)
+				} else {
+					append(&human.cards, card)
+				}
 				card = {}
 				state_switch(.WAIT_FOR_ROLL)
 			}

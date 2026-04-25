@@ -200,18 +200,26 @@ add_particles :: proc(position: Vector3, color: rl.Color){
 }
 
 add_text :: proc{add_text_vec3, add_text_vec3_vec2, add_text_vec2, add_text_vec2_vec2}
-add_text_vec3_vec2 :: proc (start: Vector3, end: rl.Vector2, text: string, color: rl.Color, lifetime:f32=2.0, font_size:f32=30, anchor:TextAnchor=.LEFT) {
+add_text_vec3_vec2 :: proc (
+		start: Vector3, end: rl.Vector2, text: string, color: rl.Color,
+		lifetime:f32=2.0, font_size:f32=30, anchor:TextAnchor=.LEFT) {
 	start_2d := rl.GetWorldToScreen(start, app.camera3d)
 	add_text_vec2_vec2(start_2d, {f32(end.x), f32(end.y)}, text, color, lifetime, font_size, anchor)
 }
-add_text_vec3 :: proc (start: Vector3, text: string, color: rl.Color, lifetime:f32=2.0, font_size:f32=30, anchor:TextAnchor=.LEFT) {
+add_text_vec3 :: proc (
+		start: Vector3, text: string, color: rl.Color, lifetime:f32=2.0,
+		font_size:f32=30, anchor:TextAnchor=.LEFT) {
 	start_2d := rl.GetWorldToScreen(start, app.camera3d)
 	add_text_vec2_vec2(start_2d, start_2d + Vector2{0, -100}, text, color, lifetime, font_size, anchor)
 }
-add_text_vec2 :: proc (start: Vector2, text: string, color: rl.Color, lifetime:f32=2.0, font_size: f32=30, anchor:TextAnchor=.LEFT) {
+add_text_vec2 :: proc (
+		start: Vector2, text: string, color: rl.Color, lifetime:f32=2.0,
+		font_size: f32=30, anchor:TextAnchor=.LEFT) {
 	add_text_vec2_vec2(start, start + Vector2{0, -100}, text, color, lifetime, font_size, anchor)
 }
-add_text_vec2_vec2 :: proc (start, end: Vector2, text: string, color: rl.Color, lifetime:f32=2.0, font_size: f32=30, anchor:TextAnchor=.LEFT) {
+add_text_vec2_vec2 :: proc (
+		start, end: Vector2, text: string, color: rl.Color, lifetime:f32=2.0,
+		font_size: f32=30, anchor:TextAnchor=.LEFT) {
 	for &t in app.text_animations{
 		if t.visible do continue
 

@@ -71,7 +71,8 @@ card_activate :: proc(player: ^Player, card: ^Card){
 		player.roll_cards_lifetime += 1
 	case .CardCycle_ExtraDice:
 		// player.n_dices += 1
-		append(&app.dices, Dice{player=player.id, position={0, 1000, 0}, state=.DEAD})
+		append(&app.dices, Dice{player=player.id, state=.DEAD})
+		dice_init(&app.dices[len(app.dices)-1])
 	case .CardCycle_Graveyard:
 		player.ghosts_max += 1
 	}
@@ -82,11 +83,15 @@ card_activate :: proc(player: ^Player, card: ^Card){
 		for &upgrade in dice.upgrades{
 			#partial switch upgrade.type {
 			case .CardDice_Historian:
-				upgrade.var1 += 0.25
-				add_text(dice.position, fmt.aprint("HISTORIAN: +0.25 SCORE!"), dice.color, 0.5)
+				if card.category == .ROLL{
+					upgrade.var1 += 0.25
+					add_text(dice.position, fmt.aprint("HISTORIAN: +0.25 SCORE!"), dice.color, 0.5)
+				}
 			case .CardDice_Librarian:
-				upgrade.var1 += 0.5
-				add_text(dice.position, fmt.aprint("LIBRARIAN: +0.5 SCORE!"), dice.color, 0.5)
+				if card.category == .DICE{
+					upgrade.var1 += 0.5
+					add_text(dice.position, fmt.aprint("LIBRARIAN: +0.5 SCORE!"), dice.color, 0.5)
+				}
 			}
 		}
 	}
