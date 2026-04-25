@@ -656,7 +656,7 @@ cards_battle :: proc (dt: real) {
 				ghost_score: sco
 				for ghost in player.ghosts do ghost_score += sco(ghost)
 				player.roll.score += ghost_score
-				add_text(position, app.gui.score_positions[p], fmt.aprintf("+%v FROM GHOSTS!", ghost_score), player.color, lifetime=0.4)
+				add_text(position, fmt.aprintf("+%.1f FROM GHOSTS!", ghost_score), player.color, lifetime=0.4)
 			case .CardRoll_HappyHour:
 				player.roll.multiplier += 3
 				add_text(position, app.gui.score_positions[p], fmt.aprint("X3"), player.color, lifetime=0.4)
@@ -744,7 +744,6 @@ dices_battle :: proc(dt: real) {
 }
 
 get_text :: proc(id: any, key: string) -> string{
-	fmt.printfln("%v/%v", id, key)
 	return app.texts[fmt.tprintf("%v/%v", id, key)]
 }
 
@@ -778,7 +777,7 @@ dices_scoring :: proc(dt: real) {
 					} else {
 						player.roll.antennas *= dice.current_score
 					}
-					text = fmt.aprintf("ANTENNA NETWORK X%v!", dice.current_score)
+					text = fmt.aprintf("ANTENNA NETWORK X.f!", dice.current_score)
 
 					dice.current_score = 0
 				case .CardDice_Journalist:
@@ -792,23 +791,23 @@ dices_scoring :: proc(dt: real) {
 					}
 				case .CardDice_Investor:
 					if dice.current_number == 1 {
-						text = fmt.aprintf("PAYOUT +%v", math.floor(upgrade.var1))
+						text = fmt.aprintf("PAYOUT +%.1f", math.floor(upgrade.var1))
 						dice.current_score += math.floor(upgrade.var1)
 						upgrade.var1 = 0.
 					} else {
 						upgrade.var1 += dice.current_score
 						upgrade.var1 *= 1.1
 						dice.current_score = 0
-						text = fmt.aprintf("INVESTING +%v", math.floor(upgrade.var1))
+						text = fmt.aprintf("INVESTING +%.1f", math.floor(upgrade.var1))
 					}
 				case .CardDice_Historian:
-					text = fmt.aprintf("HISTORIAN: +%v!", math.ceil(upgrade.var1))
+					text = fmt.aprintf("HISTORIAN: +%.1f!", math.ceil(upgrade.var1))
 					dice.current_score += math.ceil(upgrade.var1)
 				case .CardDice_Librarian:
-					text = fmt.aprintf("LIBRARIAN: +%v!", math.ceil(upgrade.var1))
+					text = fmt.aprintf("LIBRARIAN: +%.1f!", math.ceil(upgrade.var1))
 					dice.current_score += math.ceil(upgrade.var1)
 				case .CardDice_PowerDice:
-					text = fmt.aprintf("POWER UP: %v X %v!", dice.current_score, dice.current_score)
+					text = fmt.aprintf("POWER UP: %.f X %.f!", dice.current_score, dice.current_score)
 					dice.current_score *= dice.current_score
 				case:
 					continue
@@ -830,7 +829,7 @@ dices_scoring :: proc(dt: real) {
 			// add_particles(dice.position, dice.color)
 			if dice.current_score != 0 {
 				add_text(dice.position, app.gui.score_positions[p],
-						 fmt.aprintf("+%v", dice.current_score), dice.color, wait_time, font_size=app.gui.font_size1)
+						 fmt.aprintf("+%.1f", dice.current_score), dice.color, wait_time, font_size=app.gui.font_size1)
 			}
 
 			return
@@ -1097,9 +1096,8 @@ draw :: proc(power: f32) {
 			}
 		}
 
-		text := fmt.tprintf("%v", player.total_score)
 		position := app.gui.score_positions[p]
-
+		text := fmt.tprintf("%.f", player.total_score)
 		draw_text(text, {position.x, position.y+40}, app.gui.font_size1, player.color, anchor=(p == 1) ? .RIGHT : .LEFT)
 
 		text = (p == 0) ? "YOU" : "ANTAGONIST"
@@ -1112,9 +1110,9 @@ draw :: proc(power: f32) {
 				font_size += math.max((0.3-app.state_timer), 0.1) * 100
 			}
 			if player.roll.multiplier > 0 {
-				text = fmt.tprintf("+ %v X %v", player.roll.score+player.roll.antennas, player.roll.multiplier)
+				text = fmt.tprintf("+ %.1f X %.1f", player.roll.score+player.roll.antennas, player.roll.multiplier)
 			} else {
-				text = fmt.tprintf("+ %v", player.roll.score+player.roll.antennas)
+				text = fmt.tprintf("+ %.1f", player.roll.score+player.roll.antennas)
 			}
 
 			if p == 1{
@@ -1140,16 +1138,6 @@ draw :: proc(power: f32) {
 			text := strings.join(upgrades[:count], ", ", context.temp_allocator)
 			draw_text(text, position, app.gui.font_size2, dice.color)
 		}
-	}
-
-	for text in app.text_animations{
-		if !text.visible do continue
-
-		x := math.lerp(text.start.x, text.end.x, 1.-text.lifetime/text.start_lifetime)
-		y := math.lerp(text.start.y, text.end.y, 1.-text.lifetime/text.start_lifetime)
-		text_size := measure_text(text.text, text.font_size)
-		rl.DrawRectangleV({x-10, y-10}, {text_size.x+20, text_size.y+20}, text.color/2.)
-		draw_text(text.text, {x, y}, text.font_size, text.color, anchor=text.anchor)
 	}
 
 	if app.opponent.speaking {
@@ -1234,7 +1222,7 @@ draw :: proc(power: f32) {
 			if already_scored do n_scored_combos += 1
 			draw_text(fmt.tprintf("%v", combo_type), position, app.gui.font_size2, (match && !already_scored) ? rl.RAYWHITE : rl.GRAY, strikethrough=already_scored)
 			if !already_scored && match && enough_ghosts {
-				draw_text(fmt.tprintf("+%v", score), position+{600, 0}, app.gui.font_size2, rl.RAYWHITE)
+				draw_text(fmt.tprintf("+%.1f", score), position+{600, 0}, app.gui.font_size2, rl.RAYWHITE)
 
 				for ghost_number, g in ghost_selected_numbers{
 					dice_button(ghost_number, position+{300+f32(g)*(ghost_size2+5), -7},
@@ -1385,6 +1373,16 @@ draw :: proc(power: f32) {
 			add_text(mouse_pos, fmt.aprint("Keep card in hand!"), rl.RAYWHITE, 1.5)
 			state_switch(.WAIT_FOR_ROLL)
 		}
+	}
+
+	for text in app.text_animations{
+		if !text.visible do continue
+
+		x := math.lerp(text.start.x, text.end.x, 1.-text.lifetime/text.start_lifetime)
+		y := math.lerp(text.start.y, text.end.y, 1.-text.lifetime/text.start_lifetime)
+		text_size := measure_text(text.text, text.font_size)
+		rl.DrawRectangleV({x-10, y-10}, {text_size.x+20, text_size.y+20}, text.color/2.)
+		draw_text(text.text, {x, y}, text.font_size, text.color, anchor=text.anchor)
 	}
 }
 
