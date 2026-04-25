@@ -6,18 +6,27 @@ import rl "vendor:raylib"
 CardCategory :: enum {NONE, ROLL, DICE, CYCLE}
 CardType :: enum i32{
 		CardNone,
+	CardRoll_Attack,
+	CardRoll_Defense,
+	CardRoll_GhostHour,
 	CardRoll_HappyHour,
+	CardRoll_TombRaider,
 		CardRolls,				// <- Until here we got roll cards
 	CardDice_Antenna,
+	CardDice_Assassin,
 	CardDice_Journalist,
 	CardDice_General,
+	CardDice_Investor,
 	CardDice_PowerDice,
-	CardDice_ShortSighted,
-	CardDice_Blind,
+	// CardDice_ShortSighted,
+	// CardDice_Blind,
 	CardDice_Historian,
 	CardDice_Librarian,
+	CardDice_Tank,
 		CardDices,				// <- Until we got upgrade cards
 	CardCycle_ExtraDice,
+	CardCycle_EternalRoll,
+	CardCycle_Graveyard,
 		CardCycles,				// <- Until we got cycle cards
 }
 Card :: struct{
@@ -54,6 +63,20 @@ card_activate :: proc(card: ^Card){
 	sound := app.sounds[10]
 	rl.SetSoundVolume(sound, 1.)
 	rl.PlaySound(sound)
+}
+
+card_activate_cycle_card :: proc(player_id: i32, card: ^Card){
+	player := &app.players[player_id]
+	#partial switch card.type {
+	case .CardCycle_EternalRoll:
+		player.roll_cards_lifetime += 1
+	case .CardCycle_ExtraDice:
+		player.n_dices += 1
+		append(&app.dices, Dice{player=u8(player_id), position={0, 1000, 0}, state=.DEAD})
+	case .CardCycle_Graveyard:
+		player.ghosts_max += 1
+	}
+	card_activate(card)
 }
 
 card_in_hand :: proc(player: Player, card_type: CardType, start_index:i32=0, only_active:=false) -> Card{

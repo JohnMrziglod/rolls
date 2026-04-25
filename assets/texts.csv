@@ -1,22 +1,42 @@
+title/CardRoll_Attack|FULL ATTACK!
+description/CardRoll_Attack|All your dices get +1 ATTACK.
+title/CardRoll_Defense|DEFENSE! DEFENSE!
+description/CardRoll_Defense|All your dices get +1 HEALTH.
+title/CardRoll_GhostHour|GHOST HOUR
+description/CardRoll_GhostHour|Your GHOST DICES' numbers add to your ROLL SCORE.
 title/CardRoll_HappyHour|HAPPY HOUR
-description/CardRoll_HappyHour|X3 your roll score
+description/CardRoll_HappyHour|X3 your ROLL SCORE.
+title/CardRoll_TombRaider|TOMB RAIDER
+description/CardRoll_TombRaider|Steal one of your antagonist's GHOST DICES.
+title/CardDice_Assassin|ASSASSIN
+description/CardDice_Assassin|Gets +2 ATTACK at start of each ROLL.
+title/CardDice_Defender|TANK
+description/CardDice_Tank|Gets +2 HEALTH at start of each ROLL.
 title/CardDice_Antenna|ANTENNA
-description/CardDice_Antenna|Multiply dice's score with other dices with antenna.
-title/CardDice_Enforcer|ENFORCER #%v
-description/CardDice_Enforcer|Replace one arbitrary side of this dice with a #%v.
+description/CardDice_Antenna|Multiply dice's SCORE with the SCORE of other dices with ANTENNA.
+title/CardDice_Optimist|OPTIMIST
+description/CardDice_Optimist|All sides of this dices show one number higher (max. 6).
+title/CardDice_Pessimist|PESSIMIST
+description/CardDice_Pessimist|All sides of this dices show one number lower (min. 1).
 title/CardDice_Journalist|JOURNALIST
-description/CardDice_Journalist|X2 your roll score.
+description/CardDice_Journalist|X2 your ROLL SCORE.
 title/CardDice_General|GENERAL
 description/CardDice_General|Create a roll card if it survives and shows a 6.
-title/CardDice_PowerDice|POWER DICE
+title/CardDice_Investor|INVESTOR
+description/CardDice_Investor|Saves its own SCORE when surviving with 10%% interest. Pay out when showing a 1.
+title/CardDice_PowerDice|POWER UP
 description/CardDice_PowerDice|Multiply dice's score with its own score again.
 title/CardDice_ShortSighted|SHORT-SIGHTED
 description/CardDice_ShortSighted|Attacks farthest antagonist's dice regardless of its number.
 title/CardDice_Blind|BLIND
 description/CardDice_Blind|Attacks closest antagonist's dice regardless of its number.
 title/CardDice_Historian|HISTORIAN
-description/CardDice_Historian|Gains +0.1 score for each used roll card.
+description/CardDice_Historian|Gains +0.1 SCORE when surviving an activated roll card.
 title/CardDice_Librarian|LIBRARIAN
-description/CardDice_Librarian|Gains +0.1 score for each used dice card.
+description/CardDice_Librarian|Gains +0.2 SCORE when surviving an assigned dice card.
 title/CardCycle_ExtraDice|EXTRA DICE
 description/CardCycle_ExtraDice|Add +1 Dice to your army.
+title/CardCycle_EternalRoll|ETERNAL ROLL
+description/CardCycle_EternalRoll|Your ROLL CARDS' lifetime increases by 1 ROLL.
+title/CardCycle_Graveyard|GRAVEYARD
+description/CardCycle_Graveyard|+1 SPACE for GHOST DICES.
