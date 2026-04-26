@@ -634,6 +634,16 @@ cards_battle :: proc (dt: real) {
 					append(&player.ghosts, ghost)
 				}
 				slice.sort(player.ghosts[:])
+			case .CardRoll_GraveRoll:
+				if len(player.ghosts) > 0{
+					for &ghost in player.ghosts{
+						ghost = rand.int32_range(1, 7)
+					}
+					slice.sort(player.ghosts[:])
+					add_text(position, fmt.aprint("REROLLED YOUR GHOSTS!"), player.color, lifetime=1.)
+				} else {
+					add_text(position, fmt.aprint("NO GHOSTS TO REROLL!"), player.color, lifetime=1.)
+				}
 			case .CardRoll_GhostHour:
 				ghost_score: sco
 				for ghost in player.ghosts do ghost_score += sco(ghost)
@@ -913,18 +923,30 @@ cards_scoring :: proc(dt: real) {
 scoring_summary :: proc(dt: real) {
 	if app.state_timer < 0.4 do return	// some pauses for counting
 
-	for &player, i in app.players {
+	roll_scores := [2]sco{}
+	for &player, p in app.players {
 		player.roll.score += player.roll.antennas
 		if player.roll.multiplier > 0. {
 			player.roll.score *= player.roll.multiplier
 		}
 
-		player.total_score += player.roll.score
+		// We delay it due to the Revenge Roll Card
+		roll_scores[p] = player.roll.score
 		player.roll = {}
 
 		for &card, c in player.cards{
 			card.already_scored = false
 		}
+	}
+
+	if .CardRoll_Revenge in app.players[0].roll_effects && roll_scores[0] < roll_scores[1]{
+		roll_scores = {roll_scores[1], roll_scores[0]}
+	}
+	if .CardRoll_Revenge in app.players[1].roll_effects && roll_scores[1] < roll_scores[0]{
+		roll_scores = {roll_scores[1], roll_scores[0]}
+	}
+	for &player, p in app.players {
+		player.total_score += roll_scores[p]
 	}
 
 	app.current_player = (app.current_player + 1) % N_PLAYERS

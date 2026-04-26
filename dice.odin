@@ -4,6 +4,13 @@ import "core:fmt"
 import "core:slice"
 
 dice_kills :: proc(killer, victim: ^Dice){
+	player := &app.players[victim.player]
+
+	if .CardRoll_Immortality in player.roll_effects{
+		add_text(victim.position, fmt.aprint("IMMORTAL!"), victim.color, 1.5, font_size=app.gui.font_size2)
+		return
+	}
+
 	add_particles(victim.position, victim.color)
 	add_text(victim.position, fmt.aprint("GHOST!"), victim.color, 1.5, font_size=app.gui.font_size2)
 
@@ -11,7 +18,10 @@ dice_kills :: proc(killer, victim: ^Dice){
 	victim.position.y = 1000.
 	app.players[killer.player].roll.kills += 1
 
-	player := &app.players[victim.player]
+	if .CardRoll_Exorcism in player.roll_effects{
+		return
+	}
+
 	if .CardRoll_WhiteElephant in player.roll_effects{
 		other_player := &app.players[killer.player]
 		if i32(len(other_player.ghosts)) >= other_player.ghosts_max do clear(&other_player.ghosts)

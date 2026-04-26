@@ -7,18 +7,30 @@ CardRoll_Defense
 CardRoll_Doppelgeist
 /title="DOPPELGEIST"
 /description="Duplicates your GHOST DICES."
-CardRoll_GhostHour
-/title="GHOST HOUR"
-/description="Your GHOST DICES' numbers add to your ROLL SCORE."
-CardRoll_HappyHour
-/title="HAPPY HOUR"
-/description="X2 your ROLL SCORE."
+CardRoll_Exorcism
+/title="EXORCISM"
+/description="You won't gain any GHOST DICES this ROLL."
 CardRoll_FakeNews
 /title="FAKE NEWS"
 /description="All JOURNALIST DICES multiply the ROLL SCORE by 0.5 instead of 2."
+CardRoll_GhostHour
+/title="GHOST HOUR"
+/description="Your GHOST DICES' numbers add to your ROLL SCORE."
+CardRoll_GraveRoll
+/title="GRAVE ROLL"
+/description="Your GHOST DICES will be rerolled."
+CardRoll_HappyHour
+/title="HAPPY HOUR"
+/description="X2 your ROLL SCORE."
+CardRoll_Immortality
+/title="IMMORTALITY"
+/description="Your DICES cannot die during this ROLL."
 CardRoll_MarketCrash
 /title="MARKET CRASH"
 /description="All INVESTOR DICES lose 50%%%% of their savings."
+CardRoll_Revenge
+/title="REVENGE"
+/description="If you have a lower ROLL SCORE than your antagonist, swap them."
 CardRoll_WhiteElephant
 /title="WHITE ELEPHANT"
 /description="Your antagonist gets all your GHOST DICES of this ROLL."
