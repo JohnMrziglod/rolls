@@ -4,12 +4,21 @@ CardRoll_Attack
 CardRoll_Defense
 /title="DEFENSE! DEFENSE!"
 /description="All your dices get +1 HEALTH."
+CardRoll_Doppelgeist
+/title="DOPPELGEIST"
+/description="Duplicates your GHOST DICES."
 CardRoll_GhostHour
 /title="GHOST HOUR"
 /description="Your GHOST DICES' numbers add to your ROLL SCORE."
 CardRoll_HappyHour
 /title="HAPPY HOUR"
-/description="X3 your ROLL SCORE."
+/description="X2 your ROLL SCORE."
+CardRoll_MarketCrash
+/title="MARKET CRASH"
+/description="All INVESTOR DICES lose 50%% of their savings."
+CardRoll_WhiteElephant
+/title="WHITE ELEPHANT"
+/description="Your antagonist gets all your GHOST DICES of this ROLL."
 CardRoll_TombRaider
 /title="TOMB RAIDER"
 /description="Steal one of your antagonist's GHOST DICES."
@@ -28,18 +37,27 @@ CardDice_Optimist
 CardDice_Pessimist
 /title="PESSIMIST"
 /description="All sides of this dices show one number lower (min. 1)."
+CardDice_General
+/title="GENERAL"
+/description="Adds number of your surviving DICES to its SCORE."
 CardDice_Journalist
 /title="JOURNALIST"
 /description="X2 your ROLL SCORE."
 CardDice_Influencer
 /title="INFLUENCER"
-/description="Create a roll card if it survives and shows a 6."
+/description="Create a ROLL CARD if it survives and shows a 1."
+CardDice_Engineer
+/title="ENGINEER"
+/description="Create a DICE CARD if it survives and shows a 1."
+CardDice_Medium
+/title="MEDIUM"
+/description="Adds number of your GHOST DICES to its SCORE."
 CardDice_Investor
 /title="INVESTOR"
-/description="Saves its own SCORE when surviving with 10% interest. Pay out when showing a 1."
+/description="Saves its own SCORE when surviving with 10%% interest. Pay out when showing a 1."
 CardDice_PowerDice
 /title="POWER UP"
-/description="Multiply dice's score with its own score again."
+/description="Multiply dice's SCORE with its own SCORE again."
 CardDice_ShortSighted
 /title="SHORT-SIGHTED"
 /description="Attacks farthest antagonist's dice regardless of its number."
@@ -48,13 +66,13 @@ CardDice_Blind
 /description="Attacks closest antagonist's dice regardless of its number."
 CardDice_Historian
 /title="HISTORIAN"
-/description="Gains +0.25 SCORE when witnessing an activated roll card."
+/description="Gains +1 SCORE when alive and activating a ROLL CARD."
 CardDice_Librarian
 /title="LIBRARIAN"
-/description="Gains +0.5 SCORE when witnessing an assigned dice card."
+/description="Gains +1 SCORE when alive and assigning DICE CARD."
 CardCycle_ExtraDice
 /title="EXTRA DICE"
-/description="Add +1 Dice to your army."
+/description="Add +1 DICE to your army."
 CardCycle_EternalRoll
 /title="ETERNAL ROLL"
 /description="Your ROLL CARDS' lifetime increases by 1 ROLL."

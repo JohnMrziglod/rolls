@@ -13,6 +13,7 @@ import "core:strings"
 import rl "vendor:raylib"
 
 sco :: f64
+void :: struct{}
 
 AREA_SIZE :: 30.0
 // COLOR_BACKGROUND := rl.Color{203, 161, 53, 255}
@@ -42,7 +43,7 @@ Dice :: struct {
 	attack: sco,
 	health: sco,
 }
-Opponent :: struct {
+Antagonist :: struct {
 	message: string,
 	speaking: bool
 }
@@ -92,6 +93,7 @@ Player :: struct {
 	is_scoring: bool,
 
 	cards: [dynamic]Card,
+	roll_effects: map[CardType]void,	// used for some roll cards
 	roll_cards_lifetime: i32,
 	ghosts: [dynamic]i32,
 	ghosts_max: i32,
@@ -125,37 +127,12 @@ Application :: struct {
 	current_player: u8,
 	dices: [dynamic]Dice,
 	contacts: [dynamic]Contact,
-	opponent: Opponent,
+	antagonist: Antagonist,
 	cards_offer: [5]Card, // Up to five cards can be selected
 	card_selected: Card,
 	ghosts_selected: [5]i32,
 }
 app: Application
-
-CardGenerateTypes :: enum{AllCards, RollCards, RollAndDiceCards, DiceCards, CycleCards}
-cards_generate :: proc(cards: []Card, types:CardGenerateTypes){
-	for i in 0..<len(cards) {
-		lower_bound := i32(CardType.CardNone)+1
-		upper_bound := i32(CardType.CardCycles)
-		switch types {
-		case .AllCards:
-			// do nothing, we want all cards
-		case .DiceCards:
-			lower_bound = i32(CardType.CardRolls)+1
-			upper_bound = i32(CardType.CardDices)
-		case .RollCards:
-			upper_bound = i32(CardType.CardRolls)
-		case .RollAndDiceCards:
-			upper_bound = i32(CardType.CardDices)
-		case .CycleCards:
-			 lower_bound = i32(CardType.CardDices)+1
-			 upper_bound = i32(CardType.CardCycles)
-		}
-		card_type := CardType(rand.int32_range(lower_bound, upper_bound))
-		if card_type == .CardRolls do card_type = CardType(i32(card_type)-1)
-		cards[i] = Card{type=card_type, category=card_category(card_type)}
-	}
-}
 
 main :: proc() {
 	// Initialize window
@@ -179,9 +156,6 @@ main :: proc() {
     // rl.MaximizeWindow()
     rl.SetWindowPosition(0, 30)
     rl.SetExitKey(.KEY_NULL) // we don't want the window to be closed by accident
-
-	// screen_width = rl.GetScreenWidth()
-	// screen_height = rl.GetScreenHeight()
 	target_ratio := 1080 / f32(screen_height)
 
 	app = {
@@ -190,16 +164,16 @@ main :: proc() {
 		players = {
 			{
 				color=COLOR_PLAYERS[0], id=0, n_dices=6,
-				ghosts_max=10, roll_cards_lifetime=3,
+				ghosts_max=10, roll_cards_lifetime=2,
 			},
 			{
 				color=COLOR_PLAYERS[1], id=1, n_dices=6,
-				ghosts_max=10, roll_cards_lifetime=3,
+				ghosts_max=10, roll_cards_lifetime=2,
 			},
 		},
-		opponent = {
+		antagonist = {
 			message = "Let's see who reaches\n1000 points first!",
-			speaking = false,
+			speaking = true,
 		},
 		ghosts_selected = {-1, -1, -1, -1, -1},
 	}
@@ -333,7 +307,6 @@ main :: proc() {
 	// }
 
 	// Main game loop
-
 	for !rl.WindowShouldClose() {
 		dt := rl.GetFrameTime()
 		app.state_timer += dt
@@ -413,9 +386,9 @@ main :: proc() {
 			}
 		}
 
-		if app.opponent.speaking {
+		if app.antagonist.speaking {
 			if rl.IsKeyPressed(rl.KeyboardKey.SPACE) {
-				app.opponent.speaking = false
+				app.antagonist.speaking = false
 				app.state_timer = 0.0
 			}
 		} else {
@@ -580,9 +553,6 @@ physics :: proc(duration: real) {
 	}
 
 	if len(app.contacts) > 0 {
-		if app.state != .ROLLING {
-			fmt.println("Resolving", len(app.contacts), "app.contacts")
-		}
 		resolver := ContactResolver{
 			position_iterations=i32(len(app.contacts))*16, velocity_iterations=i32(len(app.contacts))*16
 		}
@@ -626,51 +596,61 @@ rolling :: proc(dt: real){
 }
 
 cards_battle :: proc (dt: real) {
-	if app.state_timer < 0.4 do return	// some pauses for counting
+	if app.state_timer < 0.5 do return	// some pauses for counting
 	app.state_timer = 0.0
 
 	for &player, p in app.players {
+		other_player := &app.players[(p+1)%N_PLAYERS]
 		for &card, c in player.cards{
 			if !card.active || card.already_scored do continue
 
-			position := app.gui.hand_positions[p]
+			position := app.gui.hand_positions[p]+app.gui.card_size/2.
 			if len(player.cards) > 5 {
-				position += {0, app.gui.hand_area_height/f32(len(player.cards))*f32(c)}
+				position.y += app.gui.hand_area_height/f32(len(player.cards))*f32(c)
 			} else {
-				position += {0, f32(c)*(30+app.gui.card_size.y)}
+				position.y += f32(c)*(30+app.gui.card_size.y)
 			}
 			#partial switch card.type {
 			case .CardRoll_Attack:
 				for &dice, d in app.dices{
 					if dice.state != .ALIVE || dice.player != u8(p) do continue
 					dice.attack += 2
-					add_text(dice.position, fmt.aprint("+2 ATTACK"), player.color, lifetime=0.4)
+					add_text(dice.position, fmt.aprint("+2 ATTACK"), COLOR_CARDS[card.category], lifetime=0.6)
 				}
 			case .CardRoll_Defense:
 				for &dice, d in app.dices{
 					if dice.state != .ALIVE || dice.player != u8(p) do continue
 					dice.health += 2
-					add_text(dice.position, fmt.aprint("+2 HEALTH"), player.color, lifetime=0.4)
+					add_text(dice.position, fmt.aprint("+2 HEALTH"), COLOR_CARDS[card.category], lifetime=0.6)
 				}
 			case .CardRoll_GhostHour:
 				ghost_score: sco
 				for ghost in player.ghosts do ghost_score += sco(ghost)
 				player.roll.score += ghost_score
-				add_text(position, fmt.aprintf("+%.1f FROM GHOSTS!", ghost_score), player.color, lifetime=0.4)
+				add_text(position, fmt.aprintf("+%.f FROM GHOSTS!", ghost_score), COLOR_CARDS[card.category], lifetime=1.)
 			case .CardRoll_HappyHour:
 				player.roll.multiplier += 3
-				add_text(position, app.gui.score_positions[p], fmt.aprint("X3"), player.color, lifetime=0.4)
+				add_text(position, fmt.aprint("ROLL SCORE X3"), player.color, lifetime=1.)
 			case .CardRoll_TombRaider:
-				victim := app.players[(p+1)%N_PLAYERS]
-				if len(victim.ghosts) == 0 {
-					add_text(position, fmt.aprint("NO GHOSTS TO STEAL"), player.color, lifetime=0.4)
+				if len(other_player.ghosts) == 0 {
+					add_text(position, fmt.aprint("NO GHOSTS TO STEAL"), COLOR_CARDS[card.category], lifetime=1.)
 				} else {
 					if i32(len(player.ghosts)) >= player.ghosts_max do clear(&player.ghosts)
-					append(&player.ghosts, pop(&victim.ghosts))
+					index_stolen := rand.int32_range(0, i32(len(other_player.ghosts)))
+					append(&player.ghosts, other_player.ghosts[index_stolen])
+					ordered_remove(&other_player.ghosts, index_stolen)
+					add_text(position, fmt.aprint("STEALING GHOSTS!"), COLOR_CARDS[card.category], lifetime=1.)
 				}
 				// Sort the ghost dices (makes other things easier later on also for the human player)
 				slice.sort(player.ghosts[:])
-				add_text(position, fmt.aprint("STEALING GHOSTS!"), player.color, lifetime=0.4)
+			case .CardRoll_Doppelgeist:
+				// @TODO
+				ghosts := player.ghosts
+				for ghost in ghosts{
+					if i32(len(player.ghosts)) >= player.ghosts_max do clear(&player.ghosts)
+					append(&player.ghosts, ghost)
+				}
+				slice.sort(player.ghosts[:])
 			case:
 				continue
 			}
@@ -684,10 +664,10 @@ cards_battle :: proc (dt: real) {
 			rl.SetSoundPitch(sound, pitch)
 			rl.PlaySound(sound)
 
-			card.already_scored = true
-			card.active_since += 1
 			card.triggered = 1.0
-			if card.active_since > player.roll_cards_lifetime {
+			card.already_scored = true
+			card.lifetime -= 1
+			if card.lifetime <= 0 {
 				card_discard(&player, i32(c))
 				// It is import that we return afterwards, otherwise we might get in trouble with the indices...
 			}
@@ -759,6 +739,10 @@ dices_scoring :: proc(dt: real) {
 
 	for &player, p in app.players{
 		player.is_scoring = true
+		n_alive := 0
+		for dice in app.dices {
+			if dice.state == .ALIVE && u8(p) == dice.player do n_alive += 1
+		}
 
 		for &dice, i in app.dices {
 			if dice.state != .ALIVE || dice.already_scored || u8(p) != dice.player do continue
@@ -784,28 +768,40 @@ dices_scoring :: proc(dt: real) {
 					player.roll.multiplier += 2
 					text = fmt.aprint("JOURNALIST: X2!")
 				case .CardDice_Influencer:
-					if dice.current_number == 6 {
+					if dice.current_number == 1 {
 						append(&player.cards, Card{})
 						cards_generate(player.cards[len(player.cards)-1:], .RollCards)
 						text = fmt.aprint("INFLUENCER: +1 ROLL CARD")
 					}
+				case .CardDice_Engineer:
+					if dice.current_number == 1 {
+						append(&player.cards, Card{})
+						cards_generate(player.cards[len(player.cards)-1:], .DiceCards)
+						text = fmt.aprint("ENGINEER: +1 DICE CARD")
+					}
 				case .CardDice_Investor:
 					if dice.current_number == 1 {
-						text = fmt.aprintf("PAYOUT +%.1f", math.floor(upgrade.var1))
+						text = fmt.aprintf("PAYOUT +%.f", upgrade.var1)
 						dice.current_score += math.floor(upgrade.var1)
 						upgrade.var1 = 0.
 					} else {
 						upgrade.var1 += dice.current_score
 						upgrade.var1 *= 1.1
 						dice.current_score = 0
-						text = fmt.aprintf("INVESTING +%.1f", math.floor(upgrade.var1))
+						text = fmt.aprintf("INVESTING +%.1f", upgrade.var1)
 					}
+				case .CardDice_General:
+					text = fmt.aprintf("GENERAL: +%.f!", n_alive)
+					dice.current_score += sco(n_alive)
 				case .CardDice_Historian:
-					text = fmt.aprintf("HISTORIAN: +%.1f!", math.ceil(upgrade.var1))
-					dice.current_score += math.ceil(upgrade.var1)
+					text = fmt.aprintf("HISTORIAN: +%.f!", upgrade.var1)
+					dice.current_score += upgrade.var1
+				case .CardDice_Medium:
+					text = fmt.aprintf("MEDIUM: +%v!", len(player.ghosts))
+					dice.current_score += sco(len(player.ghosts))
 				case .CardDice_Librarian:
-					text = fmt.aprintf("LIBRARIAN: +%.1f!", math.ceil(upgrade.var1))
-					dice.current_score += math.ceil(upgrade.var1)
+					text = fmt.aprintf("LIBRARIAN: +%.1f!", upgrade.var1)
+					dice.current_score += upgrade.var1
 				case .CardDice_PowerDice:
 					text = fmt.aprintf("POWER UP: %.f X %.f!", dice.current_score, dice.current_score)
 					dice.current_score *= dice.current_score
@@ -829,7 +825,7 @@ dices_scoring :: proc(dt: real) {
 			// add_particles(dice.position, dice.color)
 			if dice.current_score != 0 {
 				add_text(dice.position, app.gui.score_positions[p],
-						 fmt.aprintf("+%.1f", dice.current_score), dice.color, wait_time, font_size=app.gui.font_size1)
+						 fmt.aprintf("+%.f", dice.current_score), dice.color, wait_time, font_size=app.gui.font_size1)
 			}
 
 			return
@@ -857,11 +853,11 @@ cards_scoring :: proc(dt: real) {
 			#partial switch card.type {
 			case .CardRoll_HappyHour:
 				player.roll.multiplier += 3
-				position := app.gui.hand_positions[p]
+				position := app.gui.hand_positions[p]+app.gui.card_size/2.
 				if len(player.cards) > 5 {
-					position += {0, app.gui.hand_area_height/f32(len(player.cards))*f32(c)}
+					position.y += app.gui.hand_area_height/f32(len(player.cards))*f32(c)
 				} else {
-					position += {0, f32(c)*(30+app.gui.card_size.y)}
+					position.y += f32(c)*(30+app.gui.card_size.y)
 				}
 
 				add_text(position, app.gui.score_positions[p], fmt.aprint("X3"), COLOR_CARDS[card.category], lifetime=0.4)
@@ -876,12 +872,10 @@ cards_scoring :: proc(dt: real) {
 			rl.SetSoundPitch(sound, pitch)
 			rl.PlaySound(sound)
 
-			// add_particles(dice.position, dice.color)
-
-
+			card.triggered = 1.0
 			card.already_scored = true
-			card.active_since += 1
-			if card.active_since > player.roll_cards_lifetime {
+			card.lifetime -= 1
+			if card.lifetime <= 0 {
 				card_discard(&player, i32(c))
 				// It is import that we return afterwards, otherwise we might get in trouble with the indices...
 			}
@@ -1103,16 +1097,17 @@ draw :: proc(power: f32) {
 		text = (p == 0) ? "YOU" : "ANTAGONIST"
 		draw_text(text, {position.x, position.y+100}, app.gui.font_size2, player.color, anchor=(p == 1) ? .RIGHT : .LEFT, overline=true)
 
-		if app.state == .DICES_SCORING || app.state == .SCORING_SUMMARY || player.roll.score > 0. {
+		roll_score := player.roll.score+player.roll.antennas
+		if app.state == .DICES_SCORING || app.state == .SCORING_SUMMARY || roll_score > 0. {
 
 			font_size := app.gui.font_size1
-			if player.is_scoring && player.roll.score+player.roll.antennas > 0. {
+			if player.is_scoring && roll_score > 0. {
 				font_size += math.max((0.3-app.state_timer), 0.1) * 100
 			}
 			if player.roll.multiplier > 0 {
-				text = fmt.tprintf("+ %.1f X %.1f", player.roll.score+player.roll.antennas, player.roll.multiplier)
+				text = fmt.tprintf("+ %.f X %.f", roll_score, player.roll.multiplier)
 			} else {
-				text = fmt.tprintf("+ %.1f", player.roll.score+player.roll.antennas)
+				text = fmt.tprintf("+ %.f", roll_score)
 			}
 
 			if p == 1{
@@ -1140,10 +1135,10 @@ draw :: proc(power: f32) {
 		}
 	}
 
-	if app.opponent.speaking {
+	if app.antagonist.speaking {
 		fs := app.gui.font_size1
-		width :=measure_text(app.opponent.message, fs).x
-		draw_text(app.opponent.message,
+		width :=measure_text(app.antagonist.message, fs).x
+		draw_text(app.antagonist.message,
 			{screen_width/2. - width/2., screen_height/2.}, fs, rl.RAYWHITE
 		)
 	}
@@ -1222,7 +1217,7 @@ draw :: proc(power: f32) {
 			if already_scored do n_scored_combos += 1
 			draw_text(fmt.tprintf("%v", combo_type), position, app.gui.font_size2, (match && !already_scored) ? rl.RAYWHITE : rl.GRAY, strikethrough=already_scored)
 			if !already_scored && match && enough_ghosts {
-				draw_text(fmt.tprintf("+%.1f", score), position+{600, 0}, app.gui.font_size2, rl.RAYWHITE)
+				draw_text(fmt.tprintf("+%.f", score), position+{600, 0}, app.gui.font_size2, rl.RAYWHITE)
 
 				for ghost_number, g in ghost_selected_numbers{
 					dice_button(ghost_number, position+{300+f32(g)*(ghost_size2+5), -7},
@@ -1262,12 +1257,12 @@ draw :: proc(power: f32) {
 			text = fmt.tprintf("Your best combination is worth %v points", highest_score)
 		}
 		draw_text(text, board_position + rl.Vector2{20, 20}, app.gui.font_size2, rl.RAYWHITE)
-		if button("ESC", board_position + rl.Vector2{board_size.x - 80, 20}, app.gui.font_size2) {
+		if button("ESC", board_position + rl.Vector2{board_size.x - 20, 20}, app.gui.font_size2, anchor=.RIGHT) {
 			state_switch(.WAIT_FOR_ROLL)
 			app.ghosts_selected = {-1, -1, -1, -1, -1}
 		}
-		if n_scored_combos == 2 {
-			if button("FINISH CYCLE", board_position+board_size-{80, 70}, app.gui.font_size2, anchor=.RIGHT) {
+		if n_scored_combos == 15 {
+			if button("FINISH CYCLE", board_position+board_size-{20, 70}, app.gui.font_size2, anchor=.RIGHT) {
 				add_text(board_position+board_size/2.,
 					fmt.aprint("CYCLE COMPLETE!"), human.color, 2.,
 					font_size=app.gui.font_size1, anchor=TextAnchor.CENTER)
@@ -1278,8 +1273,8 @@ draw :: proc(power: f32) {
 				human.cycle.scored_combinations = {}
 				state_switch(.CARDS_OFFER)
 			}
-		} else if n_scored_combos > 0{
-			if button("RUSH CYCLE", board_position+board_size-{80, 70}, app.gui.font_size2, anchor=.RIGHT) {
+		} else if n_scored_combos > 10{
+			if button("RUSH CYCLE", board_position+board_size-{20, 70}, app.gui.font_size2, anchor=.RIGHT) {
 				add_text(board_position+board_size/2.,
 					fmt.aprint("CYCLE COMPLETE BY RUSHING!"), human.color, 2.,
 					font_size=app.gui.font_size1, anchor=TextAnchor.CENTER)
@@ -1381,7 +1376,10 @@ draw :: proc(power: f32) {
 		x := math.lerp(text.start.x, text.end.x, 1.-text.lifetime/text.start_lifetime)
 		y := math.lerp(text.start.y, text.end.y, 1.-text.lifetime/text.start_lifetime)
 		text_size := measure_text(text.text, text.font_size)
-		rl.DrawRectangleV({x-10, y-10}, {text_size.x+20, text_size.y+20}, text.color/2.)
+		box_position := Vector2{x-10, y-10}
+		if text.anchor == .CENTER do box_position.x -= text_size.x/2.
+		if text.anchor == .RIGHT do box_position.x -= text_size.x
+		rl.DrawRectangleV(box_position, {text_size.x+20, text_size.y+20}, text.color/2.)
 		draw_text(text.text, {x, y}, text.font_size, text.color, anchor=text.anchor)
 	}
 }

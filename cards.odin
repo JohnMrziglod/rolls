@@ -2,6 +2,7 @@ package game
 
 import "core:fmt"
 import "core:math"
+import "core:math/rand"
 import rl "vendor:raylib"
 
 CardCategory :: enum {NONE, ROLL, DICE, CYCLE}
@@ -9,16 +10,21 @@ CardType :: enum i32{
 		CardNone,
 	CardRoll_Attack,
 	CardRoll_Defense,
+	CardRoll_Doppelgeist,
 	CardRoll_GhostHour,
 	CardRoll_HappyHour,
+	CardRoll_MarketCrash,
 	CardRoll_TombRaider,
+	CardRoll_WhiteElephant,
 		CardRolls,				// <- Until here we got roll cards
 	CardDice_Antenna,
 	CardDice_Assassin,
+	CardDice_Engineer,
 	CardDice_Journalist,
-	// CardDice_General,
+	CardDice_General,
 	CardDice_Influencer,
 	CardDice_Investor,
+	CardDice_Medium,
 	CardDice_PowerDice,
 	// CardDice_ShortSighted,
 	// CardDice_Blind,
@@ -38,8 +44,33 @@ Card :: struct{
 	var2: f64,
 	already_scored: bool,
 	active: bool,
-	active_since: i32,	// Number of rolls since activation, used for cards that have a duration
+	lifetime: i32,		// Number of rolls until discard
 	triggered: f32,		// How long it should be displayed as triggered in seconds
+}
+
+CardGenerateTypes :: enum{AllCards, RollCards, RollAndDiceCards, DiceCards, CycleCards}
+cards_generate :: proc(cards: []Card, types:CardGenerateTypes){
+	for i in 0..<len(cards) {
+		lower_bound := i32(CardType.CardNone)+1
+		upper_bound := i32(CardType.CardCycles)
+		switch types {
+		case .AllCards:
+			// do nothing, we want all cards
+		case .DiceCards:
+			lower_bound = i32(CardType.CardRolls)+1
+			upper_bound = i32(CardType.CardDices)
+		case .RollCards:
+			upper_bound = i32(CardType.CardRolls)
+		case .RollAndDiceCards:
+			upper_bound = i32(CardType.CardDices)
+		case .CycleCards:
+			lower_bound = i32(CardType.CardDices)+1
+			upper_bound = i32(CardType.CardCycles)
+		}
+		card_type := CardType(rand.int32_range(lower_bound, upper_bound))
+		if card_type == .CardRolls do card_type = CardType(i32(card_type)-1)
+		cards[i] = Card{type=card_type, category=card_category(card_type)}
+	}
 }
 
 card_category :: proc(type: CardType) -> CardCategory{
@@ -61,6 +92,9 @@ card_discard :: proc(player: ^Player, index: i32, silent:bool=false){
 card_activate :: proc(player: ^Player, card: ^Card){
 	card.active = true
 	card.triggered = 1.0
+	if card.category == .ROLL{
+		card.lifetime = player.roll_cards_lifetime
+	}
 
 	sound := app.sounds[10]
 	rl.SetSoundVolume(sound, 1.)
@@ -84,13 +118,13 @@ card_activate :: proc(player: ^Player, card: ^Card){
 			#partial switch upgrade.type {
 			case .CardDice_Historian:
 				if card.category == .ROLL{
-					upgrade.var1 += 0.25
-					add_text(dice.position, fmt.aprint("HISTORIAN: +0.25 SCORE!"), dice.color, 0.5)
+					upgrade.var1 += 1.
+					add_text(dice.position, fmt.aprint("HISTORIAN: +1 SCORE!"), dice.color, 0.5)
 				}
 			case .CardDice_Librarian:
 				if card.category == .DICE{
-					upgrade.var1 += 0.5
-					add_text(dice.position, fmt.aprint("LIBRARIAN: +0.5 SCORE!"), dice.color, 0.5)
+					upgrade.var1 += 1.
+					add_text(dice.position, fmt.aprint("LIBRARIAN: +1 SCORE!"), dice.color, 0.5)
 				}
 			}
 		}

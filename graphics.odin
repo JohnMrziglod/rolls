@@ -202,24 +202,24 @@ add_particles :: proc(position: Vector3, color: rl.Color){
 add_text :: proc{add_text_vec3, add_text_vec3_vec2, add_text_vec2, add_text_vec2_vec2}
 add_text_vec3_vec2 :: proc (
 		start: Vector3, end: rl.Vector2, text: string, color: rl.Color,
-		lifetime:f32=2.0, font_size:f32=30, anchor:TextAnchor=.LEFT) {
+		lifetime:f32=2.0, font_size:f32=30, anchor:TextAnchor=.CENTER) {
 	start_2d := rl.GetWorldToScreen(start, app.camera3d)
 	add_text_vec2_vec2(start_2d, {f32(end.x), f32(end.y)}, text, color, lifetime, font_size, anchor)
 }
 add_text_vec3 :: proc (
 		start: Vector3, text: string, color: rl.Color, lifetime:f32=2.0,
-		font_size:f32=30, anchor:TextAnchor=.LEFT) {
+		font_size:f32=30, anchor:TextAnchor=.CENTER) {
 	start_2d := rl.GetWorldToScreen(start, app.camera3d)
 	add_text_vec2_vec2(start_2d, start_2d + Vector2{0, -100}, text, color, lifetime, font_size, anchor)
 }
 add_text_vec2 :: proc (
 		start: Vector2, text: string, color: rl.Color, lifetime:f32=2.0,
-		font_size: f32=30, anchor:TextAnchor=.LEFT) {
+		font_size: f32=30, anchor:TextAnchor=.CENTER) {
 	add_text_vec2_vec2(start, start + Vector2{0, -100}, text, color, lifetime, font_size, anchor)
 }
 add_text_vec2_vec2 :: proc (
 		start, end: Vector2, text: string, color: rl.Color, lifetime:f32=2.0,
-		font_size: f32=30, anchor:TextAnchor=.LEFT) {
+		font_size: f32=30, anchor:TextAnchor=.CENTER) {
 	for &t in app.text_animations{
 		if t.visible do continue
 
@@ -410,6 +410,10 @@ draw_card :: proc(card: Card, position: rl.Vector2, color:rl.Color=rl.BLANK, act
 	// Title
 	text_pos := position + {padding, padding}
 	draw_text(get_text(card.type, "title"), text_pos, font_size, rl.RAYWHITE, max_width=size.x-2*padding)
+
+	if card.category == .ROLL && card.lifetime > 0 {
+		draw_text(fmt.aprintf("%v ROLLS", card.lifetime), position+{size.x-padding, padding}, font_size, rl.RAYWHITE, anchor=.RIGHT)
+	}
 
 	// Description
 	text_pos += {0, line_pos+padding}
