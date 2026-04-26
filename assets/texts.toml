@@ -13,9 +13,12 @@ CardRoll_GhostHour
 CardRoll_HappyHour
 /title="HAPPY HOUR"
 /description="X2 your ROLL SCORE."
+CardRoll_FakeNews
+/title="FAKE NEWS"
+/description="All JOURNALIST DICES multiply the ROLL SCORE by 0.5 instead of 2."
 CardRoll_MarketCrash
 /title="MARKET CRASH"
-/description="All INVESTOR DICES lose 50%% of their savings."
+/description="All INVESTOR DICES lose 50%%%% of their savings."
 CardRoll_WhiteElephant
 /title="WHITE ELEPHANT"
 /description="Your antagonist gets all your GHOST DICES of this ROLL."
@@ -54,7 +57,7 @@ CardDice_Medium
 /description="Adds number of your GHOST DICES to its SCORE."
 CardDice_Investor
 /title="INVESTOR"
-/description="Saves its own SCORE when surviving with 10%% interest. Pay out when showing a 1."
+/description="Saves its own SCORE when surviving with 10%%%% interest. Pay out when showing a 1."
 CardDice_PowerDice
 /title="POWER UP"
 /description="Multiply dice's SCORE with its own SCORE again."

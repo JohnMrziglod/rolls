@@ -600,9 +600,13 @@ cards_battle :: proc (dt: real) {
 	app.state_timer = 0.0
 
 	for &player, p in app.players {
+		player.roll_effects = {}
 		other_player := &app.players[(p+1)%N_PLAYERS]
+
 		for &card, c in player.cards{
 			if !card.active || card.already_scored do continue
+
+			player.roll_effects[card.type] = {}
 
 			position := app.gui.hand_positions[p]+app.gui.card_size/2.
 			if len(player.cards) > 5 {
@@ -623,6 +627,13 @@ cards_battle :: proc (dt: real) {
 					dice.health += 2
 					add_text(dice.position, fmt.aprint("+2 HEALTH"), COLOR_CARDS[card.category], lifetime=0.6)
 				}
+			case .CardRoll_Doppelgeist:
+				ghosts := player.ghosts
+				for ghost in ghosts{
+					if i32(len(player.ghosts)) >= player.ghosts_max do clear(&player.ghosts)
+					append(&player.ghosts, ghost)
+				}
+				slice.sort(player.ghosts[:])
 			case .CardRoll_GhostHour:
 				ghost_score: sco
 				for ghost in player.ghosts do ghost_score += sco(ghost)
@@ -631,6 +642,19 @@ cards_battle :: proc (dt: real) {
 			case .CardRoll_HappyHour:
 				player.roll.multiplier += 3
 				add_text(position, fmt.aprint("ROLL SCORE X3"), player.color, lifetime=1.)
+			case .CardRoll_MarketCrash:
+				for &dice, d in app.dices{
+					for &upgrade, u in dice.upgrades{
+						position := dice.position - f32(u) * Vector3{0, 2, 0}
+						text: string
+
+						#partial switch upgrade.type {
+						case .CardDice_Investor:
+							upgrade.var1 *= 0.5
+							add_text(dice.position, fmt.aprint("MARKET CRASH: LOSING 50%"), COLOR_CARDS[card.category], lifetime=0.6)
+						}
+					}
+				}
 			case .CardRoll_TombRaider:
 				if len(other_player.ghosts) == 0 {
 					add_text(position, fmt.aprint("NO GHOSTS TO STEAL"), COLOR_CARDS[card.category], lifetime=1.)
@@ -642,14 +666,6 @@ cards_battle :: proc (dt: real) {
 					add_text(position, fmt.aprint("STEALING GHOSTS!"), COLOR_CARDS[card.category], lifetime=1.)
 				}
 				// Sort the ghost dices (makes other things easier later on also for the human player)
-				slice.sort(player.ghosts[:])
-			case .CardRoll_Doppelgeist:
-				// @TODO
-				ghosts := player.ghosts
-				for ghost in ghosts{
-					if i32(len(player.ghosts)) >= player.ghosts_max do clear(&player.ghosts)
-					append(&player.ghosts, ghost)
-				}
 				slice.sort(player.ghosts[:])
 			case:
 				continue
@@ -738,6 +754,8 @@ dices_scoring :: proc(dt: real) {
 	app.state_timer = 0.0
 
 	for &player, p in app.players{
+		other_player := &app.players[(p+1)%N_PLAYERS]
+
 		player.is_scoring = true
 		n_alive := 0
 		for dice in app.dices {
@@ -761,12 +779,17 @@ dices_scoring :: proc(dt: real) {
 					} else {
 						player.roll.antennas *= dice.current_score
 					}
-					text = fmt.aprintf("ANTENNA NETWORK X.f!", dice.current_score)
+					text = fmt.aprintf("ANTENNA NETWORK %.f!", dice.current_score)
 
 					dice.current_score = 0
 				case .CardDice_Journalist:
-					player.roll.multiplier += 2
-					text = fmt.aprint("JOURNALIST: X2!")
+					if .CardRoll_FakeNews in player.roll_effects || .CardRoll_FakeNews in other_player.roll_effects{
+						player.roll.multiplier += 0.5
+						text = fmt.aprint("FAKE NEWS : X0.5!")
+					} else {
+						player.roll.multiplier += 2
+						text = fmt.aprint("JOURNALIST: X2!")
+					}
 				case .CardDice_Influencer:
 					if dice.current_number == 1 {
 						append(&player.cards, Card{})
@@ -1264,7 +1287,7 @@ draw :: proc(power: f32) {
 		if n_scored_combos == 15 {
 			if button("FINISH CYCLE", board_position+board_size-{20, 70}, app.gui.font_size2, anchor=.RIGHT) {
 				add_text(board_position+board_size/2.,
-					fmt.aprint("CYCLE COMPLETE!"), human.color, 2.,
+					fmt.aprint("CYCLE COMPLETED!"), human.color, 2.,
 					font_size=app.gui.font_size1, anchor=TextAnchor.CENTER)
 				human.roll.score += math.floor(human.total_score) / 10.
 				app.ghosts_selected = {}-1 // deselect everything
@@ -1273,10 +1296,10 @@ draw :: proc(power: f32) {
 				human.cycle.scored_combinations = {}
 				state_switch(.CARDS_OFFER)
 			}
-		} else if n_scored_combos > 10{
+		} else if n_scored_combos > 9{
 			if button("RUSH CYCLE", board_position+board_size-{20, 70}, app.gui.font_size2, anchor=.RIGHT) {
 				add_text(board_position+board_size/2.,
-					fmt.aprint("CYCLE COMPLETE BY RUSHING!"), human.color, 2.,
+					fmt.aprint("CYCLE COMPLETED BY RUSHING!"), human.color, 2.,
 					font_size=app.gui.font_size1, anchor=TextAnchor.CENTER)
 				app.ghosts_selected = {}-1 // deselect everything
 				app.cards_offer = {}
@@ -1359,7 +1382,7 @@ draw :: proc(power: f32) {
 			}
 
 			if !could_upgrade {
-				add_text(dice.position, "Dice has no free upgrade slots!", dice.color, 1.5)
+				add_text(dice.position, fmt.aprint("Dice has no free upgrade slots!"), dice.color, 1.5)
 			}
 		} else if rl.IsMouseButtonPressed(.RIGHT) {
 			app.card_selected.triggered = 0.

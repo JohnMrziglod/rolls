@@ -9,12 +9,17 @@ dice_kills :: proc(killer, victim: ^Dice){
 
 	victim.state = .DEAD
 	victim.position.y = 1000.
+	app.players[killer.player].roll.kills += 1
 
 	player := &app.players[victim.player]
-	if i32(len(player.ghosts)) >= player.ghosts_max do clear(&player.ghosts)
-	append(&player.ghosts, victim.current_number)
-	// Sort the ghost dices (makes other things easier later on also for the human player)
-	slice.sort(player.ghosts[:])
-
-	app.players[killer.player].roll.kills += 1
+	if .CardRoll_WhiteElephant in player.roll_effects{
+		other_player := &app.players[killer.player]
+		if i32(len(other_player.ghosts)) >= other_player.ghosts_max do clear(&other_player.ghosts)
+		append(&other_player.ghosts, victim.current_number)
+		slice.sort(other_player.ghosts[:])
+	} else {
+		if i32(len(player.ghosts)) >= player.ghosts_max do clear(&player.ghosts)
+		append(&player.ghosts, victim.current_number)
+		slice.sort(player.ghosts[:])
+	}
 }
