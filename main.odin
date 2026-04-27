@@ -45,8 +45,7 @@ Dice :: struct {
 	health: sco,
 }
 Antagonist :: struct {
-	message: string,
-	speaking: bool
+	message: string
 }
 
 GameState :: enum {
@@ -137,6 +136,45 @@ Application :: struct {
 }
 app: Application
 
+
+load_texts :: proc(texts_buffer: ^string, path: string) {
+	file, file_ok := os.read_entire_file(path)
+	if !file_ok{
+		fmt.println("Error loading texts!")
+		os.exit(1)
+	}
+	texts_buffer ^= string(file)
+
+	Token :: enum{Root, Section, Key, Value}
+	token: Token
+	expect_section_or_key := true
+	section_start, section_end := 0, 0
+	key_start, key_end := 0, 0
+	for r, i in texts_buffer {
+		if token == .Root && r == '/' {
+			key_start = i
+			token = .Key
+		} else if token == .Key && r == '=' {
+			key_end = i // we don't need the =
+			token = .Value
+		} else if token == .Value && r == '\n' {
+			key := strings.join(
+				{texts_buffer[section_start:section_end],
+				 texts_buffer[key_start:key_end]}, ""
+			)
+			value := texts_buffer[key_end+2:i-2] // +2 for =", -2 to remove " and the \r before \n
+			app.texts[key] = value
+			token = .Root
+		} else if token == .Section && r == '\n'{
+			section_end = i-1
+			token = .Root
+		} else if token == .Root && !strings.is_space(r) {
+			section_start = i
+			token = .Section
+		}
+	}
+}
+
 main :: proc() {
 	// Initialize window
 	screen_width := rl.GetScreenWidth()
@@ -176,9 +214,8 @@ main :: proc() {
 				max_lifetime_roll_cards=2,
 			},
 		},
-		antagonist = {
-			message = "Let's see who reaches\n1000 points first!",
-			speaking = true,
+		antagonist={
+			message = "Let's see who reaches 1000 points first!",
 		},
 		ghosts_selected = {-1, -1, -1, -1, -1},
 	}
@@ -267,42 +304,13 @@ main :: proc() {
 			rl.UnloadTexture(texture)
 		}
 	}
-	file, file_ok := os.read_entire_file("assets/texts.toml")
-	if !file_ok{
-		fmt.println("Error loading texts!")
-		os.exit(1)
-	}
-	texts_buffer := string(file)
+
+	texts_buffer: string
+	load_texts(&texts_buffer, "assets/cards.toml")
 	defer delete(texts_buffer)
 
-	Token :: enum{Root, Section, Key, Value}
-	token: Token
-	expect_section_or_key := true
-	section_start, section_end := 0, 0
-	key_start, key_end := 0, 0
-	for r, i in texts_buffer {
-		if token == .Root && r == '/' {
-			key_start = i
-			token = .Key
-		} else if token == .Key && r == '=' {
-			key_end = i // we don't need the =
-			token = .Value
-		} else if token == .Value && r == '\n' {
-			key := strings.join(
-				{texts_buffer[section_start:section_end],
-				 texts_buffer[key_start:key_end]}, ""
-			)
-			value := texts_buffer[key_end+2:i-2] // +2 for =", -2 to remove " and the \r before \n
-			app.texts[key] = value
-			token = .Root
-		} else if token == .Section && r == '\n'{
-			section_end = i-1
-			token = .Root
-		} else if token == .Root && !strings.is_space(r) {
-			section_start = i
-			token = .Section
-		}
-	}
+	// load_texts("assets/antagonist.toml")
+
 	// defer {
 	// 	for key, value in app.texts {
 	// 		delete(key)
@@ -401,9 +409,9 @@ main :: proc() {
 			}
 		}
 
-		if app.antagonist.speaking {
+		if len(app.antagonist.message) > 0 {
 			if rl.IsKeyPressed(rl.KeyboardKey.SPACE) {
-				app.antagonist.speaking = false
+				app.antagonist.message = {}
 				app.state_timer = 0.0
 			}
 		} else {
@@ -1245,12 +1253,21 @@ draw :: proc(power: f32) {
 		}
 	}
 
-	if app.antagonist.speaking {
-		fs := app.gui.font_size1
-		width :=measure_text(app.antagonist.message, fs).x
-		draw_text(app.antagonist.message,
-			{screen_width/2. - width/2., screen_height/2.}, fs, rl.RAYWHITE
-		)
+	if len(app.antagonist.message) > 0 {
+		// Let's the bubble get bigger and smaller to make it more dynamic, and also changes the color a bit
+		time_factor := 1. + 0.05 * math.sin(f32(rl.GetTime())*5)
+		font_size := app.gui.font_size1 * time_factor
+		thickness :f32= 4.
+		max_width :f32= 600 * time_factor
+		padding :f32= 20.
+		color_fill := rl.BLACK
+		color_text := app.players[1].color
+		size := measure_text(app.antagonist.message, font_size, max_width=max_width) + padding
+		position := Vector2{app.gui.width-40, app.gui.height - 200 } - size - padding
+		rl.DrawRectangleV(position, size, color_fill)
+		rl.DrawRectangleLinesEx(
+			{position.x-thickness, position.y-thickness, size.x+2*thickness, size.y+2*thickness}, thickness, rl.BLACK)
+		draw_text(app.antagonist.message, position + padding/2., font_size, color_text, max_width=max_width)
 	}
 
 	if app.state == .CHARGING && app.current_player == 0 {

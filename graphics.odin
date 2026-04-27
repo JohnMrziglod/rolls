@@ -253,71 +253,21 @@ add_text_vec2_vec2 :: proc (
 	}
 }
 
-measure_text :: proc(text: string, font_size: f32, spacing:f32=1.0) -> rl.Vector2 {
-	font := app.font
-	scale_factor := font_size / f32(font.baseSize)
-
-	width :f32= 0.
-	height :f32= 0.
-
-	for r in text{
-		if r == '\n' {
-			height += 1.5 * f32(font_size)
-			width = 0.
-			continue
-		}
-
-		glyph_index := rl.GetGlyphIndex(font, r)
-		glyph := font.glyphs[glyph_index]
-		rec := font.recs[glyph_index]
-		if glyph.advanceX == 0 {
-			width += f32(rec.width) * scale_factor
-		} else {
-			width += f32(glyph.advanceX) * scale_factor
-		}
-		width += spacing
-		height = math.max(height, f32(glyph.offsetY) + rec.height*scale_factor)
-	}
-
-	return rl.Vector2{width, height}
+measure_text :: proc(text: string, font_size: f32, spacing:f32=1.0, max_width:f32=9999) -> rl.Vector2 {
+	return draw_text(text, {0, 0}, font_size, spacing=spacing, max_width=max_width, measure_only=true)
 }
 
 draw_text :: proc(text: string, position: rl.Vector2, font_size: f32,
-		color: rl.Color=rl.RAYWHITE, spacing:f32=1.0, max_width:f32=-1.,
+		color: rl.Color=rl.RAYWHITE, spacing:f32=1.0, max_width:f32=9999,
 		strikethrough:bool=false, overline:bool=false,
-		anchor:TextAnchor=.LEFT){
+		anchor:TextAnchor=.LEFT, measure_only:bool=false) -> rl.Vector2{
 
 	position := position
 	if anchor == .RIGHT do position.x -= measure_text(text, font_size).x
 	if anchor == .CENTER do position.x -= measure_text(text, font_size).x / 2.
 
-	if max_width < 0. {
-		rl.DrawTextEx(app.font,
-			strings.clone_to_cstring(text, context.temp_allocator),
-			position, font_size, spacing, color)
-
-		text_size := measure_text(text, font_size)
-
-		if strikethrough {
-			rl.DrawLineEx(
-				position + rl.Vector2{0,  text_size.y / 2.},
-				position + rl.Vector2{text_size.x,  text_size.y / 2.},
-				font_size / 10., color)
-		}
-
-		if overline {
-			rl.DrawLineEx(
-				position + rl.Vector2{0,  -font_size / 5.},
-				position + rl.Vector2{text_size.x,  -font_size / 5.},
-				font_size / 10., color)
-		}
-
-		return
-	}
-
 	font := app.font
-
-	// We need to wrap the text... below is the c function, we have to refactor it into odin...
+	text_size := rl.Vector2{0, 0}
 	text_offset_y := f32(0)
 	text_offset_x := f32(0)
 
@@ -355,7 +305,7 @@ draw_text :: proc(text: string, position: rl.Vector2, font_size: f32,
 			if strings.is_space(nr) do break
 		}
 
-		if !strings.is_space(r) {
+		if !measure_only && !strings.is_space(r) {
 			rl.DrawTextCodepoint(
 				font, r,
 				position + rl.Vector2{text_offset_x, text_offset_y},
@@ -365,7 +315,29 @@ draw_text :: proc(text: string, position: rl.Vector2, font_size: f32,
 		if text_offset_x != 0. || !strings.is_space(r) {
 			text_offset_x += glyph_width
 		}
+		text_size = {
+			math.max(text_size.x, text_offset_x),
+			math.max(text_size.y, text_offset_y + f32(font.baseSize) * scale_factor)
+		}
+
+		if !measure_only{
+			if strikethrough {
+				rl.DrawLineEx(
+					position + rl.Vector2{0,  text_size.y / 2.},
+					position + rl.Vector2{text_size.x,  text_size.y / 2.},
+					font_size / 10., color)
+			}
+
+			if overline {
+				rl.DrawLineEx(
+					position + rl.Vector2{0,  -font_size / 5.},
+					position + rl.Vector2{text_size.x,  -font_size / 5.},
+					font_size / 10., color)
+			}
+		}
 	}
+
+	return text_size
 }
 
 draw_box :: proc(position: rl.Vector2, size: rl.Vector2,
