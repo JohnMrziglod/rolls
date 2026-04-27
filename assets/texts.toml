@@ -31,6 +31,9 @@ CardRoll_MarketCrash
 CardRoll_Revenge
 /title="REVENGE"
 /description="If you have a lower ROLL SCORE than your antagonist, swap them."
+CardRoll_Suidice
+/title="SUIDICE"
+/description="Your DICE with the highest number explodes and eliminates all of your ANTAGONIST'S DICES."
 CardRoll_WhiteElephant
 /title="WHITE ELEPHANT"
 /description="Your antagonist gets all your GHOST DICES of this ROLL."

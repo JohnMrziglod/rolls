@@ -19,6 +19,7 @@ CardType :: enum i32{
 	CardRoll_Immortality,
 	CardRoll_MarketCrash,
 	CardRoll_Revenge,
+	CardRoll_Suidice,
 	CardRoll_TombRaider,
 	CardRoll_WhiteElephant,
 		CardRolls,				// <- Until here we got roll cards
@@ -30,6 +31,8 @@ CardType :: enum i32{
 	CardDice_Influencer,
 	CardDice_Investor,
 	CardDice_Medium,
+	CardDice_Optimist,
+	CardDice_Pessimist,
 	CardDice_PowerDice,
 	// CardDice_ShortSighted,
 	// CardDice_Blind,

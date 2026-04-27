@@ -36,6 +36,7 @@ Dice :: struct {
 	using body: RigidBody,
 	player: u8,
 	color: rl.Color,
+	numbers: [6]i32, 	// which numbers are shown on the faces, normally 1..6 but it can be manipulated
 	current_number: i32, // which number is shown on top face
 	current_score: sco,
 	already_scored: bool,
@@ -82,6 +83,7 @@ RollState :: struct{
 	multiplier: sco,
 	antennas: sco,
 	kills: i32,
+	effects: map[CardType]void,
 }
 
 N_PLAYERS :: 2
@@ -92,8 +94,7 @@ Player :: struct {
 	roll: RollState,
 	is_scoring: bool,
 
-	cards: [dynamic]Card,
-	roll_effects: map[CardType]void,	// used for some roll cards
+	cards: [dynamic]Card,	// used for some roll cards
 	roll_cards_lifetime: i32,
 	ghosts: [dynamic]i32,
 	ghosts_max: i32,
@@ -298,7 +299,6 @@ main :: proc() {
 			token = .Section
 		}
 	}
-	fmt.println(app.texts)
 	// defer {
 	// 	for key, value in app.texts {
 	// 		delete(key)
@@ -320,6 +320,17 @@ main :: proc() {
 				// quit the game
 				break
 			}
+		}
+
+		if rl.IsKeyPressed(rl.KeyboardKey.G){
+			app.cards_offer = {}
+			cards_generate(app.cards_offer[:5], .RollAndDiceCards)
+			state_switch(.CARDS_OFFER)
+		}
+		if rl.IsKeyPressed(rl.KeyboardKey.H){
+			app.cards_offer = {}
+			cards_generate(app.cards_offer[:5], .CycleCards)
+			state_switch(.CARDS_OFFER)
 		}
 
 		if app.state == .WAIT_FOR_ROLL && rl.IsKeyPressed(rl.KeyboardKey.SPACE) {
@@ -443,7 +454,8 @@ dice_init :: proc(dice: ^Dice, position:=Vector3{0, 1000, 0}){
 		current_score=0,
 		attack=1,
 		health=1,
-		upgrades=dice.upgrades
+		upgrades=dice.upgrades,
+		numbers={1, 2, 3, 4, 5, 6},
 	}
 }
 
@@ -478,27 +490,8 @@ dices_reset :: proc(power:f32=1., first_round:bool=false) {
 			}
 
 			dice_init(&dice, position)
-
-			dice = {
-				state=.ALIVE,
-				shape=ShapeBox{half_size=half_size},
-				position=position,
-				velocity=velocity,
-				orientation=random_orientation(),
-				rotation=random_vector(-20.0, 20.0),
-				acceleration=Vector3{0.0, -50.0, 0.0},
-				linear_damping=0.99,
-				angular_damping=0.9,
-				inverse_mass=1./mass,
-				can_sleep=true,
-				player=dice.player,
-				color=app.players[dice.player].color,
-				current_number=0,
-				current_score=0,
-				attack=1,
-				health=1,
-				upgrades=dice.upgrades
-			}
+			dice.state = .ALIVE
+			dice.velocity = velocity
 		}
 		body_set_awake(&dice)
 
@@ -506,6 +499,10 @@ dices_reset :: proc(power:f32=1., first_round:bool=false) {
 		body_set_block_inertia_tensor(&dice, dice.shape.(ShapeBox).half_size, 1./dice.inverse_mass)
 		body_calculate_derived_data(&dice)
 	}
+}
+
+cards_pre_rolling :: proc(dt: real){
+	
 }
 
 physics :: proc(duration: real) {
@@ -585,7 +582,7 @@ rolling :: proc(dt: real){
 			height := body_get_point_in_world_space(&dice, face).y
 			if height > highest_face_height {
 				highest_face_height = height
-				dice.current_number = i32(i)+1
+				dice.current_number = dice.numbers[i]
 			}
 		}
 		dice.already_scored = false
@@ -600,13 +597,13 @@ cards_battle :: proc (dt: real) {
 	app.state_timer = 0.0
 
 	for &player, p in app.players {
-		player.roll_effects = {}
+		player.roll.effects = {}
 		other_player := &app.players[(p+1)%N_PLAYERS]
 
 		for &card, c in player.cards{
 			if !card.active || card.already_scored do continue
 
-			player.roll_effects[card.type] = {}
+			player.roll.effects[card.type] = {}
 
 			position := app.gui.hand_positions[p]+app.gui.card_size/2.
 			if len(player.cards) > 5 {
@@ -699,6 +696,8 @@ cards_battle :: proc (dt: real) {
 			}
 			return
 		}
+
+		fmt.printfln("Roll effects: %v", player.roll.effects)
 	}
 
 	state_switch(.DICES_BATTLE)
@@ -707,12 +706,60 @@ cards_battle :: proc (dt: real) {
 dices_battle :: proc(dt: real) {
 	if app.state_timer < 0.3 do return
 
+	for &player, p in app.players{
+		if .CardRoll_Suidice in player.roll.effects{
+
+			// Find dice with highest number
+			suidice_index := -1
+			suidice_number :i32= 0
+			for &dice, d in app.dices{
+				if dice.state != .ALIVE || dice.player != u8(p) do continue
+
+				if dice.current_number > suidice_number {
+					suidice_index = d
+					suidice_number = dice.current_number
+				}
+			}
+
+			if suidice_index != -1{
+				suidice := &app.dices[suidice_index]
+
+				dice_killed(suidice)
+				add_text(suidice.position, fmt.aprint("SUIDICE!"), suidice.color, 2.0, font_size=app.gui.font_size2)
+
+				for &dice, d in app.dices{
+					if dice.state != .ALIVE || dice.player == u8(p) do continue
+
+					dice_killed(&dice, suidice)
+				}
+			}
+		}
+	}
+
 	// We eliminate all app.dices from each player that show the same numbers.
 	// E.g. if player 1 has two app.dices showing a 3 and player 2 has one dice showing a 3,
 	// one dice each is eliminated and won't give points to either player.
 
 	for &dice, d in app.dices{
 		if dice.state != .ALIVE do continue
+
+		// Apply dice card effects
+		// for &upgrade, u in dice.upgrades{
+		// 	position := dice.position - f32(u) * Vector3{0, 2, 0}
+		// 	text: string
+
+		// 	#partial switch upgrade.type {
+		// 	case .CardDice_Antenna:
+		// 		if player.roll.antennas == 0 {
+		// 			player.roll.antennas = dice.current_score
+		// 		} else {
+		// 			player.roll.antennas *= dice.current_score
+		// 		}
+		// 		text = fmt.aprintf("ANTENNA NETWORK %.f!", dice.current_score)
+
+		// 		dice.current_score = 0
+		// 	}
+		// }
 
 		for &other_dice, o in app.dices{
 			if d == o || other_dice.state != .ALIVE || dice.player == other_dice.player do continue
@@ -721,13 +768,13 @@ dices_battle :: proc(dt: real) {
 				other_dice.health = math.max(other_dice.health-dice.attack, 0)
 
 				if other_dice.health == 0{
-					dice_kills(&dice, &other_dice)
+					dice_killed(&other_dice, killer=&dice)
 				} else {
 					add_text(other_dice.position, fmt.aprint("HIT!"), other_dice.color, 1.5, font_size=app.gui.font_size2)
 				}
 
 				if dice.health == 0{
-					dice_kills(&other_dice, &dice)
+					dice_killed(&dice, killer=&other_dice)
 				} else  {
 					add_text(dice.position, fmt.aprint("HIT!"), dice.color, 1.5, font_size=40)
 				}
@@ -793,7 +840,7 @@ dices_scoring :: proc(dt: real) {
 
 					dice.current_score = 0
 				case .CardDice_Journalist:
-					if .CardRoll_FakeNews in player.roll_effects || .CardRoll_FakeNews in other_player.roll_effects{
+					if .CardRoll_FakeNews in player.roll.effects || .CardRoll_FakeNews in other_player.roll.effects{
 						player.roll.multiplier += 0.5
 						text = fmt.aprint("FAKE NEWS : X0.5!")
 					} else {
@@ -939,10 +986,10 @@ scoring_summary :: proc(dt: real) {
 		}
 	}
 
-	if .CardRoll_Revenge in app.players[0].roll_effects && roll_scores[0] < roll_scores[1]{
+	if .CardRoll_Revenge in app.players[0].roll.effects && roll_scores[0] < roll_scores[1]{
 		roll_scores = {roll_scores[1], roll_scores[0]}
 	}
-	if .CardRoll_Revenge in app.players[1].roll_effects && roll_scores[1] < roll_scores[0]{
+	if .CardRoll_Revenge in app.players[1].roll.effects && roll_scores[1] < roll_scores[0]{
 		roll_scores = {roll_scores[1], roll_scores[0]}
 	}
 	for &player, p in app.players {
