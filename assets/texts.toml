@@ -51,10 +51,10 @@ CardDice_Antenna
 /description="Multiply dice's SCORE with the SCORE of other dices with ANTENNA."
 CardDice_Optimist
 /title="OPTIMIST"
-/description="All sides of this dices show one number higher (max. 6)."
+/description="All sides of this dices show one number higher (MAX. 6)."
 CardDice_Pessimist
 /title="PESSIMIST"
-/description="All sides of this dices show one number lower (min. 1)."
+/description="All sides of this dices show one number lower (MIN. 1)."
 CardDice_General
 /title="GENERAL"
 /description="Adds number of your surviving DICES to its SCORE."
@@ -94,6 +94,9 @@ CardCycle_ExtraDice
 CardCycle_EternalRoll
 /title="ETERNAL ROLL"
 /description="Your ROLL CARDS' lifetime increases by 1 ROLL."
+CardCycle_GhostDiscount
+/title="GHOST DISCOUNT"
+/description="When scoring a combination, you'll get one GHOST DICE back (MAX. 4)."
 CardCycle_Graveyard
 /title="GRAVEYARD"
 /description="+1 SPACE for GHOST DICES."

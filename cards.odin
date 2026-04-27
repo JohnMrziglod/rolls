@@ -43,6 +43,7 @@ CardType :: enum i32{
 	CardCycle_ExtraDice,
 	CardCycle_EternalRoll,
 	CardCycle_Graveyard,
+	CardCycle_GhostDiscount,
 		CardCycles,				// <- Until we got cycle cards
 }
 Card :: struct{
@@ -101,7 +102,7 @@ card_activate :: proc(player: ^Player, card: ^Card){
 	card.active = true
 	card.triggered = 1.0
 	if card.category == .ROLL{
-		card.lifetime = player.roll_cards_lifetime
+		card.lifetime = player.max_lifetime_roll_cards
 	}
 
 	sound := app.sounds[10]
@@ -110,13 +111,16 @@ card_activate :: proc(player: ^Player, card: ^Card){
 
 	#partial switch card.type {
 	case .CardCycle_EternalRoll:
-		player.roll_cards_lifetime += 1
+		player.max_lifetime_roll_cards += 1
 	case .CardCycle_ExtraDice:
 		// player.n_dices += 1
 		append(&app.dices, Dice{player=player.id, state=.DEAD})
 		dice_init(&app.dices[len(app.dices)-1])
 	case .CardCycle_Graveyard:
 		player.ghosts_max += 1
+	case .CardCycle_GhostDiscount:
+		player.ghosts_costs_per_combination -= 1
+		if player.ghosts_costs_per_combination < 1 do player.ghosts_costs_per_combination=1
 	}
 
 	for &dice, d in app.dices{

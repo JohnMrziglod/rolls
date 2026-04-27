@@ -52,6 +52,7 @@ Antagonist :: struct {
 GameState :: enum {
 	WAIT_FOR_ROLL,
 	CHARGING,
+	PRE_ROLLING,
 	ROLLING,
 	CARDS_BATTLE,
 	DICES_BATTLE,
@@ -95,9 +96,10 @@ Player :: struct {
 	is_scoring: bool,
 
 	cards: [dynamic]Card,	// used for some roll cards
-	roll_cards_lifetime: i32,
+	max_lifetime_roll_cards: i32,
 	ghosts: [dynamic]i32,
 	ghosts_max: i32,
+	ghosts_costs_per_combination: i32,
 	cycle: Cycle,
 	n_dices: i32,
 }
@@ -161,15 +163,17 @@ main :: proc() {
 
 	app = {
 		font = rl.LoadFont("assets/j_audio_cassette.otf"),
-		state = .ROLLING,
+		state = .PRE_ROLLING,
 		players = {
 			{
 				color=COLOR_PLAYERS[0], id=0, n_dices=6,
-				ghosts_max=10, roll_cards_lifetime=2,
+				ghosts_max=10, ghosts_costs_per_combination=5,
+				max_lifetime_roll_cards=2,
 			},
 			{
 				color=COLOR_PLAYERS[1], id=1, n_dices=6,
-				ghosts_max=10, roll_cards_lifetime=2,
+				ghosts_costs_per_combination=5, ghosts_max=10,
+				max_lifetime_roll_cards=2,
 			},
 		},
 		antagonist = {
@@ -346,7 +350,7 @@ main :: proc() {
 			(app.current_player == 1 && power >= 1.0)) {
 				dices_reset(power=power)
 				app.state_timer = 0.0
-				app.state = .ROLLING
+				app.state = .PRE_ROLLING
 		}
 
 		if rl.IsKeyPressed(rl.KeyboardKey.S) {
@@ -403,7 +407,10 @@ main :: proc() {
 				app.state_timer = 0.0
 			}
 		} else {
-			if app.state == .ROLLING{
+			if app.state == .PRE_ROLLING{
+				apply_dice_upgrades(dt)
+				state_switch(.ROLLING)
+			} else if app.state == .ROLLING{
 				physics(dt)
 				rolling(dt)
 			} else if app.state == .CARDS_BATTLE {
@@ -501,8 +508,21 @@ dices_reset :: proc(power:f32=1., first_round:bool=false) {
 	}
 }
 
-cards_pre_rolling :: proc(dt: real){
-	
+apply_dice_upgrades :: proc(dt: real){
+	for &dice, d in app.dices{
+		for &upgrade, u in dice.upgrades{
+			#partial switch upgrade.type {
+			case .CardDice_Optimist:
+				for n, i in dice.numbers{
+					dice.numbers[i] = n < 6 ? n+1 : n
+				}
+			case .CardDice_Pessimist:
+				for n, i in dice.numbers{
+					dice.numbers[i] = n > 1 ? n-1 : n
+				}
+			}
+		}
+	}
 }
 
 physics :: proc(duration: real) {
@@ -696,8 +716,6 @@ cards_battle :: proc (dt: real) {
 			}
 			return
 		}
-
-		fmt.printfln("Roll effects: %v", player.roll.effects)
 	}
 
 	state_switch(.DICES_BATTLE)
@@ -1325,8 +1343,15 @@ draw :: proc(power: f32) {
 					copy(ghosts_copy[:], human.ghosts[:])
 					clear(&human.ghosts)
 
+					ghosts_discount := 5-human.ghosts_costs_per_combination
 					for ghost, index in ghosts_copy{
-						if !contains(app.ghosts_selected[:], i32(index)) do append(&human.ghosts, ghost)
+						if !contains(app.ghosts_selected[:], i32(index)) {
+							append(&human.ghosts, ghost)
+							continue
+						} else if ghosts_discount > 0{
+							append(&human.ghosts, ghost)
+							ghosts_discount -= 1
+						}
 					}
 					app.ghosts_selected = {}-1 // deselect everything
 					app.cards_offer = {}
@@ -1442,6 +1467,7 @@ draw :: proc(power: f32) {
 				if upgrade.type == .CardNone {
 					upgrade = app.card_selected
 					card_activate(human, &upgrade)
+					apply_dice_upgrades(0.)	// @FIXME: Is that good?
 					app.card_selected = {}
 					could_upgrade = true
 					add_text(dice.position, fmt.aprintf("Upgraded to %v!", get_text(upgrade.type, "title")), dice.color, 1.5)
