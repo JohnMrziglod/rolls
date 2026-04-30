@@ -315,7 +315,7 @@ main :: proc() {
 			rl.UnloadSound(sound)
 		}
 	}
-	app.textures = {rl.LoadTexture("assets/textures/dice.png")}
+	app.textures = {rl.LoadTexture("assets/textures/dice_white.png")}
 	defer {
 		for texture in app.textures {
 			rl.UnloadTexture(texture)
@@ -329,7 +329,8 @@ main :: proc() {
 		for file in files do defer delete(file)
 	}
 
-	antagonist_story("antagonist_intro1")
+	app.antagonist.tutorial = 2
+	// antagonist_story("antagonist_intro1")
 
 	// Main game loop
 	for !rl.WindowShouldClose() {
@@ -462,7 +463,7 @@ main :: proc() {
 }
 
 dice_init :: proc(dice: ^Dice, position:=Vector3{0, 1000, 0}){
-	half_size :f32= .75
+	half_size :f32= 1.
 	mass := math.pow(half_size, 3) * 8.
 	orientation := dice.orientation
 	rotation := dice.rotation
@@ -502,14 +503,6 @@ dices_reset :: proc(power:f32=1., first_round:bool=false) {
 	}
 
 	for &dice, d in app.dices {
-		half_size :f32= .75
-		mass := math.pow(half_size, 3) * 8.
-		position := dice.position+Vector3{0, 10, 0}
-		velocity := Vector3{0, -5, 0}
-		orientation := dice.orientation
-		rotation := dice.rotation
-		acceleration := dice.acceleration
-
 		if dice.player == app.current_player || first_round
 		{
 			position := random_vector(-AREA_SIZE/8.0, AREA_SIZE/8.0)
