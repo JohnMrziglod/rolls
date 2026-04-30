@@ -1,45 +1,45 @@
 CardRoll_Attack
 /title="FULL ATTACK!"
-/description="All your dices get +1 ATTACK."
+/description="All your DICE get +1 ATTACK."
 CardRoll_Defense
 /title="DEFENSE! DEFENSE!"
-/description="All your dices get +1 HEALTH."
+/description="All your DICE get +1 HEALTH."
 CardRoll_Doppelgeist
 /title="DOPPELGEIST"
-/description="Duplicates your GHOST DICES."
+/description="Duplicates your GHOST DICE."
 CardRoll_Exorcism
 /title="EXORCISM"
-/description="You won't gain any GHOST DICES this ROLL."
+/description="You won't gain any GHOST DICE this ROLL."
 CardRoll_FakeNews
 /title="FAKE NEWS"
-/description="All JOURNALIST DICES multiply the ROLL SCORE by 0.5 instead of 2."
+/description="All JOURNALIST DICE multiply the ROLL SCORE by 0.5 instead of 2."
 CardRoll_GhostHour
 /title="GHOST HOUR"
-/description="Your GHOST DICES' numbers add to your ROLL SCORE."
+/description="Your GHOST DICE' numbers add to your ROLL SCORE."
 CardRoll_GraveRoll
 /title="GRAVE ROLL"
-/description="Your GHOST DICES will be rerolled."
+/description="Your GHOST DICE will be rerolled."
 CardRoll_HappyHour
 /title="HAPPY HOUR"
 /description="X2 your ROLL SCORE."
 CardRoll_Immortality
 /title="IMMORTALITY"
-/description="Your DICES cannot die during this ROLL."
+/description="Your DICE cannot die during this ROLL."
 CardRoll_MarketCrash
 /title="MARKET CRASH"
-/description="All INVESTOR DICES lose 50%%%% of their savings."
+/description="All INVESTOR DICE lose 50%%%% of their savings."
 CardRoll_Revenge
 /title="REVENGE"
 /description="If you have a lower ROLL SCORE than your antagonist, swap them."
 CardRoll_Suidice
 /title="SUIDICE"
-/description="Your DICE with the highest number explodes and eliminates all of your ANTAGONIST'S DICES."
+/description="Your DICE with the highest number explodes and eliminates all of your ANTAGONIST'S DICE."
 CardRoll_WhiteElephant
 /title="WHITE ELEPHANT"
-/description="Your antagonist gets all your GHOST DICES of this ROLL."
+/description="Your antagonist gets all your GHOST DICE of this ROLL."
 CardRoll_TombRaider
 /title="TOMB RAIDER"
-/description="Steal one of your antagonist's GHOST DICES."
+/description="Steal one of your antagonist's GHOST DICE."
 CardDice_Assassin
 /title="ASSASSIN"
 /description="Gets +2 ATTACK at start of each ROLL."
@@ -48,16 +48,16 @@ CardDice_Tank
 /description="Gets +2 HEALTH at start of each ROLL."
 CardDice_Antenna
 /title="ANTENNA"
-/description="Multiply dice's SCORE with the SCORE of other dices with ANTENNA."
+/description="Multiply dice's SCORE with the SCORE of other DICE with ANTENNA."
 CardDice_Optimist
 /title="OPTIMIST"
-/description="All sides of this dices show one number higher (MAX. 6)."
+/description="All sides of this DICE show one number higher (MAX. 6)."
 CardDice_Pessimist
 /title="PESSIMIST"
-/description="All sides of this dices show one number lower (MIN. 1)."
+/description="All sides of this DICE show one number lower (MIN. 1)."
 CardDice_General
 /title="GENERAL"
-/description="Adds number of your surviving DICES to its SCORE."
+/description="Adds number of your surviving DICE to its SCORE."
 CardDice_Journalist
 /title="JOURNALIST"
 /description="X2 your ROLL SCORE."
@@ -69,7 +69,7 @@ CardDice_Engineer
 /description="Create a DICE CARD if it survives and shows a 1."
 CardDice_Medium
 /title="MEDIUM"
-/description="Adds number of your GHOST DICES to its SCORE."
+/description="Adds number of your GHOST DICE to its SCORE."
 CardDice_Investor
 /title="INVESTOR"
 /description="Saves its own SCORE when surviving with 10%%%% interest. Pay out when showing a 1."
@@ -99,4 +99,4 @@ CardCycle_GhostDiscount
 /description="When scoring a combination, you'll get one GHOST DICE back (MAX. 4)."
 CardCycle_Graveyard
 /title="GRAVEYARD"
-/description="+1 SPACE for GHOST DICES."
+/description="+1 SPACE for GHOST DICE."

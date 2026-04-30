@@ -35,7 +35,7 @@ TextAnimation :: struct{
 }
 
 button :: proc(text: string, position: rl.Vector2, size:rl.Vector2={1, 1}, color:rl.Color=rl.BLACK, active_color:rl.Color=rl.BLANK,
-		font_size:f32=30, clickable:bool=true, padding:f32=10., anchor:TextAnchor=.LEFT, hover_motion:bool=true) -> bool{
+		font_size:f32=30, clickable:bool=true, padding:f32=10., text_color:=rl.WHITE, anchor:TextAnchor=.LEFT, hover_motion:bool=true) -> bool{
 	text_size := measure_text(text, font_size) + padding
 
 	// highlight it if the mouse is hovering over it
@@ -59,11 +59,9 @@ button :: proc(text: string, position: rl.Vector2, size:rl.Vector2={1, 1}, color
 	text_position := position + {box.width-text_size.x, 0} / 2. + padding/2.
 	// Debug box for text position
 	// rl.DrawRectangleV(text_position, text_size, rl.RED)
-	draw_text(text, text_position, font_size, rl.WHITE)
-
+	draw_text(text, text_position, font_size, text_color)
 
 	clicked := hovered && rl.IsMouseButtonPressed(.LEFT)
-
 	if clicked {
 		sound := app.sounds[12]
 		rl.SetSoundVolume(sound, 1.)

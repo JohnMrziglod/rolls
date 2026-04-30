@@ -45,10 +45,13 @@ Dice :: struct {
 	health: sco,
 }
 Antagonist :: struct {
-	message: string
+	story_id: string,
+	index: i32,
+	tutorial: i32,		// step through the tutorial...
 }
 
 GameState :: enum {
+	TUTORIAL,
 	WAIT_FOR_ROLL,
 	CHARGING,
 	PRE_ROLLING,
@@ -136,6 +139,22 @@ Application :: struct {
 }
 app: Application
 
+antagonist_story :: proc(story_id: string, index:i32=1){
+	app.antagonist.story_id = story_id
+	app.antagonist.index = index
+}
+antagonist_story_continue :: proc(){
+	if len(app.antagonist.story_id) == 0 do return
+
+	app.antagonist.index += 1
+	text_id := fmt.aprintf("%s/%d", app.antagonist.story_id, app.antagonist.index)
+	if text_id in app.texts {
+		antagonist_story(app.antagonist.story_id, app.antagonist.index)
+	} else {
+		app.antagonist.story_id = ""
+		app.antagonist.index = 0
+	}
+}
 
 load_texts :: proc(texts_buffer: ^string, path: string) {
 	file, file_ok := os.read_entire_file(path)
@@ -200,6 +219,7 @@ main :: proc() {
 	target_ratio := 1080 / f32(screen_height)
 
 	app = {
+		// font = rl.LoadFont("assets/j_audio_cassette.otf"),
 		font = rl.LoadFont("assets/j_audio_cassette.otf"),
 		state = .PRE_ROLLING,
 		players = {
@@ -213,9 +233,6 @@ main :: proc() {
 				ghosts_costs_per_combination=5, ghosts_max=10,
 				max_lifetime_roll_cards=2,
 			},
-		},
-		antagonist={
-			message = "Let's see who reaches 1000 points first!",
 		},
 		ghosts_selected = {-1, -1, -1, -1, -1},
 	}
@@ -305,18 +322,14 @@ main :: proc() {
 		}
 	}
 
-	texts_buffer: string
-	load_texts(&texts_buffer, "assets/cards.toml")
-	defer delete(texts_buffer)
+	files: [2]string
+	load_texts(&files[0], "assets/cards.toml")
+	load_texts(&files[1], "assets/antagonist.toml")
+	defer {
+		for file in files do defer delete(file)
+	}
 
-	// load_texts("assets/antagonist.toml")
-
-	// defer {
-	// 	for key, value in app.texts {
-	// 		delete(key)
-	// 		delete(value)
-	// 	}
-	// }
+	antagonist_story("antagonist_intro1")
 
 	// Main game loop
 	for !rl.WindowShouldClose() {
@@ -409,10 +422,9 @@ main :: proc() {
 			}
 		}
 
-		if len(app.antagonist.message) > 0 {
+		if len(app.antagonist.story_id) > 0 {
 			if rl.IsKeyPressed(rl.KeyboardKey.SPACE) {
-				app.antagonist.message = {}
-				app.state_timer = 0.0
+				antagonist_story_continue()
 			}
 		} else {
 			if app.state == .PRE_ROLLING{
@@ -433,6 +445,11 @@ main :: proc() {
 				scoring_summary(dt)
 			} else if app.state == .WAIT_FOR_AI {
 				wait_for_ai()
+			} else if app.state == .WAIT_FOR_ROLL && len(app.antagonist.story_id) == 0 {
+				if app.antagonist.tutorial == 0 {
+					app.antagonist.tutorial += 1
+					antagonist_story("antagonist_intro2")
+				}
 			}
 		}
 
@@ -822,7 +839,11 @@ dices_battle :: proc(dt: real) {
 	app.state_timer = 0.0
 }
 
-get_text :: proc(id: any, key: string) -> string{
+get_text :: proc{get_text_string_int, get_text_id_string}
+get_text_string_int :: proc(id: string, key: i32) -> string{
+	return app.texts[fmt.tprintf("%v/%d", id, key)]
+}
+get_text_id_string :: proc(id: any, key: string) -> string{
 	return app.texts[fmt.tprintf("%v/%v", id, key)]
 }
 
@@ -1022,10 +1043,14 @@ scoring_summary :: proc(dt: real) {
 		player.total_score += roll_scores[p]
 	}
 
-	app.current_player = (app.current_player + 1) % N_PLAYERS
+	if app.players[0].total_score > 350{
+		antagonist_story("antagonist_lost")
+	} else if app.players[1].total_score > 350{
+		antagonist_story("antagonist_wins")
+	}
 
-	app.state = .WAIT_FOR_AI
-	app.state_timer = 0
+	app.current_player = (app.current_player + 1) % N_PLAYERS
+	state_switch(.WAIT_FOR_AI)
 }
 
 wait_for_ai :: proc(){
@@ -1191,15 +1216,23 @@ draw :: proc(power: f32) {
 			card_discard(&player, i32(discard_card), silent=discard_silent)
 		}
 
-		ghost_cols := 5 // @TODO: make this dynamic based on the max number of ghosts a player can have
+		ghost_cols :i32= 5 // @TODO: make this dynamic based on the max number of ghosts a player can have
 		ghost_size :f32= app.gui.font_size1
 		ghost_padding :f32= 4
-		for ghost_number, i in player.ghosts{
-			row := i / ghost_cols
-			col := i % ghost_cols
+		for i in 0..<player.ghosts_max {
+			ghost_index := i32(i)
+			row := ghost_index / ghost_cols
+			col := ghost_index % ghost_cols
 			if p == 1 do col *= -1	// flip the ghosts for the right player
 			position := app.gui.ghost_positions[p] + (ghost_size+ghost_padding)*rl.Vector2{f32(col), f32(row)}
 			if p == 1 do position.x -= ghost_size+ghost_padding	// shift the right player's ghosts to the left
+
+			if ghost_index >= i32(len(player.ghosts)) {
+				thickness :f32= 2
+				draw_box(position+{2, 2}, {ghost_size-2, ghost_size-2}-thickness, fill={100, 100, 100, 120}, thickness=thickness)
+				continue
+			}
+			ghost_number := player.ghosts[ghost_index]
 
 			clickable := app.state == .WAIT_FOR_ROLL && p == 0
 			if dice_button(ghost_number, position, ghost_size, player.color/2, active_color=player.color, clickable=clickable) {
@@ -1207,6 +1240,8 @@ draw :: proc(power: f32) {
 				app.ghosts_selected[0] = i32(i)
 			}
 		}
+
+
 
 		position := app.gui.score_positions[p]
 		text := fmt.tprintf("%.f", player.total_score)
@@ -1253,7 +1288,7 @@ draw :: proc(power: f32) {
 		}
 	}
 
-	if len(app.antagonist.message) > 0 {
+	if len(app.antagonist.story_id) > 0 {
 		// Let's the bubble get bigger and smaller to make it more dynamic, and also changes the color a bit
 		time_factor := 1. + 0.05 * math.sin(f32(rl.GetTime())*5)
 		font_size := app.gui.font_size1 * time_factor
@@ -1262,12 +1297,26 @@ draw :: proc(power: f32) {
 		padding :f32= 20.
 		color_fill := rl.BLACK
 		color_text := app.players[1].color
-		size := measure_text(app.antagonist.message, font_size, max_width=max_width) + padding
+		message := get_text(app.antagonist.story_id, app.antagonist.index)
+		size := measure_text(message, font_size, max_width=max_width) + padding
 		position := Vector2{app.gui.width-40, app.gui.height - 200 } - size - padding
+
 		rl.DrawRectangleV(position, size, color_fill)
 		rl.DrawRectangleLinesEx(
 			{position.x-thickness, position.y-thickness, size.x+2*thickness, size.y+2*thickness}, thickness, rl.BLACK)
-		draw_text(app.antagonist.message, position + padding/2., font_size, color_text, max_width=max_width)
+		draw_text(message, position + padding/2., font_size, color_text, max_width=max_width)
+
+		hovered := rl.CheckCollisionPointRec(mouse_pos, {x=position.x, y=position.y, width=size.x, height=size.y})
+		clicked := hovered && rl.IsMouseButtonPressed(.LEFT)
+		if clicked {
+			antagonist_story_continue()
+		}
+
+		button_pos := position + size
+
+		// if button(fmt.tprint("&gt;"), button_pos, font_size=app.gui.font_size2, anchor=.RIGHT, text_color=color_text, hover_motion=false) {
+		// 	antagonist_story_continue()
+		// }
 	}
 
 	if app.state == .CHARGING && app.current_player == 0 {

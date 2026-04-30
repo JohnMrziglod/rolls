@@ -1,5 +1,22 @@
-Antagonist_Intro
+antagonist_intro1
 /1="Oh... a newcomer!"
 /2="Leave! Run for your lives!"
 /3="Haha.. just kidding."
 /4="You probably don't even know how to play, don't you?"
+antagonist_intro2
+/1="We roll against each other."
+/2="Our dice will attack and kill each other if they show the same number."
+/3="Dead dice become GHOST DICE."
+/4="Use them to score COMBINATIONS and obtain CARDS."
+/5="Whoever reaches 350 POINTS wins."
+antagonist_lost
+/1="How could that..."
+/2="No way, you are playing for the first time!"
+/3="You are a dirty little cheater, aren't you?"
+/4="F*** off!"
+antagonist_wins
+/1="I told you..."
+/2="Not very surprising."
+/3="I don't think you have it in you."
+/4="I'd like to say it was a pleasure..."
+/5="but I don't like to lie."
