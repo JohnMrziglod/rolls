@@ -366,7 +366,7 @@ package game
 // 			}
 
 // 			// update_dice(&dices[i], dt)
-// 			draw_dice(
+// 			draw_die(
 // 				dices[i].position,
 // 				dices[i].rotation,
 // 				players[dice.player].color,

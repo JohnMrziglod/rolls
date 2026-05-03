@@ -40,7 +40,7 @@ Dice :: struct {
 	current_number: i32, // which number is shown on top face
 	current_score: sco,
 	already_scored: bool,
-	upgrades: [5]Card,
+	upgrades: [3]Card,
 	attack: sco,
 	health: sco,
 }
@@ -315,7 +315,7 @@ main :: proc() {
 			rl.UnloadSound(sound)
 		}
 	}
-	app.textures = {rl.LoadTexture("assets/textures/dice_white.png")}
+	app.textures = {rl.LoadTexture("assets/textures/dice_with_bg.png")}
 	defer {
 		for texture in app.textures {
 			rl.UnloadTexture(texture)
@@ -428,26 +428,27 @@ main :: proc() {
 				antagonist_story_continue()
 			}
 		} else {
-			if app.state == .PRE_ROLLING{
+			#partial switch app.state{
+			case .PRE_ROLLING:
 				apply_dice_upgrades(dt)
 				state_switch(.ROLLING)
-			} else if app.state == .ROLLING{
+			case .ROLLING:
 				physics(dt)
 				rolling(dt)
-			} else if app.state == .CARDS_BATTLE {
+			case .CARDS_BATTLE:
 				cards_battle(dt)
-			} else if app.state == .DICES_BATTLE {
+			case .DICES_BATTLE:
 				dices_battle(dt)
-			} else if app.state == .DICES_SCORING {
+			case .DICES_SCORING:
 				dices_scoring(dt)
-			} else if app.state == .CARDS_SCORING {
+			case .CARDS_SCORING:
 				cards_scoring(dt)
-			}else if app.state == .SCORING_SUMMARY {
+			case .SCORING_SUMMARY:
 				scoring_summary(dt)
-			} else if app.state == .WAIT_FOR_AI {
+			case .WAIT_FOR_AI:
 				wait_for_ai()
-			} else if app.state == .WAIT_FOR_ROLL && len(app.antagonist.story_id) == 0 {
-				if app.antagonist.tutorial == 0 {
+			case .WAIT_FOR_ROLL:
+				if len(app.antagonist.story_id) == 0 && app.antagonist.tutorial == 0 {
 					app.antagonist.tutorial += 1
 					antagonist_story("antagonist_intro2")
 				}
@@ -1137,15 +1138,15 @@ draw :: proc(power: f32) {
 	rl.BeginMode3D(app.camera3d)
 
 	// Draw a big cube to represent the area where the app.dices can move
-	rl.DrawCube(rl.Vector3{0.0, -.5, 0.0}, AREA_SIZE, 1.0, AREA_SIZE, COLOR_TABLE)
-	rl.DrawCubeWires(rl.Vector3{0.0, -.5, 0.0}, AREA_SIZE, 1.0, AREA_SIZE, rl.BLACK)
+	rl.DrawCube(rl.Vector3{0.0, -.5001, 0.0}, AREA_SIZE, 1.0, AREA_SIZE, COLOR_TABLE)
+	rl.DrawCubeWires(rl.Vector3{0.0, -.5001, 0.0}, AREA_SIZE, 1.0, AREA_SIZE, rl.BLACK)
 
 	dice_selected := -1
 	dice_hovered := -1
 	for &dice, d in app.dices{
 		if dice.state != .ALIVE do continue
 		hoverable := app.state != .ROLLING && (app.state != .ASSIGN_CARD || dice.player == 0)
-		if draw_dice(dice, app.textures[0], hoverable=hoverable) {
+		if draw_die(dice, hoverable=hoverable) {
 			dice_hovered = d
 			if rl.IsMouseButtonPressed(.LEFT) do dice_selected = d
 		}

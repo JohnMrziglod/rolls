@@ -1,9 +1,11 @@
 package game
 
 import "core:math"
+import "core:math/linalg"
 import "core:math/rand"
 import "core:unicode/utf8"
 import "core:fmt"
+import "core:slice"
 import "core:strings"
 import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
@@ -101,90 +103,95 @@ dice_button :: proc(number: i32, position: rl.Vector2, size: f32,
 	return hovered && rl.IsMouseButtonPressed(.LEFT)
 }
 
-draw_dice :: proc(dice: Dice, texture: rl.Texture2D, hoverable:bool=false) -> bool {
-	size := dice.shape.(ShapeBox).half_size
-
-	ray := rl.GetScreenToWorldRay(rl.GetMousePosition(), app.camera3d)
-
-    // Check collision between ray and box
-    collision := rl.GetRayCollisionBox(ray, {min=dice.position-size, max=dice.position+size})
-
+draw_cube :: proc(transform: ^f32, size: f32, texture: rl.Texture, faces: [6]Vector2, face_size: Vector2, color: rl.Color){
 	rlgl.SetTexture(texture.id)
-	t_w: f32 : 1.0 / 6.0 // Texture has 6 columns for the different orientations of the numbers
-	t_h: f32 : 1.0 // Texture has 1 row for the numbers 1-6
 
 	rlgl.PushMatrix()
 
-	rot_matrix := body_get_gl_transform(dice)
-	rlgl.MultMatrixf(raw_data(&rot_matrix))
+	rlgl.MultMatrixf(transform)
 
 	// Draw the numbers on each face of the cube
 	rlgl.Begin(rlgl.QUADS)
-	color := dice.color
-	if dice.state != .ALIVE do color /= 2
-	if hoverable && collision.hit do color = rl.ColorBrightness(color, -0.3)
-	rlgl.Color4ub(color.r, color.g, color.b, color.a)
 
-	// faces := []rl.Vector3{
-	// 	{0.0, 0.0, 1.0}, // Front face (1)
-	// 	{-1.0, 0.0, 0.0}, // Left face (2)
-	// 	{0.0, 1.0, 0.0}, // Top face (3)
-	// 	{0.0, -1.0, 0.0}, // Bottom face (4)
-	// 	{1.0, 0.0, 0.0}, // Right face (5)
-	// 	{0.0, 0.0, -1.0}, // Back face (6)
-	// }
+	rlgl.Color4ub(color.r, color.g, color.b, color.a)
 
 	// Front face (1)
 	n := dice.numbers[0]
 	rlgl.Normal3f(0.0, 0.0, 1.0) // Normal pointing left
-	rlgl.TexCoord2f(f32(n-1) * t_w, t_h); rlgl.Vertex3f(-size, -size, size) // Bottom-left
-	rlgl.TexCoord2f(f32(n)   * t_w, t_h); rlgl.Vertex3f( size, -size, size) // Bottom-right
-	rlgl.TexCoord2f(f32(n)   * t_w, 0.0); rlgl.Vertex3f( size,  size, size) // Top-right
-	rlgl.TexCoord2f(f32(n-1) * t_w, 0.0); rlgl.Vertex3f(-size,  size, size) // Top-left
+	rlgl.TexCoord2f(f32(n)   * t_w, t_h); rlgl.Vertex3f(-size, -size, size) // Bottom-left
+	rlgl.TexCoord2f(f32(n+1) * t_w, t_h); rlgl.Vertex3f( size, -size, size) // Bottom-right
+	rlgl.TexCoord2f(f32(n+1) * t_w, 0.0); rlgl.Vertex3f( size,  size, size) // Top-right
+	rlgl.TexCoord2f(f32(n)   * t_w, 0.0); rlgl.Vertex3f(-size,  size, size) // Top-left
 
 	// Left face (2)
 	n = dice.numbers[1]
 	rlgl.Normal3f(-1.0, 0.0, 0.0) // Normal pointing left
-	rlgl.TexCoord2f(f32(n-1) * t_w, t_h); rlgl.Vertex3f(-size, -size, -size) // Bottom-left
-	rlgl.TexCoord2f(f32(n)   * t_w, t_h); rlgl.Vertex3f(-size, -size,  size) // Bottom-right
-	rlgl.TexCoord2f(f32(n)   * t_w, 0.0); rlgl.Vertex3f(-size,  size,  size) // Top-right
-	rlgl.TexCoord2f(f32(n-1) * t_w, 0.0); rlgl.Vertex3f(-size,  size, -size) // Top-left
+	rlgl.TexCoord2f(f32(n)   * t_w, t_h); rlgl.Vertex3f(-size, -size, -size) // Bottom-left
+	rlgl.TexCoord2f(f32(n+1) * t_w, t_h); rlgl.Vertex3f(-size, -size,  size) // Bottom-right
+	rlgl.TexCoord2f(f32(n+1) * t_w, 0.0); rlgl.Vertex3f(-size,  size,  size) // Top-right
+	rlgl.TexCoord2f(f32(n)   * t_w, 0.0); rlgl.Vertex3f(-size,  size, -size) // Top-left
 
 	// // Top face (3)
 	n = dice.numbers[2]
 	rlgl.Normal3f(0.0, 1.0, 0.0) // Normal pointing up
-	rlgl.TexCoord2f(f32(n-1) * t_w, t_h); rlgl.Vertex3f(-size,  size,  size) // Bottom-left
-	rlgl.TexCoord2f(f32(n)   * t_w, t_h); rlgl.Vertex3f( size,  size,  size) // Bottom-right
-	rlgl.TexCoord2f(f32(n)   * t_w, 0.0); rlgl.Vertex3f( size,  size, -size) // Top-right
-	rlgl.TexCoord2f(f32(n-1) * t_w, 0.0); rlgl.Vertex3f(-size,  size, -size) // Top-lefts
+	rlgl.TexCoord2f(f32(n)   * t_w, t_h); rlgl.Vertex3f(-size,  size,  size) // Bottom-left
+	rlgl.TexCoord2f(f32(n+1) * t_w, t_h); rlgl.Vertex3f( size,  size,  size) // Bottom-right
+	rlgl.TexCoord2f(f32(n+1) * t_w, 0.0); rlgl.Vertex3f( size,  size, -size) // Top-right
+	rlgl.TexCoord2f(f32(n)   * t_w, 0.0); rlgl.Vertex3f(-size,  size, -size) // Top-lefts
 
 	// // Bottom face (4)
 	n = dice.numbers[3]
 	rlgl.Normal3f(0.0, -1.0, 0.0) // Normal pointing down
-	rlgl.TexCoord2f(f32(n-1) * t_w, t_h); rlgl.Vertex3f(-size, -size, -size) // Bottom-left
-	rlgl.TexCoord2f(f32(n)   * t_w, t_h); rlgl.Vertex3f( size, -size, -size) // Bottom-right
-	rlgl.TexCoord2f(f32(n)   * t_w, 0.0); rlgl.Vertex3f( size, -size,  size) // Top-right
-	rlgl.TexCoord2f(f32(n-1) * t_w, 0.0); rlgl.Vertex3f(-size, -size,  size) // Top-left
+	rlgl.TexCoord2f(f32(n)   * t_w, t_h); rlgl.Vertex3f(-size, -size, -size) // Bottom-left
+	rlgl.TexCoord2f(f32(n+1) * t_w, t_h); rlgl.Vertex3f( size, -size, -size) // Bottom-right
+	rlgl.TexCoord2f(f32(n+1) * t_w, 0.0); rlgl.Vertex3f( size, -size,  size) // Top-right
+	rlgl.TexCoord2f(f32(n)   * t_w, 0.0); rlgl.Vertex3f(-size, -size,  size) // Top-left
 
 	// // Right face (5)
 	n = dice.numbers[4]
 	rlgl.Normal3f(1.0, 0.0, 0.0) // Normal pointing right
-	rlgl.TexCoord2f(f32(n-1) * t_w, t_h); rlgl.Vertex3f( size, -size,  size) // Bottom-left
-	rlgl.TexCoord2f(f32(n)   * t_w, t_h); rlgl.Vertex3f( size, -size, -size) // Bottom-right
-	rlgl.TexCoord2f(f32(n)   * t_w, 0.0); rlgl.Vertex3f( size,  size, -size) // Top-right
-	rlgl.TexCoord2f(f32(n-1) * t_w, 0.0); rlgl.Vertex3f( size,  size,  size) // Top-left
+	rlgl.TexCoord2f(f32(n)   * t_w, t_h); rlgl.Vertex3f( size, -size,  size) // Bottom-left
+	rlgl.TexCoord2f(f32(n+1) * t_w, t_h); rlgl.Vertex3f( size, -size, -size) // Bottom-right
+	rlgl.TexCoord2f(f32(n+1) * t_w, 0.0); rlgl.Vertex3f( size,  size, -size) // Top-right
+	rlgl.TexCoord2f(f32(n)   * t_w, 0.0); rlgl.Vertex3f( size,  size,  size) // Top-left
 
 	// // Back face (6)
 	n = dice.numbers[5]
 	rlgl.Normal3f(0.0, 0.0, -1.0) // Normal pointing away from viewer
-	rlgl.TexCoord2f(f32(n-1) * t_w, t_h); rlgl.Vertex3f( size, -size, -size) // Bottom-right
-	rlgl.TexCoord2f(f32(n)   * t_w, t_h); rlgl.Vertex3f(-size, -size, -size) // Bottom-left
-	rlgl.TexCoord2f(f32(n)   * t_w, 0.0); rlgl.Vertex3f(-size,  size, -size) // Top-left
-	rlgl.TexCoord2f(f32(n-1) * t_w, 0.0); rlgl.Vertex3f( size,  size, -size) // Top-right
+	rlgl.TexCoord2f(f32(n)   * t_w, t_h); rlgl.Vertex3f( size, -size, -size) // Bottom-right
+	rlgl.TexCoord2f(f32(n+1) * t_w, t_h); rlgl.Vertex3f(-size, -size, -size) // Bottom-left
+	rlgl.TexCoord2f(f32(n+1) * t_w, 0.0); rlgl.Vertex3f(-size,  size, -size) // Top-left
+	rlgl.TexCoord2f(f32(n)   * t_w, 0.0); rlgl.Vertex3f( size,  size, -size) // Top-right
 
 	rlgl.End()
 
 	rlgl.PopMatrix()
+}
+
+draw_die :: proc(dice: Dice, hoverable:bool=false) -> bool {
+	size := dice.shape.(ShapeBox).half_size
+	ray := rl.GetScreenToWorldRay(rl.GetMousePosition(), app.camera3d)
+
+    // Check collision between ray and b
+    collision := rl.GetRayCollisionBox(ray, {min=dice.position-size, max=dice.position+size})
+
+    color := dice.color
+	if dice.state != .ALIVE do color /= 2
+	if hoverable && collision.hit do color = rl.ColorBrightness(color, -0.3)
+
+	fs = Vecto2{
+		1.0 / 6.0, // Texture has 6 columns for the different orientations of the numbers
+		1.0 // Texture has 1 row for the numbers 1-6
+	}
+
+	// transform: [16]f32, size: f32, texture: rl.Texture, faces: [6][2]f32, color: rl.Color
+	transform := raw_data(&body_get_gl_transform(dice))
+
+	faces := [6]Vector2{
+		f32(n)   * t_w, t_h
+	}
+
+	draw_cube(transform, size, app.textures[0], faces, face_size, color)
 
 	return hoverable && collision.hit
 }
