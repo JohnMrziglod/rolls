@@ -30,6 +30,7 @@ COLOR_PLAYERS := [2]rl.Color{
 }
 
 N_DICES :: 12
+DICE_HALF_SIZE :: 0.75
 EntityState :: enum {NOT_USED, DEAD, ALIVE,}
 Dice :: struct {
 	state: EntityState,
@@ -111,6 +112,13 @@ Cycle :: struct {
 	scored_combinations: bit_set[CombinationType],
 }
 
+Camera3D :: struct{
+	using raylib: rl.Camera3D,
+	desired_target: rl.Vector3,
+	timer: f64,
+	angle: f32,
+}
+
 Application :: struct {
 	// resources
 	font: rl.Font,
@@ -120,7 +128,8 @@ Application :: struct {
 
 	// gui
 	gui: GUI,
-	camera3d: rl.Camera3D,
+	last_mouse_position: rl.Vector2,
+	camera3d: Camera3D,
 	camera2d: rl.Camera2D,
 	particles: [1000]Particles,
 	text_animations: [200]TextAnimation,
@@ -220,7 +229,7 @@ main :: proc() {
 
 	app = {
 		// font = rl.LoadFont("assets/j_audio_cassette.otf"),
-		font = rl.LoadFont("assets/j_audio_cassette.otf"),
+		font = rl.LoadFont("assets/fonts/Paperlogy-6SemiBold.ttf"),
 		state = .PRE_ROLLING,
 		players = {
 			{
@@ -240,8 +249,8 @@ main :: proc() {
 	app.gui = {
 		width = f32(screen_width),
 		height = f32(screen_height),
-		font_size1 = 50,
-		font_size2 = 30,
+		font_size1 = 50*1.,
+		font_size2 = 30*1.,
 		bg_color = COLOR_PLAYERS[0]/2,
 		score_positions = {
 			{50, f32(screen_height)-200},
@@ -315,7 +324,7 @@ main :: proc() {
 			rl.UnloadSound(sound)
 		}
 	}
-	app.textures = {rl.LoadTexture("assets/textures/dice_with_bg.png")}
+	app.textures = {rl.LoadTexture("assets/textures/upgrades2.png")}
 	defer {
 		for texture in app.textures {
 			rl.UnloadTexture(texture)
@@ -336,6 +345,8 @@ main :: proc() {
 	for !rl.WindowShouldClose() {
 		dt := rl.GetFrameTime()
 		app.state_timer += dt
+
+		app.camera3d.target = linalg.lerp(app.camera3d.target, app.camera3d.desired_target, f32(dt)*5)
 
 		if rl.IsKeyPressed(rl.KeyboardKey.ESCAPE) {
 			if app.state == .GHOST_BOARD {
@@ -360,8 +371,7 @@ main :: proc() {
 		}
 
 		if app.state == .WAIT_FOR_ROLL && rl.IsKeyPressed(rl.KeyboardKey.SPACE) {
-			app.state = .CHARGING
-			app.state_timer = 0.
+			state_switch(.CHARGING)
 		}
 
 		// Max power is reached after 3 seconds of charging)
@@ -375,17 +385,17 @@ main :: proc() {
 				app.state = .PRE_ROLLING
 		}
 
-		if rl.IsKeyPressed(rl.KeyboardKey.S) {
-			for dice, d in app.dices{
-				if dice.state != .ALIVE do continue
-				if dice.player == app.current_player do fmt.println(d, dice)
-			}
-		}
-
 		// Zoom in and out:
 		mouse_wheel := rl.GetMouseWheelMove()
 		if mouse_wheel != 0.0 {
 			app.camera3d.position.y += 200. * mouse_wheel * dt
+		}
+
+		if rl.IsMouseButtonDown(.MIDDLE){
+			// app.camera_rotat
+			delta := rl.GetMouseDelta()
+			app.camera3d.angle += (delta.x+delta.y) * math.RAD_PER_DEG * dt * 5
+			app.camera3d.position = {math.cos(app.camera3d.angle)*30., app.camera3d.position.y, math.sin(app.camera3d.angle)*30.}
 		}
 
 		// update app.particles:
@@ -464,7 +474,7 @@ main :: proc() {
 }
 
 dice_init :: proc(dice: ^Dice, position:=Vector3{0, 1000, 0}){
-	half_size :f32= 1.
+	half_size :f32= DICE_HALF_SIZE
 	mass := math.pow(half_size, 3) * 8.
 	orientation := dice.orientation
 	rotation := dice.rotation
@@ -779,24 +789,6 @@ dices_battle :: proc(dt: real) {
 
 	for &dice, d in app.dices{
 		if dice.state != .ALIVE do continue
-
-		// Apply dice card effects
-		// for &upgrade, u in dice.upgrades{
-		// 	position := dice.position - f32(u) * Vector3{0, 2, 0}
-		// 	text: string
-
-		// 	#partial switch upgrade.type {
-		// 	case .CardDice_Antenna:
-		// 		if player.roll.antennas == 0 {
-		// 			player.roll.antennas = dice.current_score
-		// 		} else {
-		// 			player.roll.antennas *= dice.current_score
-		// 		}
-		// 		text = fmt.aprintf("ANTENNA NETWORK %.f!", dice.current_score)
-
-		// 		dice.current_score = 0
-		// 	}
-		// }
 
 		for &other_dice, o in app.dices{
 			if d == o || other_dice.state != .ALIVE || dice.player == other_dice.player do continue
@@ -1138,8 +1130,8 @@ draw :: proc(power: f32) {
 	rl.BeginMode3D(app.camera3d)
 
 	// Draw a big cube to represent the area where the app.dices can move
-	rl.DrawCube(rl.Vector3{0.0, -.5001, 0.0}, AREA_SIZE, 1.0, AREA_SIZE, COLOR_TABLE)
-	rl.DrawCubeWires(rl.Vector3{0.0, -.5001, 0.0}, AREA_SIZE, 1.0, AREA_SIZE, rl.BLACK)
+	rl.DrawCube(rl.Vector3{0.0, -.50001, 0.0}, AREA_SIZE, 1.0, AREA_SIZE, COLOR_TABLE)
+	rl.DrawCubeWires(rl.Vector3{0.0, -.50001, 0.0}, AREA_SIZE, 1.0, AREA_SIZE, rl.BLACK)
 
 	dice_selected := -1
 	dice_hovered := -1
@@ -1148,7 +1140,10 @@ draw :: proc(power: f32) {
 		hoverable := app.state != .ROLLING && (app.state != .ASSIGN_CARD || dice.player == 0)
 		if draw_die(dice, hoverable=hoverable) {
 			dice_hovered = d
-			if rl.IsMouseButtonPressed(.LEFT) do dice_selected = d
+			if rl.IsMouseButtonPressed(.LEFT) {
+				dice_selected = d
+				app.camera3d.desired_target = dice.position
+			}
 		}
 	}
 	size :f32= 0.35
@@ -1473,8 +1468,7 @@ draw :: proc(power: f32) {
 		text := "Press <SPACE> to continue" //app.current_player == 0 ? "ROLL!" : "ANTAGONIST ROLLS"
 		if button(text, {screen_width/2., screen_height - 150}, size={300, 80}, font_size=app.gui.font_size1,
 				color=app.gui.bg_color, anchor=.CENTER) {
-			app.state = .CHARGING
-			app.state_timer = 0.
+			state_switch(.CHARGING)
 		}
 	}
 
@@ -1565,4 +1559,6 @@ draw :: proc(power: f32) {
 state_switch :: proc(new_state: GameState, timer: f32=0.) {
 	app.state = new_state
 	app.state_timer = timer
+
+	if new_state == .CHARGING do app.camera3d.desired_target = {}
 }
