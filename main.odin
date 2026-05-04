@@ -1,6 +1,6 @@
 package game
 
-import "core:encoding/json"
+import "core:strconv"
 import "core:fmt"
 import "core:math"
 import "core:math/rand"
@@ -15,8 +15,50 @@ import rl "vendor:raylib"
 sco :: f64
 void :: struct{}
 
+COLORS := []rl.Color{
+	rl.LIGHTGRAY,
+	rl.GRAY,
+	rl.DARKGRAY,
+	rl.YELLOW,
+	rl.GOLD,
+	rl.ORANGE,
+	rl.PINK,
+	rl.RED,
+	rl.MAROON,
+	rl.GREEN,
+	rl.LIME,
+	rl.DARKGREEN,
+	rl.SKYBLUE,
+	rl.BLUE,
+	rl.DARKBLUE,
+	rl.PURPLE,
+	rl.VIOLET,
+	rl.DARKPURPLE,
+	rl.BEIGE,
+	rl.BROWN,
+	rl.DARKBROWN,
+}
+
+random_color :: proc(contrast_color: rl.Color) -> rl.Color{
+	index := rand.int32_range(0, i32(len(COLORS)))
+	color := COLORS[index]
+	// make sure the color is not too similar to the contrast color:
+	return color
+
+	// r := rand.int32_range(0, 255)
+	// g := rand.int32_range(0, 255)
+	// b := rand.int32_range(0, 255)
+
+	// // make sure the color is not too similar to the contrast color:
+	// if math.abs(r-i32(contrast_color.r)) < 50 do r = (r + 100) % 256
+	// if math.abs(g-i32(contrast_color.g)) < 50 do g = (g + 100) % 256
+	// if math.abs(b-i32(contrast_color.b)) < 50 do b = (b + 100) % 256
+
+	// return rl.Color{u8(r), u8(g), u8(b), 255}
+}
+
 AREA_SIZE :: 30.0
-// COLOR_BACKGROUND := rl.Color{203, 161, 53, 255}
+COLOR_BACKGROUND := rl.Color{203, 161, 53, 255}
 COLOR_CARDS := [CardCategory]rl.Color{
 	.NONE=rl.BLACK,
 	.ROLL=rl.Color{200, 224, 193, 255},
@@ -36,12 +78,13 @@ Dice :: struct {
 	state: EntityState,
 	using body: RigidBody,
 	player: u8,
-	color: rl.Color,
+	color1: rl.Color,	// face color (back ground)
+	color2: rl.Color,	// points and borders color
 	numbers: [6]i32, 	// which numbers are shown on the faces, normally 1..6 but it can be manipulated
 	current_number: i32, // which number is shown on top face
 	current_score: sco,
 	already_scored: bool,
-	upgrades: [3]Card,
+	upgrades: [6]Card,  // For each side is one upgrade possible:
 	attack: sco,
 	health: sco,
 }
@@ -94,6 +137,7 @@ N_PLAYERS :: 2
 Player :: struct {
 	id: u8,
 	color: rl.Color,
+	color2: rl.Color,
 	total_score: sco,
 	roll: RollState,
 	is_scoring: bool,
@@ -123,6 +167,7 @@ Application :: struct {
 	// resources
 	font: rl.Font,
 	textures: []rl.Texture2D,
+	sub_textures: map[string]Vector2,
 	sounds: []rl.Sound,
 	texts: map[string]string,
 
@@ -165,7 +210,7 @@ antagonist_story_continue :: proc(){
 	}
 }
 
-load_texts :: proc(texts_buffer: ^string, path: string) {
+load_data :: proc(texts_buffer: ^string, path: string) {
 	file, file_ok := os.read_entire_file(path)
 	if !file_ok{
 		fmt.println("Error loading texts!")
@@ -186,12 +231,29 @@ load_texts :: proc(texts_buffer: ^string, path: string) {
 			key_end = i // we don't need the =
 			token = .Value
 		} else if token == .Value && r == '\n' {
-			key := strings.join(
-				{texts_buffer[section_start:section_end],
-				 texts_buffer[key_start:key_end]}, ""
-			)
+		    section := texts_buffer[section_start:section_end]
+			local_key := texts_buffer[key_start+1:key_end]
+			global_key := strings.join({section, local_key}, "/")
 			value := texts_buffer[key_end+2:i-2] // +2 for =", -2 to remove " and the \r before \n
-			app.texts[key] = value
+			if texts_buffer[key_end+1] == '"' {
+			    app.texts[global_key] = value
+			} else if texts_buffer[key_end+1] == '[' && local_key == "texture_id"{
+			    values := strings.split(value, ",", context.temp_allocator)
+				x_coord, x_ok := strconv.parse_int(values[0])
+				y_coord, y_ok := strconv.parse_int(values[1])
+				if x_ok && y_ok {
+                    app.sub_textures[section] = {
+                        f32(x_coord),
+                        f32(y_coord),
+                    }
+				} else {
+				    fmt.println("Error parsing texture coordinates for ", section)
+				}
+            } else {
+                fmt.printfln("Warning: value for key %s in section %s is neither a string nor a texture id:\n%s", local_key, section, value)
+            }
+
+
 			token = .Root
 		} else if token == .Section && r == '\n'{
 			section_end = i-1
@@ -296,7 +358,7 @@ main :: proc() {
 		defer rl.EndMode3D()
 
 		 // Draw a big cube to represent the area where the app.dices can move
-		rl.DrawCube(rl.Vector3{0.0, -0.5, 0.0}, AREA_SIZE, 1.0, AREA_SIZE, COLOR_TABLE)
+		// rl.DrawCube(rl.Vector3{0.0, -0.5, 0.0}, AREA_SIZE, 1.0, AREA_SIZE, COLOR_TABLE)
 	}
 
 	rl.SetTargetFPS(60)
@@ -324,7 +386,7 @@ main :: proc() {
 			rl.UnloadSound(sound)
 		}
 	}
-	app.textures = {rl.LoadTexture("assets/textures/upgrades2.png")}
+	app.textures = {rl.LoadTexture("assets/textures/die.png")}
 	defer {
 		for texture in app.textures {
 			rl.UnloadTexture(texture)
@@ -332,11 +394,12 @@ main :: proc() {
 	}
 
 	files: [2]string
-	load_texts(&files[0], "assets/cards.toml")
-	load_texts(&files[1], "assets/antagonist.toml")
+	load_data(&files[0], "assets/cards.toml")
+	load_data(&files[1], "assets/antagonist.toml")
 	defer {
 		for file in files do defer delete(file)
 	}
+	fmt.println("Loaded texts: ", app.sub_textures)
 
 	app.antagonist.tutorial = 2
 	// antagonist_story("antagonist_intro1")
@@ -493,7 +556,8 @@ dice_init :: proc(dice: ^Dice, position:=Vector3{0, 1000, 0}){
 		inverse_mass=1./mass,
 		can_sleep=true,
 		player=dice.player,
-		color=app.players[dice.player].color,
+		color1=dice.color1,
+		color2=dice.color2,
 		current_number=0,
 		current_score=0,
 		attack=1,
@@ -508,7 +572,7 @@ dices_reset :: proc(power:f32=1., first_round:bool=false) {
 		clear(&app.dices)
 		for player, p in app.players{
 			for i in 0..<player.n_dices {
-				append(&app.dices, Dice{player=player.id})
+				append(&app.dices, Dice{player=player.id, color1=player.color, color2=rl.BLACK})
 			}
 		}
 	}
@@ -772,7 +836,7 @@ dices_battle :: proc(dt: real) {
 				suidice := &app.dices[suidice_index]
 
 				dice_killed(suidice)
-				add_text(suidice.position, fmt.aprint("SUIDICE!"), suidice.color, 2.0, font_size=app.gui.font_size2)
+				add_text(suidice.position, fmt.aprint("SUIDICE!"), suidice.color1, 2.0, font_size=app.gui.font_size2)
 
 				for &dice, d in app.dices{
 					if dice.state != .ALIVE || dice.player == u8(p) do continue
@@ -799,13 +863,13 @@ dices_battle :: proc(dt: real) {
 				if other_dice.health == 0{
 					dice_killed(&other_dice, killer=&dice)
 				} else {
-					add_text(other_dice.position, fmt.aprint("HIT!"), other_dice.color, 1.5, font_size=app.gui.font_size2)
+					add_text(other_dice.position, fmt.aprint("HIT!"), other_dice.color1, 1.5, font_size=app.gui.font_size2)
 				}
 
 				if dice.health == 0{
 					dice_killed(&dice, killer=&other_dice)
 				} else  {
-					add_text(dice.position, fmt.aprint("HIT!"), dice.color, 1.5, font_size=40)
+					add_text(dice.position, fmt.aprint("HIT!"), dice.color1, 1.5, font_size=40)
 				}
 
 				sound := app.sounds[5]
@@ -921,7 +985,7 @@ dices_scoring :: proc(dt: real) {
 				case:
 					continue
 				}
-				add_text(position, text, dice.color, 2.0, font_size=app.gui.font_size2)
+				add_text(position, text, dice.color1, 2.0, font_size=app.gui.font_size2)
 			}
 
 			app.players[dice.player].roll.score += dice.current_score
@@ -935,10 +999,10 @@ dices_scoring :: proc(dt: real) {
 			rl.SetSoundPitch(sound, pitch)
 			rl.PlaySound(sound)
 
-			// add_particles(dice.position, dice.color)
+			// add_particles(dice.position, dice.color1)
 			if dice.current_score != 0 {
 				add_text(dice.position, app.gui.score_positions[p],
-						 fmt.aprintf("+%.f", dice.current_score), dice.color, wait_time, font_size=app.gui.font_size1)
+						 fmt.aprintf("+%.f", dice.current_score), dice.color1, wait_time, font_size=app.gui.font_size1)
 			}
 
 			return
@@ -1117,21 +1181,24 @@ draw :: proc(power: f32) {
 	rl.BeginDrawing()
 	defer rl.EndDrawing()
 
+	anti_bg := rl.Color{}
 	if app.state == .WAIT_FOR_ROLL{
 		ratio := app.state_timer / 3.
 		color1 := COLOR_PLAYERS[app.current_player]
 		color2 := COLOR_PLAYERS[(app.current_player+1)%N_PLAYERS]
 		app.gui.bg_color = rl.ColorLerp(color2/2, color1/2, ratio)
+		anti_bg = rl.ColorLerp(color1/2, color2/2, ratio)
 	} else if app.state == .ROLLING{
 		app.gui.bg_color = COLOR_PLAYERS[app.current_player]/2
+		anti_bg = COLOR_PLAYERS[(app.current_player+1)%N_PLAYERS]/2
 	}
 	rl.ClearBackground(app.gui.bg_color)
 
 	rl.BeginMode3D(app.camera3d)
 
 	// Draw a big cube to represent the area where the app.dices can move
-	rl.DrawCube(rl.Vector3{0.0, -.50001, 0.0}, AREA_SIZE, 1.0, AREA_SIZE, COLOR_TABLE)
-	rl.DrawCubeWires(rl.Vector3{0.0, -.50001, 0.0}, AREA_SIZE, 1.0, AREA_SIZE, rl.BLACK)
+	rl.DrawCube(rl.Vector3{0.0, -.6, 0.0}, AREA_SIZE, 1.0, AREA_SIZE, COLOR_TABLE)
+	rl.DrawCubeWires(rl.Vector3{0.0, -.6, 0.0}, AREA_SIZE, 1.0, AREA_SIZE, rl.BLACK)
 
 	dice_selected := -1
 	dice_hovered := -1
@@ -1224,7 +1291,7 @@ draw :: proc(power: f32) {
 			ghost_number := player.ghosts[ghost_index]
 
 			clickable := app.state == .WAIT_FOR_ROLL && p == 0
-			if dice_button(ghost_number, position, ghost_size, player.color/2, active_color=player.color, clickable=clickable) {
+			if dice_button(ghost_number, position, ghost_size, active_color=player.color, clickable=clickable) {
 				app.state = .GHOST_BOARD
 				app.ghosts_selected[0] = i32(i)
 			}
@@ -1273,7 +1340,7 @@ draw :: proc(power: f32) {
 		position := rl.GetMousePosition() + Vector2{10, 10}
 		if count > 0 {
 			text := strings.join(upgrades[:count], ", ", context.temp_allocator)
-			draw_text(text, position, app.gui.font_size2, dice.color)
+			draw_text(text, position, app.gui.font_size2, dice.color1)
 		}
 	}
 
@@ -1344,7 +1411,7 @@ draw :: proc(power: f32) {
 			ghost_number := human.ghosts[ghost_index]
 			active := contains(app.ghosts_selected[:], i32(ghost_index))
 
-			if dice_button(ghost_number, position, ghost_size, human.color/2, active_color=human.color, active=active, clickable=true) {
+			if dice_button(ghost_number, position, ghost_size, active_color=human.color, active=active, clickable=true) {
 				free_index := -1
 				for &slot, s in app.ghosts_selected{
 					if slot == -1 && free_index == -1 {
@@ -1386,7 +1453,7 @@ draw :: proc(power: f32) {
 
 				for ghost_number, g in ghost_selected_numbers{
 					dice_button(ghost_number, position+{300+f32(g)*(ghost_size2+5), -7},
-								ghost_size2, human.color/2, active_color=human.color,
+								ghost_size2, active_color=human.color,
 								active=highlighted[g], clickable=false)
 				}
 
@@ -1524,14 +1591,14 @@ draw :: proc(power: f32) {
 					apply_dice_upgrades(0.)	// @FIXME: Is that good?
 					app.card_selected = {}
 					could_upgrade = true
-					add_text(dice.position, fmt.aprintf("Upgraded to %v!", get_text(upgrade.type, "title")), dice.color, 1.5)
+					add_text(dice.position, fmt.aprintf("Upgraded to %v!", get_text(upgrade.type, "title")), dice.color1, 1.5)
 					state_switch(.WAIT_FOR_ROLL)
 					break
 				}
 			}
 
 			if !could_upgrade {
-				add_text(dice.position, fmt.aprint("Dice has no free upgrade slots!"), dice.color, 1.5)
+				add_text(dice.position, fmt.aprint("Dice has no free upgrade slots!"), dice.color1, 1.5)
 			}
 		} else if rl.IsMouseButtonPressed(.RIGHT) {
 			app.card_selected.triggered = 0.

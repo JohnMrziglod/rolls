@@ -43,6 +43,7 @@ CardRoll_TombRaider
 CardDice_Assassin
 /title="ASSASSIN"
 /description="Gets +2 ATTACK at start of each ROLL."
+/texture_id=[1,1]
 CardDice_Tank
 /title="TANK"
 /description="Gets +2 HEALTH at start of each ROLL."

@@ -131,12 +131,12 @@ card_activate :: proc(player: ^Player, card: ^Card){
 			case .CardDice_Historian:
 				if card.category == .ROLL{
 					upgrade.var1 += 1.
-					add_text(dice.position, fmt.aprint("HISTORIAN: +1 SCORE!"), dice.color, 0.5)
+					add_text(dice.position, fmt.aprint("HISTORIAN: +1 SCORE!"), dice.color1, 0.5)
 				}
 			case .CardDice_Librarian:
 				if card.category == .DICE{
 					upgrade.var1 += 1.
-					add_text(dice.position, fmt.aprint("LIBRARIAN: +1 SCORE!"), dice.color, 0.5)
+					add_text(dice.position, fmt.aprint("LIBRARIAN: +1 SCORE!"), dice.color1, 0.5)
 				}
 			}
 		}

@@ -7,12 +7,12 @@ dice_killed :: proc(victim: ^Dice, killer: ^Dice=nil){
 	player := &app.players[victim.player]
 
 	if .CardRoll_Immortality in player.roll.effects{
-		add_text(victim.position, fmt.aprint("IMMORTAL!"), victim.color, 1.5, font_size=app.gui.font_size2)
+		add_text(victim.position, fmt.aprint("IMMORTAL!"), victim.color1, 1.5, font_size=app.gui.font_size2)
 		return
 	}
 
-	add_particles(victim.position, victim.color)
-	add_text(victim.position, fmt.aprint("GHOST!"), victim.color, 1.5, font_size=app.gui.font_size2)
+	add_particles(victim.position, victim.color1)
+	add_text(victim.position, fmt.aprint("GHOST!"), victim.color1, 1.5, font_size=app.gui.font_size2)
 
 	victim.state = .DEAD
 	victim.position.y = 1000.
@@ -20,7 +20,7 @@ dice_killed :: proc(victim: ^Dice, killer: ^Dice=nil){
 	if killer != nil do app.players[killer.player].roll.kills += 1
 
 	if .CardRoll_Exorcism in player.roll.effects{
-		add_text(victim.position, fmt.aprint("EXORCISED!"), victim.color, 1.5, font_size=app.gui.font_size2)
+		add_text(victim.position, fmt.aprint("EXORCISED!"), victim.color1, 1.5, font_size=app.gui.font_size2)
 		return
 	}
 

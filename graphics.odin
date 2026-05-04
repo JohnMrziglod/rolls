@@ -6,9 +6,12 @@ import "core:math/rand"
 import "core:unicode/utf8"
 import "core:fmt"
 import "core:slice"
+import "core:reflect"
 import "core:strings"
 import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
+
+TextureFaceSize :: [2]f32{128., 128.}
 
 TextAnchor :: enum {
 	LEFT,
@@ -74,31 +77,21 @@ button :: proc(text: string, position: rl.Vector2, size:rl.Vector2={1, 1}, color
 }
 
 dice_button :: proc(number: i32, position: rl.Vector2, size: f32,
-					 color:rl.Color=rl.WHITE, active_color:rl.Color=rl.BLANK, active:bool=false, clickable:bool=true) -> bool{
+					 color:rl.Color=rl.GRAY/2, active_color:rl.Color=rl.BLANK, active:bool=false, clickable:bool=true) -> bool{
 
 	if number < 1 || number > 6 do return false
 
-	texture_rect := rl.Rectangle{
-		x = f32((number-1)*app.textures[0].width/6),
-		y = 0,
-		width = f32(app.textures[0].width/6),
-		height = f32(app.textures[0].height),
-	}
-	dest_rect := rl.Rectangle{
-		x = position.x,
-		y = position.y,
-		width = size,
-		height = size,
-	}
-
-	active_color := active_color == rl.BLANK ? rl.ColorBrightness(color, 1.2) : active_color
-
 	// highlight it if the mouse is hovering over it
+	dest_rect := rl.Rectangle{x=position.x, y=position.y, width=size, height=size}
 	hovered := clickable && rl.CheckCollisionPointRec(rl.GetMousePosition(), dest_rect)
 	if hovered do dest_rect.y += math.sin(f32(rl.GetTime())*10)*5	// make the dice float up and down a bit
 
+	active_color := active_color == rl.BLANK ? rl.ColorBrightness(color, 1.2) : active_color
 	tint := active || hovered ? active_color : color
-	rl.DrawTexturePro(app.textures[0], texture_rect, dest_rect, {}, 0., tint)
+	texture := app.textures[0]
+	ts := TextureFaceSize// / {f32(texture.width), f32(texture.height)}
+	rl.DrawTexturePro(texture, {x=6.*ts.x, width=ts.x, height=ts.y}, dest_rect, {}, 0., tint)
+	rl.DrawTexturePro(texture, {x=f32(number-1)*ts.x, width=ts.x, height=ts.y}, dest_rect, {}, 0., rl.BLACK)
 
 	return hovered && rl.IsMouseButtonPressed(.LEFT)
 }
@@ -118,50 +111,50 @@ draw_cube :: proc(transform: ^f32, size: f32, texture: rl.Texture, tc: [6]Vector
 	// Front face (1)
 	i := 0
 	rlgl.Normal3f(0.0, 0.0, 1.0) // Normal pointing left
-	rlgl.TexCoord2f(tc[i].x		, tc[i].y+ts.y); rlgl.Vertex3f(-size, -size, size) // Bottom-left
+	rlgl.TexCoord2f(tc[i].x,      tc[i].y+ts.y); rlgl.Vertex3f(-size, -size, size) // Bottom-left
 	rlgl.TexCoord2f(tc[i].x+ts.x, tc[i].y+ts.y); rlgl.Vertex3f( size, -size, size) // Bottom-right
-	rlgl.TexCoord2f(tc[i].x+ts.x, 0.0		  ); rlgl.Vertex3f( size,  size, size) // Top-right
-	rlgl.TexCoord2f(tc[i].x		, 0.0		  ); rlgl.Vertex3f(-size,  size, size) // Top-left
+	rlgl.TexCoord2f(tc[i].x+ts.x, tc[i].y     ); rlgl.Vertex3f( size,  size, size) // Top-right
+	rlgl.TexCoord2f(tc[i].x,      tc[i].y     ); rlgl.Vertex3f(-size,  size, size) // Top-left
 
 	// Left face (2)
 	i = 1
 	rlgl.Normal3f(-1.0, 0.0, 0.0) // Normal pointing left
-	rlgl.TexCoord2f(tc[i].x		, tc[i].y+ts.y); rlgl.Vertex3f(-size, -size, -size) // Bottom-left
+	rlgl.TexCoord2f(tc[i].x,      tc[i].y+ts.y); rlgl.Vertex3f(-size, -size, -size) // Bottom-left
 	rlgl.TexCoord2f(tc[i].x+ts.x, tc[i].y+ts.y); rlgl.Vertex3f(-size, -size,  size) // Bottom-right
-	rlgl.TexCoord2f(tc[i].x+ts.x, 0.0		  ); rlgl.Vertex3f(-size,  size,  size) // Top-right
-	rlgl.TexCoord2f(tc[i].x		, 0.0		  ); rlgl.Vertex3f(-size,  size, -size) // Top-left
+	rlgl.TexCoord2f(tc[i].x+ts.x, tc[i].y     ); rlgl.Vertex3f(-size,  size,  size) // Top-right
+	rlgl.TexCoord2f(tc[i].x,      tc[i].y     ); rlgl.Vertex3f(-size,  size, -size) // Top-left
 
 	// // Top face (3)
 	i = 2
 	rlgl.Normal3f(0.0, 1.0, 0.0) // Normal pointing up
-	rlgl.TexCoord2f(tc[i].x		, tc[i].y+ts.y); rlgl.Vertex3f(-size,  size,  size) // Bottom-left
+	rlgl.TexCoord2f(tc[i].x,      tc[i].y+ts.y); rlgl.Vertex3f(-size,  size,  size) // Bottom-left
 	rlgl.TexCoord2f(tc[i].x+ts.x, tc[i].y+ts.y); rlgl.Vertex3f( size,  size,  size) // Bottom-right
-	rlgl.TexCoord2f(tc[i].x+ts.x, 0.0		  ); rlgl.Vertex3f( size,  size, -size) // Top-right
-	rlgl.TexCoord2f(tc[i].x		, 0.0		  ); rlgl.Vertex3f(-size,  size, -size) // Top-lefts
+	rlgl.TexCoord2f(tc[i].x+ts.x, tc[i].y     ); rlgl.Vertex3f( size,  size, -size) // Top-right
+	rlgl.TexCoord2f(tc[i].x,      tc[i].y     ); rlgl.Vertex3f(-size,  size, -size) // Top-lefts
 
 	// // Bottom face (4)
 	i = 3
 	rlgl.Normal3f(0.0, -1.0, 0.0) // Normal pointing down
-	rlgl.TexCoord2f(tc[i].x		, tc[i].y+ts.y); rlgl.Vertex3f(-size, -size, -size) // Bottom-left
+	rlgl.TexCoord2f(tc[i].x,      tc[i].y+ts.y); rlgl.Vertex3f(-size, -size, -size) // Bottom-left
 	rlgl.TexCoord2f(tc[i].x+ts.x, tc[i].y+ts.y); rlgl.Vertex3f( size, -size, -size) // Bottom-right
-	rlgl.TexCoord2f(tc[i].x+ts.x, 0.0		  ); rlgl.Vertex3f( size, -size,  size) // Top-right
-	rlgl.TexCoord2f(tc[i].x		, 0.0		  ); rlgl.Vertex3f(-size, -size,  size) // Top-left
+	rlgl.TexCoord2f(tc[i].x+ts.x, tc[i].y     ); rlgl.Vertex3f( size, -size,  size) // Top-right
+	rlgl.TexCoord2f(tc[i].x,      tc[i].y     ); rlgl.Vertex3f(-size, -size,  size) // Top-left
 
 	// // Right face (5)
 	i = 4
 	rlgl.Normal3f(1.0, 0.0, 0.0) // Normal pointing right
-	rlgl.TexCoord2f(tc[i].x		, tc[i].y+ts.y); rlgl.Vertex3f( size, -size,  size) // Bottom-left
+	rlgl.TexCoord2f(tc[i].x,      tc[i].y+ts.y); rlgl.Vertex3f( size, -size,  size) // Bottom-left
 	rlgl.TexCoord2f(tc[i].x+ts.x, tc[i].y+ts.y); rlgl.Vertex3f( size, -size, -size) // Bottom-right
-	rlgl.TexCoord2f(tc[i].x+ts.x, 0.0		  ); rlgl.Vertex3f( size,  size, -size) // Top-right
-	rlgl.TexCoord2f(tc[i].x		, 0.0		  ); rlgl.Vertex3f( size,  size,  size) // Top-left
+	rlgl.TexCoord2f(tc[i].x+ts.x, tc[i].y     ); rlgl.Vertex3f( size,  size, -size) // Top-right
+	rlgl.TexCoord2f(tc[i].x,      tc[i].y     ); rlgl.Vertex3f( size,  size,  size) // Top-left
 
 	// // Back face (6)
 	i = 5
 	rlgl.Normal3f(0.0, 0.0, -1.0) // Normal pointing away from viewer
-	rlgl.TexCoord2f(tc[i].x		, tc[i].y+ts.y); rlgl.Vertex3f( size, -size, -size) // Bottom-right
+	rlgl.TexCoord2f(tc[i].x,      tc[i].y+ts.y); rlgl.Vertex3f( size, -size, -size) // Bottom-right
 	rlgl.TexCoord2f(tc[i].x+ts.x, tc[i].y+ts.y); rlgl.Vertex3f(-size, -size, -size) // Bottom-left
-	rlgl.TexCoord2f(tc[i].x+ts.x, 0.0		  ); rlgl.Vertex3f(-size,  size, -size) // Top-left
-	rlgl.TexCoord2f(tc[i].x		, 0.0		  ); rlgl.Vertex3f( size,  size, -size) // Top-right
+	rlgl.TexCoord2f(tc[i].x+ts.x, tc[i].y     ); rlgl.Vertex3f(-size,  size, -size) // Top-left
+	rlgl.TexCoord2f(tc[i].x,      tc[i].y     ); rlgl.Vertex3f( size,  size, -size) // Top-right
 
 	rlgl.End()
 
@@ -175,23 +168,35 @@ draw_die :: proc(dice: Dice, hoverable:bool=false) -> bool {
     // Check collision between ray and b
     collision := rl.GetRayCollisionBox(ray, {min=dice.position-size, max=dice.position+size})
 
-    color := dice.color
+    color := dice.color1
 	if dice.state != .ALIVE do color /= 2
 	if hoverable && collision.hit do color = rl.ColorBrightness(color, -0.3)
 
-	fs := Vector2{
-		1.0 / 6.0, // Texture has 6 columns for the different orientations of the numbers
-		1.0 // Texture has 1 row for the numbers 1-6
-	}
 
 	// transform: [16]f32, size: f32, texture: rl.Texture, faces: [6][2]f32, color: rl.Color
 	transform := body_get_gl_transform(dice)
 
+	texture := app.textures[0]
+	fs := TextureFaceSize / {f32(texture.width), f32(texture.height)}
 	// Upper left coordinate of each face texture
 	faces := [6]Vector2{}
-	for n, i in dice.numbers do faces[i] = {f32(n-1)*fs.x, 0}
+	for n, i in dice.numbers do faces[i] = {f32(6)*fs.x, 0}
+	draw_cube(raw_data(&transform), size, texture, faces, fs, color)
 
-	draw_cube(raw_data(&transform), size, app.textures[0], faces, fs, color)
+	for n, i in dice.numbers {
+	    if dice.upgrades[i].type != .CardNone{
+			card_type := reflect.enum_string(dice.upgrades[i].type)
+			if card_type in app.sub_textures {
+			    texture_id := app.sub_textures[card_type]
+	            faces[i] = fs.yx * app.sub_textures[card_type].yx
+			} else {
+                faces[i] = {0., fs.y}
+			}
+		} else {
+            faces[i] = {f32(n-1)*fs.x, 0.}
+		}
+	}
+	draw_cube(raw_data(&transform), size, texture, faces, fs, dice.color2)
 
 	return hoverable && collision.hit
 }
@@ -399,8 +404,18 @@ draw_card :: proc(card: Card, position: rl.Vector2, color:rl.Color=rl.BLANK, act
 	rl.DrawRectangleLinesEx({position.x-4, position.y-4, size.x+2*lt, size.y+2*lt}, lt, lc)
 	// rl.DrawLineEx({position.x+padding, position.y+line_pos}, {position.x+size.x-padding, position.y+line_pos}, lt, lc)
 
-	// Title
 	text_pos := position + {padding, padding}
+
+	texture := app.textures[0]
+	ts := TextureFaceSize// / {f32(texture.width), f32(texture.height)}
+	tp := ts.yx * {0., 1.}
+	card_type_string := reflect.enum_string(card.type)
+	if card_type_string in app.sub_textures do tp = ts.yx * app.sub_textures[card_type_string].yx
+	tint := rl.ColorBrightness(color, -0.2)
+	dest_rect := rl.Rectangle{x=text_pos.x, y=text_pos.y, width=size.y, height=size.y}
+	rl.DrawTexturePro(texture, {x=tp.x, y=tp.y, width=ts.x, height=ts.y}, dest_rect, {}, 0., tint)
+
+	// Title
 	draw_text(get_text(card.type, "title"), text_pos, font_size, rl.RAYWHITE, max_width=size.x-2*padding)
 
 	if card.category == .ROLL && card.lifetime > 0 {
