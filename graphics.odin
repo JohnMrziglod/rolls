@@ -96,69 +96,60 @@ dice_button :: proc(number: i32, position: rl.Vector2, size: f32,
 	return hovered && rl.IsMouseButtonPressed(.LEFT)
 }
 
-draw_cube :: proc(transform: ^f32, size: f32, texture: rl.Texture, tc: [6]Vector2, ts: Vector2, color: rl.Color){
-	rlgl.SetTexture(texture.id)
-
-	rlgl.PushMatrix()
-
-	rlgl.MultMatrixf(transform)
-
-	// Draw the numbers on each face of the cube
-	rlgl.Begin(rlgl.QUADS)
-
-	rlgl.Color4ub(color.r, color.g, color.b, color.a)
+draw_die_face :: proc(face: int, size: f32, texture: rl.Texture, tc: Vector2, ts: Vector2, color: rl.Color, small:bool=false){
+    size := small ? size+0.05 : size
+    size2 := small ? size*0.75 :  size
+    rlgl.Color4ub(color.r, color.g, color.b, color.a)
 
 	// Front face (1)
-	i := 0
-	rlgl.Normal3f(0.0, 0.0, 1.0) // Normal pointing left
-	rlgl.TexCoord2f(tc[i].x,      tc[i].y+ts.y); rlgl.Vertex3f(-size, -size, size) // Bottom-left
-	rlgl.TexCoord2f(tc[i].x+ts.x, tc[i].y+ts.y); rlgl.Vertex3f( size, -size, size) // Bottom-right
-	rlgl.TexCoord2f(tc[i].x+ts.x, tc[i].y     ); rlgl.Vertex3f( size,  size, size) // Top-right
-	rlgl.TexCoord2f(tc[i].x,      tc[i].y     ); rlgl.Vertex3f(-size,  size, size) // Top-left
+	switch face{
+	case 0:
+    	rlgl.Normal3f(0.0, 0.0, 1.0) // Normal pointing left
+    	rlgl.TexCoord2f(tc.x,      tc.y+ts.y); rlgl.Vertex3f(-size2, -size2, size) // Bottom-left
+    	rlgl.TexCoord2f(tc.x+ts.x, tc.y+ts.y); rlgl.Vertex3f( size2, -size2, size) // Bottom-right
+    	rlgl.TexCoord2f(tc.x+ts.x, tc.y     ); rlgl.Vertex3f( size2,  size2, size) // Top-right
+    	rlgl.TexCoord2f(tc.x,      tc.y     ); rlgl.Vertex3f(-size2,  size2, size) // Top-left
 
 	// Left face (2)
-	i = 1
-	rlgl.Normal3f(-1.0, 0.0, 0.0) // Normal pointing left
-	rlgl.TexCoord2f(tc[i].x,      tc[i].y+ts.y); rlgl.Vertex3f(-size, -size, -size) // Bottom-left
-	rlgl.TexCoord2f(tc[i].x+ts.x, tc[i].y+ts.y); rlgl.Vertex3f(-size, -size,  size) // Bottom-right
-	rlgl.TexCoord2f(tc[i].x+ts.x, tc[i].y     ); rlgl.Vertex3f(-size,  size,  size) // Top-right
-	rlgl.TexCoord2f(tc[i].x,      tc[i].y     ); rlgl.Vertex3f(-size,  size, -size) // Top-left
+	case 1:
+    	rlgl.Normal3f(-1.0, 0.0, 0.0) // Normal pointing left
+    	rlgl.TexCoord2f(tc.x,      tc.y+ts.y); rlgl.Vertex3f(-size, -size2, -size2) // Bottom-left
+    	rlgl.TexCoord2f(tc.x+ts.x, tc.y+ts.y); rlgl.Vertex3f(-size, -size2,  size2) // Bottom-right
+    	rlgl.TexCoord2f(tc.x+ts.x, tc.y     ); rlgl.Vertex3f(-size,  size2,  size2) // Top-right
+    	rlgl.TexCoord2f(tc.x,      tc.y     ); rlgl.Vertex3f(-size,  size2, -size2) // Top-left
 
 	// // Top face (3)
-	i = 2
-	rlgl.Normal3f(0.0, 1.0, 0.0) // Normal pointing up
-	rlgl.TexCoord2f(tc[i].x,      tc[i].y+ts.y); rlgl.Vertex3f(-size,  size,  size) // Bottom-left
-	rlgl.TexCoord2f(tc[i].x+ts.x, tc[i].y+ts.y); rlgl.Vertex3f( size,  size,  size) // Bottom-right
-	rlgl.TexCoord2f(tc[i].x+ts.x, tc[i].y     ); rlgl.Vertex3f( size,  size, -size) // Top-right
-	rlgl.TexCoord2f(tc[i].x,      tc[i].y     ); rlgl.Vertex3f(-size,  size, -size) // Top-lefts
+	case 2:
+    	rlgl.Normal3f(0.0, 1.0, 0.0) // Normal pointing up
+    	rlgl.TexCoord2f(tc.x,      tc.y+ts.y); rlgl.Vertex3f(-size2,  size,  size2) // Bottom-left
+    	rlgl.TexCoord2f(tc.x+ts.x, tc.y+ts.y); rlgl.Vertex3f( size2,  size,  size2) // Bottom-right
+    	rlgl.TexCoord2f(tc.x+ts.x, tc.y     ); rlgl.Vertex3f( size2,  size, -size2) // Top-right
+    	rlgl.TexCoord2f(tc.x,      tc.y     ); rlgl.Vertex3f(-size2,  size, -size2) // Top-lefts
 
 	// // Bottom face (4)
-	i = 3
-	rlgl.Normal3f(0.0, -1.0, 0.0) // Normal pointing down
-	rlgl.TexCoord2f(tc[i].x,      tc[i].y+ts.y); rlgl.Vertex3f(-size, -size, -size) // Bottom-left
-	rlgl.TexCoord2f(tc[i].x+ts.x, tc[i].y+ts.y); rlgl.Vertex3f( size, -size, -size) // Bottom-right
-	rlgl.TexCoord2f(tc[i].x+ts.x, tc[i].y     ); rlgl.Vertex3f( size, -size,  size) // Top-right
-	rlgl.TexCoord2f(tc[i].x,      tc[i].y     ); rlgl.Vertex3f(-size, -size,  size) // Top-left
+	case 3:
+    	rlgl.Normal3f(0.0, -1.0, 0.0) // Normal pointing down
+    	rlgl.TexCoord2f(tc.x,      tc.y+ts.y); rlgl.Vertex3f(-size2, -size, -size2) // Bottom-left
+    	rlgl.TexCoord2f(tc.x+ts.x, tc.y+ts.y); rlgl.Vertex3f( size2, -size, -size2) // Bottom-right
+    	rlgl.TexCoord2f(tc.x+ts.x, tc.y     ); rlgl.Vertex3f( size2, -size,  size2) // Top-right
+    	rlgl.TexCoord2f(tc.x,      tc.y     ); rlgl.Vertex3f(-size2, -size,  size2) // Top-left
 
 	// // Right face (5)
-	i = 4
-	rlgl.Normal3f(1.0, 0.0, 0.0) // Normal pointing right
-	rlgl.TexCoord2f(tc[i].x,      tc[i].y+ts.y); rlgl.Vertex3f( size, -size,  size) // Bottom-left
-	rlgl.TexCoord2f(tc[i].x+ts.x, tc[i].y+ts.y); rlgl.Vertex3f( size, -size, -size) // Bottom-right
-	rlgl.TexCoord2f(tc[i].x+ts.x, tc[i].y     ); rlgl.Vertex3f( size,  size, -size) // Top-right
-	rlgl.TexCoord2f(tc[i].x,      tc[i].y     ); rlgl.Vertex3f( size,  size,  size) // Top-left
+	case 4:
+    	rlgl.Normal3f(1.0, 0.0, 0.0) // Normal pointing right
+    	rlgl.TexCoord2f(tc.x,      tc.y+ts.y); rlgl.Vertex3f( size, -size2,  size2) // Bottom-left
+    	rlgl.TexCoord2f(tc.x+ts.x, tc.y+ts.y); rlgl.Vertex3f( size, -size2, -size2) // Bottom-right
+    	rlgl.TexCoord2f(tc.x+ts.x, tc.y     ); rlgl.Vertex3f( size,  size2, -size2) // Top-right
+    	rlgl.TexCoord2f(tc.x,      tc.y     ); rlgl.Vertex3f( size,  size2,  size2) // Top-left
 
 	// // Back face (6)
-	i = 5
-	rlgl.Normal3f(0.0, 0.0, -1.0) // Normal pointing away from viewer
-	rlgl.TexCoord2f(tc[i].x,      tc[i].y+ts.y); rlgl.Vertex3f( size, -size, -size) // Bottom-right
-	rlgl.TexCoord2f(tc[i].x+ts.x, tc[i].y+ts.y); rlgl.Vertex3f(-size, -size, -size) // Bottom-left
-	rlgl.TexCoord2f(tc[i].x+ts.x, tc[i].y     ); rlgl.Vertex3f(-size,  size, -size) // Top-left
-	rlgl.TexCoord2f(tc[i].x,      tc[i].y     ); rlgl.Vertex3f( size,  size, -size) // Top-right
-
-	rlgl.End()
-
-	rlgl.PopMatrix()
+	case 5:
+    	rlgl.Normal3f(0.0, 0.0, -1.0) // Normal pointing away from viewer
+    	rlgl.TexCoord2f(tc.x,      tc.y+ts.y); rlgl.Vertex3f( size2, -size2, -size) // Bottom-right
+    	rlgl.TexCoord2f(tc.x+ts.x, tc.y+ts.y); rlgl.Vertex3f(-size2, -size2, -size) // Bottom-left
+    	rlgl.TexCoord2f(tc.x+ts.x, tc.y     ); rlgl.Vertex3f(-size2,  size2, -size) // Top-left
+    	rlgl.TexCoord2f(tc.x,      tc.y     ); rlgl.Vertex3f( size2,  size2, -size) // Top-right
+    }
 }
 
 draw_die :: proc(dice: Dice, hoverable:bool=false) -> bool {
@@ -178,25 +169,38 @@ draw_die :: proc(dice: Dice, hoverable:bool=false) -> bool {
 
 	texture := app.textures[0]
 	fs := TextureFaceSize / {f32(texture.width), f32(texture.height)}
-	// Upper left coordinate of each face texture
-	faces := [6]Vector2{}
-	for n, i in dice.numbers do faces[i] = {f32(6)*fs.x, 0}
-	draw_cube(raw_data(&transform), size, texture, faces, fs, color)
 
-	for n, i in dice.numbers {
-	    if dice.upgrades[i].type != .CardNone{
-			card_type := reflect.enum_string(dice.upgrades[i].type)
-			if card_type in app.sub_textures {
-			    texture_id := app.sub_textures[card_type]
-	            faces[i] = fs.yx * app.sub_textures[card_type].yx
-			} else {
-                faces[i] = {0., fs.y}
-			}
+	// start to draw...
+	rlgl.SetTexture(texture.id)
+	rlgl.PushMatrix()
+	rlgl.MultMatrixf(raw_data(&transform))
+	rlgl.Begin(rlgl.QUADS)
+	defer rlgl.End()
+	defer rlgl.PopMatrix()
+
+	// Draw background and borders
+	for n, i in dice.faces {
+	    draw_die_face(i, size, texture, {f32(6)*fs.x, 0}, fs, color)
+	}
+
+	// Draw numbers or upgrades
+	for n, f in dice.faces {
+	    if dice.upgrades[f].type == .CardNone{
+			draw_die_face(f, size, texture, {f32(n-1)*fs.x, 0.}, fs, rl.BLACK)
+			continue
+		}
+
+		// draw small numbers on the borders
+		draw_die_face(f, size, texture, {f32(7+f)*fs.x, 0.}, fs, color/2)
+
+		card_type := reflect.enum_string(dice.upgrades[f].type)
+		if card_type in app.sub_textures {
+		    texture_id := app.sub_textures[card_type]
+			draw_die_face(f, size, texture, fs.yx*app.sub_textures[card_type].yx, fs, color, small=true)
 		} else {
-            faces[i] = {f32(n-1)*fs.x, 0.}
+            draw_die_face(f, size, texture, {0., fs.y}, fs, color, small=true)
 		}
 	}
-	draw_cube(raw_data(&transform), size, texture, faces, fs, dice.color2)
 
 	return hoverable && collision.hit
 }
@@ -264,13 +268,13 @@ add_text_vec2_vec2 :: proc (
 }
 
 measure_text :: proc(text: string, font_size: f32, spacing:f32=1.0, max_width:f32=9999) -> rl.Vector2 {
-	return draw_text(text, {0, 0}, font_size, spacing=spacing, max_width=max_width, measure_only=true)
+	return draw_text(text, {0, 0}, font_size, spacing=spacing, max_width=max_width, draw=false)
 }
 
 draw_text :: proc(text: string, position: rl.Vector2, font_size: f32,
-		color: rl.Color=rl.RAYWHITE, spacing:f32=1.0, max_width:f32=9999,
+		color: rl.Color=rl.RAYWHITE, spacing:f32=1.0, line_spacing:f32=1.2, max_width:f32=9999,
 		strikethrough:bool=false, overline:bool=false,
-		anchor:TextAnchor=.LEFT, measure_only:bool=false) -> rl.Vector2{
+		anchor:TextAnchor=.LEFT, draw:bool=true, highlight_color:rl.Color=rl.RAYWHITE) -> rl.Vector2{
 
 	position := position
 	if anchor == .RIGHT do position.x -= measure_text(text, font_size).x
@@ -282,10 +286,26 @@ draw_text :: proc(text: string, position: rl.Vector2, font_size: f32,
 	text_offset_x := f32(0)
 
 	scale_factor := font_size / f32(font.baseSize)
+	in_tag: bool
+	highlighted: bool
 
 	for r, i in text{
-		if r == '\n' {
-			text_offset_y += 1.5 * f32(font.baseSize) * scale_factor
+	    if r == '[' {
+			in_tag = true
+			continue
+		}
+	    if in_tag {
+			if r == ']' {
+    			in_tag = false
+    			continue
+			} else if r == 'h' {
+			    highlighted = !highlighted
+				continue
+			}
+		}
+
+		if r == '\n' || (in_tag && r == 'n') {
+			text_offset_y += line_spacing * f32(font.baseSize) * scale_factor
 			text_offset_x = 0.
 			continue
 		}
@@ -293,6 +313,10 @@ draw_text :: proc(text: string, position: rl.Vector2, font_size: f32,
 		glyph_width :f32= 0.
 		next_word_length :f32= 0.
 		for nr, j in text[i:] {
+		    if nr == '[' {
+                break
+            }
+
 			if j != 0 do next_word_length += spacing
 
 			glyph_index := rl.GetGlyphIndex(font, nr)
@@ -306,7 +330,7 @@ draw_text :: proc(text: string, position: rl.Vector2, font_size: f32,
 			if text_offset_x + next_word_length > max_width || nr == '\n' {
 				if text_offset_x != 0. {
 					// we draw it onto the next line
-					text_offset_y += 1.5 * f32(font.baseSize) * scale_factor
+					text_offset_y += line_spacing * f32(font.baseSize) * scale_factor
 					text_offset_x = 0.
 				}
 				break
@@ -315,11 +339,20 @@ draw_text :: proc(text: string, position: rl.Vector2, font_size: f32,
 			if strings.is_space(nr) do break
 		}
 
-		if !measure_only && !strings.is_space(r) {
+		if draw && !strings.is_space(r) {
+		    if highlighted{
+          		// rl.DrawTextCodepoint(
+         			// font, r,
+         			// position + rl.Vector2{text_offset_x, text_offset_y} - 2.,
+         			// font_size+4, color/2)
+                rl.DrawRectangleV(
+                    position + rl.Vector2{text_offset_x, text_offset_y},
+                    {glyph_width, font_size}, rl.BLACK)
+			}
 			rl.DrawTextCodepoint(
 				font, r,
 				position + rl.Vector2{text_offset_x, text_offset_y},
-				font_size, color)
+				font_size, highlighted ? highlight_color : color)
 		}
 
 		if text_offset_x != 0. || !strings.is_space(r) {
@@ -329,21 +362,21 @@ draw_text :: proc(text: string, position: rl.Vector2, font_size: f32,
 			math.max(text_size.x, text_offset_x),
 			math.max(text_size.y, text_offset_y + f32(font.baseSize) * scale_factor)
 		}
+	}
 
-		if !measure_only{
-			if strikethrough {
-				rl.DrawLineEx(
-					position + rl.Vector2{0,  text_size.y / 2.},
-					position + rl.Vector2{text_size.x,  text_size.y / 2.},
-					font_size / 10., color)
-			}
+	if draw{
+		if strikethrough {
+			rl.DrawLineEx(
+				position + rl.Vector2{0,  text_size.y / 2.},
+				position + rl.Vector2{text_size.x,  text_size.y / 2.},
+				font_size / 10., color)
+		}
 
-			if overline {
-				rl.DrawLineEx(
-					position + rl.Vector2{0,  -font_size / 5.},
-					position + rl.Vector2{text_size.x,  -font_size / 5.},
-					font_size / 10., color)
-			}
+		if overline {
+			rl.DrawLineEx(
+				position + rl.Vector2{0,  -font_size / 5.},
+				position + rl.Vector2{text_size.x,  -font_size / 5.},
+				font_size / 10., color)
 		}
 	}
 
@@ -393,44 +426,53 @@ draw_card :: proc(card: Card, position: rl.Vector2, color:rl.Color=rl.BLANK, act
 
 	font_size :f32= app.gui.font_size2
 	padding :f32= 10
-	line_pos := font_size+2*padding
+	header_height := font_size+2*padding
 	lt :f32= 4. // line_thickness
 	lc := rl.BLACK // color / 2 // line color
 	lc.a = color.a
 
 	rl.DrawRectangleV(position, size, color)
-	rl.DrawRectangleV(position, {size.x, line_pos}, rl.BLACK)
+	rl.DrawRectangleV(position, {size.x, header_height}, rl.BLACK)
 
 	rl.DrawRectangleLinesEx({position.x-4, position.y-4, size.x+2*lt, size.y+2*lt}, lt, lc)
 	// rl.DrawLineEx({position.x+padding, position.y+line_pos}, {position.x+size.x-padding, position.y+line_pos}, lt, lc)
 
-	text_pos := position + {padding, padding}
-
 	texture := app.textures[0]
-	ts := TextureFaceSize// / {f32(texture.width), f32(texture.height)}
-	tp := ts.yx * {0., 1.}
+	ts := TextureFaceSize
+	tp := ts * {16.+f32(card.category), 0.}
+	icon_size := header_height - 2*padding
+	rl.DrawTexturePro(
+	    texture,
+	    {x=tp.x, y=tp.y, width=ts.x, height=ts.y},
+		{x=position.x+size.x-icon_size-padding, y=position.y+padding, height=icon_size, width=icon_size},
+		{}, 0., color)
+	if card.category == .ROLL && card.lifetime > 0 {
+		draw_text(fmt.tprintf("%v", card.lifetime), position+{size.x-padding-icon_size-2, padding}, font_size, rl.RAYWHITE, anchor=.RIGHT)
+	}
+
+	tp = ts.yx * {0., 1.}
 	card_type_string := reflect.enum_string(card.type)
 	if card_type_string in app.sub_textures do tp = ts.yx * app.sub_textures[card_type_string].yx
 	tint := rl.ColorBrightness(color, -0.2)
-	dest_rect := rl.Rectangle{x=text_pos.x, y=text_pos.y, width=size.y, height=size.y}
-	rl.DrawTexturePro(texture, {x=tp.x, y=tp.y, width=ts.x, height=ts.y}, dest_rect, {}, 0., tint)
+	icon_size = size.y-header_height-2*padding
+	dest := rl.Rectangle{x=position.x+padding, y=position.y+header_height+padding, width=icon_size, height=icon_size}
+	rl.DrawRectangleV({dest.x, dest.y}, {dest.width, dest.width}, tint)
+	rl.DrawTexturePro(texture, {x=tp.x, y=tp.y, width=ts.x, height=ts.y}, dest, {}, 0., color)
 
 	// Title
+	text_pos := position + padding
 	draw_text(get_text(card.type, "title"), text_pos, font_size, rl.RAYWHITE, max_width=size.x-2*padding)
 
-	if card.category == .ROLL && card.lifetime > 0 {
-		draw_text(fmt.aprintf("%v ROLLS", card.lifetime), position+{size.x-padding, padding}, font_size, rl.RAYWHITE, anchor=.RIGHT)
-	}
-
 	// Description
-	text_pos += {0, line_pos+padding}
-	draw_text(get_text(card.type, "description"), text_pos, font_size, rl.BLACK, max_width=size.x-2*padding)
+	text_pos += {icon_size+padding, header_height}
+	draw_text(get_text(card.type, "description"), text_pos, font_size, rl.BLACK,
+	    max_width=size.x-(text_pos.x-position.x), highlight_color=color)
 
 	if hovered {
-		button_pos := position + size + {-10, -35}
+		button_pos := position + size + {-10, -45}
 
 		for action, i in actions {
-			if button(action, button_pos, font_size=20, anchor=.RIGHT) do return i32(i)
+			if button(action, button_pos, font_size=font_size, anchor=.RIGHT) do return i32(i)
 			button_pos += {-100, 0}
 		}
 	}

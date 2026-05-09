@@ -16,6 +16,7 @@ dice_killed :: proc(victim: ^Dice, killer: ^Dice=nil){
 
 	victim.state = .DEAD
 	victim.position.y = 1000.
+	body_calculate_derived_data(victim)
 
 	if killer != nil do app.players[killer.player].roll.kills += 1
 

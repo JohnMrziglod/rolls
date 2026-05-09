@@ -40,22 +40,24 @@ CardRoll_WhiteElephant
 CardRoll_TombRaider
 /title="TOMB RAIDER"
 /description="Steal one of your antagonist's GHOST DICE."
+# DICE CARDS
 CardDice_Assassin
 /title="ASSASSIN"
-/description="Gets +2 ATTACK at start of each ROLL."
+/description="Attacks ANTAGONIST's highest die.[n][h]PASSIVE:[h] Has +2 ATTACK."
 /texture_id=[1,1]
 CardDice_Tank
 /title="TANK"
-/description="Gets +2 HEALTH at start of each ROLL."
+/description="Multiply DIE's SCORE by its HEALTH.[n][h]PASSIVE:[h] Has +2 HEALTH."
+/texture_id=[1,2]
 CardDice_Antenna
 /title="ANTENNA"
-/description="Multiply dice's SCORE with the SCORE of other DICE with ANTENNA."
+/description="Multiply DIE's SCORE with the SCORE of other DICE with ANTENNA."
 CardDice_Optimist
 /title="OPTIMIST"
-/description="All sides of this DICE show one number higher (MAX. 6)."
+/description="All sides of this DIE show one number higher (MAX. 6)."
 CardDice_Pessimist
 /title="PESSIMIST"
-/description="All sides of this DICE show one number lower (MIN. 1)."
+/description="All sides of this DIE show one number lower (MIN. 1)."
 CardDice_General
 /title="GENERAL"
 /description="Adds number of your surviving DICE to its SCORE."
@@ -73,7 +75,8 @@ CardDice_Medium
 /description="Adds number of your GHOST DICE to its SCORE."
 CardDice_Investor
 /title="INVESTOR"
-/description="Saves its own SCORE when surviving with 10% interest. Pay out when showing a 1."
+/description="Add its SAVINGS to its SCORE.[n][h]PASSIVE:[h] Saves its own SCORE with 10% interest."
+/texture_id=[1,3]
 CardDice_PowerDice
 /title="POWER UP"
 /description="Multiply dice's SCORE with its own SCORE again."

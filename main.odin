@@ -1,61 +1,15 @@
 package game
 
-import "core:strconv"
 import "core:fmt"
 import "core:math"
 import "core:math/rand"
 import "core:math/linalg"
-import "core:os"
-import "core:reflect"
-import vmem "core:mem/virtual"
 import "core:slice"
 import "core:strings"
 import rl "vendor:raylib"
 
 sco :: f64
 void :: struct{}
-
-COLORS := []rl.Color{
-	rl.LIGHTGRAY,
-	rl.GRAY,
-	rl.DARKGRAY,
-	rl.YELLOW,
-	rl.GOLD,
-	rl.ORANGE,
-	rl.PINK,
-	rl.RED,
-	rl.MAROON,
-	rl.GREEN,
-	rl.LIME,
-	rl.DARKGREEN,
-	rl.SKYBLUE,
-	rl.BLUE,
-	rl.DARKBLUE,
-	rl.PURPLE,
-	rl.VIOLET,
-	rl.DARKPURPLE,
-	rl.BEIGE,
-	rl.BROWN,
-	rl.DARKBROWN,
-}
-
-random_color :: proc(contrast_color: rl.Color) -> rl.Color{
-	index := rand.int32_range(0, i32(len(COLORS)))
-	color := COLORS[index]
-	// make sure the color is not too similar to the contrast color:
-	return color
-
-	// r := rand.int32_range(0, 255)
-	// g := rand.int32_range(0, 255)
-	// b := rand.int32_range(0, 255)
-
-	// // make sure the color is not too similar to the contrast color:
-	// if math.abs(r-i32(contrast_color.r)) < 50 do r = (r + 100) % 256
-	// if math.abs(g-i32(contrast_color.g)) < 50 do g = (g + 100) % 256
-	// if math.abs(b-i32(contrast_color.b)) < 50 do b = (b + 100) % 256
-
-	// return rl.Color{u8(r), u8(g), u8(b), 255}
-}
 
 AREA_SIZE :: 30.0
 COLOR_BACKGROUND := rl.Color{203, 161, 53, 255}
@@ -80,8 +34,9 @@ Dice :: struct {
 	player: u8,
 	color1: rl.Color,	// face color (back ground)
 	color2: rl.Color,	// points and borders color
-	numbers: [6]i32, 	// which numbers are shown on the faces, normally 1..6 but it can be manipulated
-	current_number: i32, // which number is shown on top face
+	faces: [6]i32, 	    // which numbers are shown on the faces, normally 1..6 but it can be manipulated
+	current_face:   int, // which face/side is shown on top, from 0..5
+	current_number: i32, // which number is shown on top face, depends on the numbers in .faces
 	current_score: sco,
 	already_scored: bool,
 	upgrades: [6]Card,  // For each side is one upgrade possible:
@@ -100,6 +55,7 @@ GameState :: enum {
 	CHARGING,
 	PRE_ROLLING,
 	ROLLING,
+	DICE_UPGRADES,
 	CARDS_BATTLE,
 	DICES_BATTLE,
 	DICES_SCORING,
@@ -163,6 +119,14 @@ Camera3D :: struct{
 	angle: f32,
 }
 
+BattleState :: enum{Over, Fighting, Retreating}
+Battle :: struct {
+    dice: [2]^Dice,
+    previous_positions: [2]Vector3,
+    timer: f32,
+    state: BattleState,
+}
+
 Application :: struct {
 	// resources
 	font: rl.Font,
@@ -186,6 +150,7 @@ Application :: struct {
 	current_player: u8,
 	dices: [dynamic]Dice,
 	contacts: [dynamic]Contact,
+	battle: Battle,
 	antagonist: Antagonist,
 	cards_offer: [5]Card, // Up to five cards can be selected
 	card_selected: Card,
@@ -207,61 +172,6 @@ antagonist_story_continue :: proc(){
 	} else {
 		app.antagonist.story_id = ""
 		app.antagonist.index = 0
-	}
-}
-
-load_data :: proc(texts_buffer: ^string, path: string) {
-	file, file_ok := os.read_entire_file(path)
-	if !file_ok{
-		fmt.println("Error loading texts!")
-		os.exit(1)
-	}
-	texts_buffer ^= string(file)
-
-	Token :: enum{Root, Section, Key, Value}
-	token: Token
-	expect_section_or_key := true
-	section_start, section_end := 0, 0
-	key_start, key_end := 0, 0
-	for r, i in texts_buffer {
-		if token == .Root && r == '/' {
-			key_start = i
-			token = .Key
-		} else if token == .Key && r == '=' {
-			key_end = i // we don't need the =
-			token = .Value
-		} else if token == .Value && r == '\n' {
-		    section := texts_buffer[section_start:section_end]
-			local_key := texts_buffer[key_start+1:key_end]
-			global_key := strings.join({section, local_key}, "/")
-			value := texts_buffer[key_end+2:i-2] // +2 for =", -2 to remove " and the \r before \n
-			if texts_buffer[key_end+1] == '"' {
-			    app.texts[global_key] = value
-			} else if texts_buffer[key_end+1] == '[' && local_key == "texture_id"{
-			    values := strings.split(value, ",", context.temp_allocator)
-				x_coord, x_ok := strconv.parse_int(values[0])
-				y_coord, y_ok := strconv.parse_int(values[1])
-				if x_ok && y_ok {
-                    app.sub_textures[section] = {
-                        f32(x_coord),
-                        f32(y_coord),
-                    }
-				} else {
-				    fmt.println("Error parsing texture coordinates for ", section)
-				}
-            } else {
-                fmt.printfln("Warning: value for key %s in section %s is neither a string nor a texture id:\n%s", local_key, section, value)
-            }
-
-
-			token = .Root
-		} else if token == .Section && r == '\n'{
-			section_end = i-1
-			token = .Root
-		} else if token == .Root && !strings.is_space(r) {
-			section_start = i
-			token = .Section
-		}
 	}
 }
 
@@ -318,7 +228,7 @@ main :: proc() {
 			{50, f32(screen_height)-200},
 			{f32(screen_width)-50, f32(screen_height)-200},
 		},
-		card_size = {500, 200},
+		card_size = {600, 200},
 		hand_positions = {
 			{50, 50},
 			{f32(screen_width)-450, 50},
@@ -508,10 +418,12 @@ main :: proc() {
 			case .ROLLING:
 				physics(dt)
 				rolling(dt)
+			case .DICE_UPGRADES:
+			    dice_upgrades(dt)
 			case .CARDS_BATTLE:
 				cards_battle(dt)
 			case .DICES_BATTLE:
-				dices_battle(dt)
+				dice_battle(dt)
 			case .DICES_SCORING:
 				dices_scoring(dt)
 			case .CARDS_SCORING:
@@ -563,7 +475,7 @@ dice_init :: proc(dice: ^Dice, position:=Vector3{0, 1000, 0}){
 		attack=1,
 		health=1,
 		upgrades=dice.upgrades,
-		numbers={1, 2, 3, 4, 5, 6},
+		faces={1, 2, 3, 4, 5, 6},
 	}
 }
 
@@ -606,12 +518,12 @@ apply_dice_upgrades :: proc(dt: real){
 		for &upgrade, u in dice.upgrades{
 			#partial switch upgrade.type {
 			case .CardDice_Optimist:
-				for n, i in dice.numbers{
-					dice.numbers[i] = n < 6 ? n+1 : n
+				for n, i in dice.faces{
+					dice.faces[i] = n < 6 ? n+1 : n
 				}
 			case .CardDice_Pessimist:
-				for n, i in dice.numbers{
-					dice.numbers[i] = n > 1 ? n-1 : n
+				for n, i in dice.faces{
+					dice.faces[i] = n > 1 ? n-1 : n
 				}
 			}
 		}
@@ -650,13 +562,13 @@ physics :: proc(duration: real) {
 
 		if collision_wall && dice.motion > 0.97{
 			sound := rand.choice(app.sounds[:4])
-			rl.SetSoundVolume(sound, math.min(1.0, linalg.length(dice.velocity) / 140.0)) // Set volume based on bounce speed
+			rl.SetSoundVolume(sound, math.min(1.0, linalg.length(dice.velocity) / 200.0)) // Set volume based on bounce speed
 			rl.SetSoundPitch(sound, rand.float32_range(0.7, 1.1)) // Add some random pitch variation
 			rl.PlaySound(sound)
 		}
 		if collision_other_dice && dice.motion > 0.9 && app.state_timer > 1.0{
 			sound := rand.choice(app.sounds[:4])
-			rl.SetSoundVolume(sound, math.min(1.0, linalg.length(dice.velocity) / 80.0)) // Set volume based on bounce speed
+			rl.SetSoundVolume(sound, math.min(1.0, linalg.length(dice.velocity) / 140.0)) // Set volume based on bounce speed
 			rl.SetSoundPitch(sound, rand.float32_range(1., 1.5)) // Add some random pitch variation
 			rl.PlaySound(sound)
 		}
@@ -695,13 +607,40 @@ rolling :: proc(dt: real){
 			height := body_get_point_in_world_space(&dice, face).y
 			if height > highest_face_height {
 				highest_face_height = height
-				dice.current_number = dice.numbers[i]
+				dice.current_face = i
+				dice.current_number = dice.faces[i]
 			}
 		}
 		dice.already_scored = false
 	}
 
 	// We move to the next app.state
+	state_switch(.DICE_UPGRADES)
+}
+
+dice_upgrades :: proc (dt: real){
+    for &dice, d in app.dices{
+		if dice.state != .ALIVE do continue
+
+		// Apply dice card effects
+		for &upgrade, u in dice.upgrades{
+			position := dice.position - f32(u) * Vector3{0, 2, 0}
+			text: string
+
+			#partial switch upgrade.type {
+			case .CardDice_Assassin:
+			    dice.attack += 2
+				text = fmt.aprint("ASSASSIN: +2 ATTACK!")
+			case .CardDice_Tank:
+			    dice.health += 2.
+				text = fmt.aprint("TANK: +2 HEALTH!")
+			case:
+				continue
+			}
+			add_text(position, text, dice.color1, 2.0, font_size=app.gui.font_size2)
+		}
+	}
+
 	state_switch(.CARDS_BATTLE)
 }
 
@@ -775,6 +714,31 @@ cards_battle :: proc (dt: real) {
 						}
 					}
 				}
+			case .CardRoll_Suidice:
+				// Find dice with highest number
+    			suidice_index := -1
+    			suidice_number :i32= 0
+    			for &dice, d in app.dices{
+    				if dice.state != .ALIVE || dice.player != u8(p) do continue
+
+    				if dice.current_number > suidice_number {
+    					suidice_index = d
+    					suidice_number = dice.current_number
+    				}
+    			}
+
+    			if suidice_index != -1{
+    				suidice := &app.dices[suidice_index]
+
+    				dice_killed(suidice)
+    				add_text(suidice.position, fmt.aprint("SUIDICE!"), suidice.color1, 2.0, font_size=app.gui.font_size2)
+
+    				for &dice, d in app.dices{
+    					if dice.state != .ALIVE || dice.player == u8(p) do continue
+
+    					dice_killed(&dice, suidice)
+    				}
+    			}
 			case .CardRoll_TombRaider:
 				if len(other_player.ghosts) == 0 {
 					add_text(position, fmt.aprint("NO GHOSTS TO STEAL"), COLOR_CARDS[card.category], lifetime=1.)
@@ -814,37 +778,69 @@ cards_battle :: proc (dt: real) {
 	state_switch(.DICES_BATTLE)
 }
 
-dices_battle :: proc(dt: real) {
+dice_fight :: proc(die1: ^Dice, die2: ^Dice) {
+    app.battle.dice = {die1, die2}
+    app.battle.previous_positions = {die1.position, die2.position}
+    app.battle.state = .Fighting
+    app.battle.timer = 0.
+}
+
+dice_battle :: proc(dt: real) {
 	if app.state_timer < 0.3 do return
 
-	for &player, p in app.players{
-		if .CardRoll_Suidice in player.roll.effects{
+	if app.battle.state != .Over{
+	    battle := &app.battle
+        battle.timer += dt
+        target_time :f32= 0.3
 
-			// Find dice with highest number
-			suidice_index := -1
-			suidice_number :i32= 0
-			for &dice, d in app.dices{
-				if dice.state != .ALIVE || dice.player != u8(p) do continue
+        clash_position := (battle.previous_positions[0] + battle.previous_positions[1]) / 2.
+        clash_position.y += 6.
 
-				if dice.current_number > suidice_number {
-					suidice_index = d
-					suidice_number = dice.current_number
+        #partial switch battle.state{
+        case .Fighting:
+            for &die, d in app.battle.dice{
+                die.position = linalg.lerp(battle.previous_positions[d], clash_position, battle.timer/target_time)
+                body_calculate_derived_data(die)     // to update the transformation matrix, etc...
+            }
+            if battle.timer > target_time {
+                die1 := app.battle.dice[0]
+                die2 := app.battle.dice[1]
+                die1.health = math.max(die1.health-die2.attack, 0)
+				die2.health = math.max(die2.health-die1.attack, 0)
+
+				if die1.health == 0{
+					dice_killed(die1, killer=die2)
+				} else {
+					add_text(die1.position, fmt.aprint("HIT!"), die1.color1, 1.5, font_size=app.gui.font_size2)
 				}
-			}
 
-			if suidice_index != -1{
-				suidice := &app.dices[suidice_index]
-
-				dice_killed(suidice)
-				add_text(suidice.position, fmt.aprint("SUIDICE!"), suidice.color1, 2.0, font_size=app.gui.font_size2)
-
-				for &dice, d in app.dices{
-					if dice.state != .ALIVE || dice.player == u8(p) do continue
-
-					dice_killed(&dice, suidice)
+				if die2.health == 0{
+					dice_killed(die2, killer=die1)
+				} else  {
+					add_text(die2.position, fmt.aprint("HIT!"), die2.color1, 1.5, font_size=40)
 				}
-			}
-		}
+
+				sound := app.sounds[5]
+				rl.SetSoundVolume(sound, rand.float32_range(0.8, 1.)) // Set volume based on bounce speed
+				rl.SetSoundPitch(sound, 0.1+f32(app.players[die1.player].roll.kills)/f32(len(app.dices)/2.)) // Add some random pitch variation
+				rl.PlaySound(sound)
+
+				battle.state = (die1.state == .ALIVE || die2.state == .ALIVE) ? .Retreating : .Over
+				battle.timer = 0.
+            }
+        case .Retreating:
+            for &die, d in app.battle.dice{
+                if die.state == .ALIVE do continue
+                die.position = linalg.lerp(clash_position, battle.previous_positions[d], battle.timer/target_time)
+                body_calculate_derived_data(die)     // to update the transformation matrix, etc...
+                // fmt.println(die.position, die.transform_matrix)
+            }
+            if battle.timer > target_time {
+                battle.state = .Over
+                battle.timer = 0.
+            }
+        }
+        return
 	}
 
 	// We eliminate all app.dices from each player that show the same numbers.
@@ -853,32 +849,10 @@ dices_battle :: proc(dt: real) {
 
 	for &dice, d in app.dices{
 		if dice.state != .ALIVE do continue
-
 		for &other_dice, o in app.dices{
 			if d == o || other_dice.state != .ALIVE || dice.player == other_dice.player do continue
 			if dice.current_number == other_dice.current_number {
-				dice.health = math.max(dice.health-other_dice.attack, 0)
-				other_dice.health = math.max(other_dice.health-dice.attack, 0)
-
-				if other_dice.health == 0{
-					dice_killed(&other_dice, killer=&dice)
-				} else {
-					add_text(other_dice.position, fmt.aprint("HIT!"), other_dice.color1, 1.5, font_size=app.gui.font_size2)
-				}
-
-				if dice.health == 0{
-					dice_killed(&dice, killer=&other_dice)
-				} else  {
-					add_text(dice.position, fmt.aprint("HIT!"), dice.color1, 1.5, font_size=40)
-				}
-
-				sound := app.sounds[5]
-				rl.SetSoundVolume(sound, rand.float32_range(0.8, 1.)) // Set volume based on bounce speed
-				rl.SetSoundPitch(sound, 0.1+f32(app.players[dice.player].roll.kills)/f32(len(app.dices)/2.)) // Add some random pitch variation
-				rl.PlaySound(sound)
-
-				// we make a small dramatic pause...
-				app.state_timer = 0.0
+			    dice_fight(&dice, &other_dice)
 				return
 			}
 		}
@@ -887,14 +861,6 @@ dices_battle :: proc(dt: real) {
 	// We move to the next app.state
 	app.state = .DICES_SCORING
 	app.state_timer = 0.0
-}
-
-get_text :: proc{get_text_string_int, get_text_id_string}
-get_text_string_int :: proc(id: string, key: i32) -> string{
-	return app.texts[fmt.tprintf("%v/%d", id, key)]
-}
-get_text_id_string :: proc(id: any, key: string) -> string{
-	return app.texts[fmt.tprintf("%v/%v", id, key)]
 }
 
 dices_scoring :: proc(dt: real) {
@@ -923,6 +889,7 @@ dices_scoring :: proc(dt: real) {
 
 			// Apply dice card effects
 			for &upgrade, u in dice.upgrades{
+			    is_active := dice.current_face == u
 				position := dice.position - f32(u) * Vector3{0, 2, 0}
 				text: string
 
@@ -945,19 +912,19 @@ dices_scoring :: proc(dt: real) {
 						text = fmt.aprint("JOURNALIST: X2!")
 					}
 				case .CardDice_Influencer:
-					if dice.current_number == 1 {
+					if is_active {
 						append(&player.cards, Card{})
 						cards_generate(player.cards[len(player.cards)-1:], .RollCards)
 						text = fmt.aprint("INFLUENCER: +1 ROLL CARD")
 					}
 				case .CardDice_Engineer:
-					if dice.current_number == 1 {
+					if is_active {
 						append(&player.cards, Card{})
 						cards_generate(player.cards[len(player.cards)-1:], .DiceCards)
 						text = fmt.aprint("ENGINEER: +1 DICE CARD")
 					}
 				case .CardDice_Investor:
-					if dice.current_number == 1 {
+					if is_active {
 						text = fmt.aprintf("PAYOUT +%.f", upgrade.var1)
 						dice.current_score += math.floor(upgrade.var1)
 						upgrade.var1 = 0.
@@ -968,7 +935,7 @@ dices_scoring :: proc(dt: real) {
 						text = fmt.aprintf("INVESTING +%.1f", upgrade.var1)
 					}
 				case .CardDice_General:
-					text = fmt.aprintf("GENERAL: +%.f!", n_alive)
+					text = fmt.aprintf("GENERAL: +%v!", n_alive)
 					dice.current_score += sco(n_alive)
 				case .CardDice_Historian:
 					text = fmt.aprintf("HISTORIAN: +%.f!", upgrade.var1)
@@ -977,11 +944,16 @@ dices_scoring :: proc(dt: real) {
 					text = fmt.aprintf("MEDIUM: +%v!", len(player.ghosts))
 					dice.current_score += sco(len(player.ghosts))
 				case .CardDice_Librarian:
-					text = fmt.aprintf("LIBRARIAN: +%.1f!", upgrade.var1)
+					text = fmt.aprintf("LIBRARIAN: +%.f!", upgrade.var1)
 					dice.current_score += upgrade.var1
 				case .CardDice_PowerDice:
 					text = fmt.aprintf("POWER UP: %.f X %.f!", dice.current_score, dice.current_score)
 					dice.current_score *= dice.current_score
+				case .CardDice_Tank:
+				    if is_active{
+    					text = fmt.aprintf("TANK: %.f X %.f!", dice.current_score, dice.health)
+    					dice.current_score *= dice.health
+					}
 				case:
 					continue
 				}
@@ -1039,6 +1011,8 @@ cards_scoring :: proc(dt: real) {
 
 				add_text(position, app.gui.score_positions[p], fmt.aprint("X3"), COLOR_CARDS[card.category], lifetime=0.4)
 				card.triggered = 1.0
+			case:
+			    continue
 			}
 
 			player.roll.score_counter += 1
