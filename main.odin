@@ -831,9 +831,9 @@ dice_battle :: proc(dt: real) {
         case .Retreating:
             for &die, d in app.battle.dice{
                 if die.state == .ALIVE do continue
-                die.position = linalg.lerp(clash_position, battle.previous_positions[d], battle.timer/target_time)
+                die^.position = linalg.lerp(clash_position, battle.previous_positions[d], battle.timer/target_time)
                 body_calculate_derived_data(die)     // to update the transformation matrix, etc...
-                // fmt.println(die.position, die.transform_matrix)
+                fmt.println(die.position, die.transform_matrix)
             }
             if battle.timer > target_time {
                 battle.state = .Over
