@@ -5,6 +5,7 @@ import "core:math"
 import "core:math/rand"
 import rl "vendor:raylib"
 
+CARD_SIZE :: [2]f32{300, 350}
 CardCategory :: enum {NONE, ROLL, DICE, CYCLE}
 CardType :: enum i32{
 		CardNone,
@@ -33,12 +34,15 @@ CardType :: enum i32{
 	CardDice_Medium,
 	CardDice_Optimist,
 	CardDice_Pessimist,
+	CardDice_PlusOne,
 	CardDice_PowerDice,
 	// CardDice_ShortSighted,
 	// CardDice_Blind,
 	CardDice_Historian,
 	CardDice_Librarian,
+	CardDice_Researcher,
 	CardDice_Tank,
+	CardDice_Train,
 		CardDices,				// <- Until we got upgrade cards
 	CardCycle_ExtraDice,
 	CardCycle_EternalRoll,
@@ -93,6 +97,7 @@ card_discard :: proc(player: ^Player, index: i32, silent:bool=false){
 	if index < 0 || index >= i32(len(player.cards)) do return // Invalid index, do nothing
 	ordered_remove(&player.cards, index)
 
+	if silent do return
 	sound := app.sounds[11]
 	rl.SetSoundVolume(sound, 1.)
 	rl.PlaySound(sound)
@@ -137,6 +142,11 @@ card_activate :: proc(player: ^Player, card: ^Card){
 				if card.category == .DICE{
 					upgrade.var1 += 1.
 					add_text(dice.position, fmt.aprint("LIBRARIAN: +1 SCORE!"), dice.color1, 0.5)
+				}
+			case .CardDice_Researcher:
+				if card.category == .CYCLE{
+					upgrade.var1 += 1.
+					add_text(dice.position, fmt.aprint("RESEARCHER: +1 ROLL MULTIPLIER!"), dice.color1, 0.5)
 				}
 			}
 		}

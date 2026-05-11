@@ -4,6 +4,7 @@ import "core:fmt"
 import "core:math"
 import "core:math/rand"
 import "core:math/linalg"
+import "core:reflect"
 import "core:slice"
 import "core:strings"
 import rl "vendor:raylib"
@@ -155,6 +156,7 @@ Application :: struct {
 	cards_offer: [5]Card, // Up to five cards can be selected
 	card_selected: Card,
 	ghosts_selected: [5]i32,
+	dice_selected: i32,
 }
 app: Application
 
@@ -216,6 +218,7 @@ main :: proc() {
 			},
 		},
 		ghosts_selected = {-1, -1, -1, -1, -1},
+		dice_selected = -1,
 	}
 	defer rl.UnloadFont(app.font)
 	app.gui = {
@@ -228,7 +231,6 @@ main :: proc() {
 			{50, f32(screen_height)-200},
 			{f32(screen_width)-50, f32(screen_height)-200},
 		},
-		card_size = {600, 200},
 		hand_positions = {
 			{50, 50},
 			{f32(screen_width)-450, 50},
@@ -309,7 +311,6 @@ main :: proc() {
 	defer {
 		for file in files do defer delete(file)
 	}
-	fmt.println("Loaded texts: ", app.sub_textures)
 
 	app.antagonist.tutorial = 2
 	// antagonist_story("antagonist_intro1")
@@ -332,6 +333,16 @@ main :: proc() {
 			}
 		}
 
+		if rl.IsKeyPressed(rl.KeyboardKey.F){
+			app.cards_offer = {}
+			cards_generate(app.cards_offer[:3], .RollAndDiceCards)
+			state_switch(.CARDS_OFFER)
+		}
+		if rl.IsKeyPressed(rl.KeyboardKey.D){
+			app.cards_offer = {}
+			cards_generate(app.cards_offer[:1], .RollAndDiceCards)
+			state_switch(.CARDS_OFFER)
+		}
 		if rl.IsKeyPressed(rl.KeyboardKey.G){
 			app.cards_offer = {}
 			cards_generate(app.cards_offer[:5], .RollAndDiceCards)
@@ -518,13 +529,9 @@ apply_dice_upgrades :: proc(dt: real){
 		for &upgrade, u in dice.upgrades{
 			#partial switch upgrade.type {
 			case .CardDice_Optimist:
-				for n, i in dice.faces{
-					dice.faces[i] = n < 6 ? n+1 : n
-				}
+			    dice.faces = {4, 4, 5, 5, 6, 6}
 			case .CardDice_Pessimist:
-				for n, i in dice.faces{
-					dice.faces[i] = n > 1 ? n-1 : n
-				}
+			    dice.faces = {1, 1, 2, 2, 3, 3}
 			}
 		}
 	}
@@ -657,11 +664,11 @@ cards_battle :: proc (dt: real) {
 
 			player.roll.effects[card.type] = {}
 
-			position := app.gui.hand_positions[p]+app.gui.card_size/2.
+			position := app.gui.hand_positions[p]+CARD_SIZE/2.
 			if len(player.cards) > 5 {
 				position.y += app.gui.hand_area_height/f32(len(player.cards))*f32(c)
 			} else {
-				position.y += f32(c)*(30+app.gui.card_size.y)
+				position.y += f32(c)*(30+CARD_SIZE.y)
 			}
 			#partial switch card.type {
 			case .CardRoll_Attack:
@@ -766,11 +773,6 @@ cards_battle :: proc (dt: real) {
 
 			card.triggered = 1.0
 			card.already_scored = true
-			card.lifetime -= 1
-			if card.lifetime <= 0 {
-				card_discard(&player, i32(c))
-				// It is import that we return afterwards, otherwise we might get in trouble with the indices...
-			}
 			return
 		}
 	}
@@ -833,7 +835,6 @@ dice_battle :: proc(dt: real) {
                 if die.state == .ALIVE do continue
                 die^.position = linalg.lerp(clash_position, battle.previous_positions[d], battle.timer/target_time)
                 body_calculate_derived_data(die)     // to update the transformation matrix, etc...
-                fmt.println(die.position, die.transform_matrix)
             }
             if battle.timer > target_time {
                 battle.state = .Over
@@ -882,7 +883,7 @@ dices_scoring :: proc(dt: real) {
 			if dice.state == .ALIVE && u8(p) == dice.player do n_alive += 1
 		}
 
-		for &dice, i in app.dices {
+		for &dice, d in app.dices {
 			if dice.state != .ALIVE || dice.already_scored || u8(p) != dice.player do continue
 
 			dice.current_score = sco(dice.current_number)
@@ -938,26 +939,68 @@ dices_scoring :: proc(dt: real) {
 					text = fmt.aprintf("GENERAL: +%v!", n_alive)
 					dice.current_score += sco(n_alive)
 				case .CardDice_Historian:
-					text = fmt.aprintf("HISTORIAN: +%.f!", upgrade.var1)
-					dice.current_score += upgrade.var1
+				    if upgrade.var1 != 0. {
+    					text = fmt.aprintf("HISTORIAN: +%.f!", upgrade.var1)
+    					dice.current_score += upgrade.var1
+					}
+				case .CardDice_Researcher:
+				    if upgrade.var1 != 0. {
+    					text = fmt.aprintf("RESEARCHER: X%.f!", upgrade.var1)
+    					player.roll.multiplier += upgrade.var1
+					}
 				case .CardDice_Medium:
 					text = fmt.aprintf("MEDIUM: +%v!", len(player.ghosts))
 					dice.current_score += sco(len(player.ghosts))
+				case .CardDice_Optimist:
+				    if is_active {
+						bonus := 0.
+						for other_dice, o in app.dices{
+                            if d == o || other_dice.state != .ALIVE || dice.player != other_dice.player || other_dice.current_number < 4 do continue
+                            bonus += sco(other_dice.current_number)
+                        }
+						text = fmt.aprintf("OPTIMIST: +%.f!", bonus)
+						dice.current_score += bonus
+					}
+				case .CardDice_PlusOne:
+				    plus_score := 1
+					if is_active do plus_score += n_alive-1
+					text = fmt.aprintf("PLUS ONE: +%v!", plus_score)
+					dice.current_score += sco(plus_score)
+				case .CardDice_Pessimist:
+				    if is_active {
+						multiplier := 0.
+						for other_dice, o in app.dices{
+                            if d == o || other_dice.state != .ALIVE || dice.player != other_dice.player || other_dice.current_number > 3 do continue
+                            multiplier += sco(other_dice.current_number)
+                        }
+                        if multiplier > 0. {
+    						text = fmt.aprintf("PESSIMIST: %.f X %.f!", dice.current_score, multiplier)
+    						dice.current_score *= multiplier
+                        }
+					}
+				case .CardDice_Train:
+					bonus := 0.
+					for other_dice, o in app.dices{
+                        if d == o || other_dice.state != .ALIVE || dice.player != other_dice.player || other_dice.current_number <= dice.current_number do continue
+                        bonus += sco(other_dice.current_number)
+                        add_text(other_dice.position, fmt.aprintf("TRAIN: +%v!", other_dice.current_number), dice.color1, 2.0)
+                    }
+                    if bonus > 0. {
+						text = fmt.aprintf("TRAIN: +%.f!", bonus)
+						dice.current_score += bonus
+                    }
 				case .CardDice_Librarian:
-					text = fmt.aprintf("LIBRARIAN: +%.f!", upgrade.var1)
-					dice.current_score += upgrade.var1
+    				if upgrade.var1 != 0. {
+       					text = fmt.aprintf("LIBRARIAN: +%.f!", upgrade.var1)
+                        dice.current_score += upgrade.var1
+       	            }
 				case .CardDice_PowerDice:
 					text = fmt.aprintf("POWER UP: %.f X %.f!", dice.current_score, dice.current_score)
 					dice.current_score *= dice.current_score
-				case .CardDice_Tank:
-				    if is_active{
-    					text = fmt.aprintf("TANK: %.f X %.f!", dice.current_score, dice.health)
-    					dice.current_score *= dice.health
-					}
 				case:
 					continue
 				}
-				add_text(position, text, dice.color1, 2.0, font_size=app.gui.font_size2)
+				if len(text) > 0 do add_text(position, text, dice.color1, 2.0)
 			}
 
 			app.players[dice.player].roll.score += dice.current_score
@@ -1002,11 +1045,11 @@ cards_scoring :: proc(dt: real) {
 			#partial switch card.type {
 			case .CardRoll_HappyHour:
 				player.roll.multiplier += 3
-				position := app.gui.hand_positions[p]+app.gui.card_size/2.
+				position := app.gui.hand_positions[p]+CARD_SIZE/2.
 				if len(player.cards) > 5 {
 					position.y += app.gui.hand_area_height/f32(len(player.cards))*f32(c)
 				} else {
-					position.y += f32(c)*(30+app.gui.card_size.y)
+					position.y += f32(c)*(30+CARD_SIZE.y)
 				}
 
 				add_text(position, app.gui.score_positions[p], fmt.aprint("X3"), COLOR_CARDS[card.category], lifetime=0.4)
@@ -1025,11 +1068,6 @@ cards_scoring :: proc(dt: real) {
 
 			card.triggered = 1.0
 			card.already_scored = true
-			card.lifetime -= 1
-			if card.lifetime <= 0 {
-				card_discard(&player, i32(c))
-				// It is import that we return afterwards, otherwise we might get in trouble with the indices...
-			}
 			return
 		}
 	}
@@ -1065,6 +1103,23 @@ scoring_summary :: proc(dt: real) {
 	}
 	for &player, p in app.players {
 		player.total_score += roll_scores[p]
+
+		// Tidy up all cards that should be inactive now...
+		cards_copy := make([dynamic]Card, len(player.cards), cap(player.cards))
+		defer delete(cards_copy)
+		copy(cards_copy[:], player.cards[:])
+		clear(&player.cards)
+
+		for &card, index in cards_copy{
+            if card.active do card.lifetime -= 1
+			if !card.active || card.lifetime > 0 {
+			    append(&player.cards, card)
+			} else {
+    			sound := app.sounds[11]
+    			rl.SetSoundVolume(sound, 1.)
+    			rl.PlaySound(sound)
+			}
+		}
 	}
 
 	if app.players[0].total_score > 350{
@@ -1174,16 +1229,19 @@ draw :: proc(power: f32) {
 	rl.DrawCube(rl.Vector3{0.0, -.6, 0.0}, AREA_SIZE, 1.0, AREA_SIZE, COLOR_TABLE)
 	rl.DrawCubeWires(rl.Vector3{0.0, -.6, 0.0}, AREA_SIZE, 1.0, AREA_SIZE, rl.BLACK)
 
-	dice_selected := -1
+	if app.state == .WAIT_FOR_ROLL && (rl.IsMouseButtonPressed(.LEFT) || rl.IsMouseButtonPressed(.RIGHT)){
+		app.dice_selected = -1
+	}
+
 	dice_hovered := -1
 	for &dice, d in app.dices{
 		if dice.state != .ALIVE do continue
 		hoverable := app.state != .ROLLING && (app.state != .ASSIGN_CARD || dice.player == 0)
 		if draw_die(dice, hoverable=hoverable) {
 			dice_hovered = d
-			if rl.IsMouseButtonPressed(.LEFT) {
-				dice_selected = d
-				app.camera3d.desired_target = dice.position
+			if app.state != rl.IsMouseButtonPressed(.LEFT) {
+				app.dice_selected = i32(d)
+				// app.camera3d.desired_target = dice.position
 			}
 		}
 	}
@@ -1214,12 +1272,14 @@ draw :: proc(power: f32) {
 	for &player, p in app.players{
 		discard_card := -1
 		discard_silent := false
-		for &card, c in player.cards{
+
+		// We draw them in reverse, so we don't get a z-order problem with the cards (the hovered one should be on top)
+		#reverse for &card, c in player.cards{
 			position := app.gui.hand_positions[p]
 			if len(player.cards) > 5 {
 				position += {0, app.gui.hand_area_height/f32(len(player.cards))*f32(c)}
 			} else {
-				position += {0, f32(c)*(30+app.gui.card_size.y)}
+				position += {0, f32(c)*(30+CARD_SIZE.y)}
 			}
 			actions := []string{}
 			if app.state == .WAIT_FOR_ROLL {
@@ -1228,7 +1288,7 @@ draw :: proc(power: f32) {
 				else if card.category == .CYCLE do actions = {"DISCARD", "ACTIVATE"}
 			}
 
-			action := draw_card(card, position, actions=actions)
+			hovered, action := draw_card(card, position, actions=actions)
 			if app.state == .WAIT_FOR_ROLL && action == 1 {
 				if card.category == .ROLL{
 					card_activate(&player, &card)
@@ -1271,8 +1331,6 @@ draw :: proc(power: f32) {
 			}
 		}
 
-
-
 		position := app.gui.score_positions[p]
 		text := fmt.tprintf("%.f", player.total_score)
 		draw_text(text, {position.x, position.y+40}, app.gui.font_size1, player.color, anchor=(p == 1) ? .RIGHT : .LEFT)
@@ -1302,20 +1360,35 @@ draw :: proc(power: f32) {
 		}
 	}
 
-	if dice_hovered != -1 {
-		dice := app.dices[dice_hovered]
-		upgrades := [6]string{}
-		count := 0
-		for upgrade, i in dice.upgrades{
-			if upgrade.type == .CardNone do continue
-			upgrades[i] = get_text(upgrade.type, "title")
-			count += 1
-		}
-		position := rl.GetMousePosition() + Vector2{10, 10}
-		if count > 0 {
-			text := strings.join(upgrades[:count], ", ", context.temp_allocator)
-			draw_text(text, position, app.gui.font_size2, dice.color1)
-		}
+	if dice_hovered != -1 || app.dice_selected != -1 {
+	    selected := app.dice_selected != -1
+		dice := selected ? app.dices[app.dice_selected] : app.dices[dice_hovered]
+		position := selected ? rl.GetWorldToScreen(dice.position, app.camera3d) : mouse_pos + Vector2{10, 10}
+		icon_size := f32(80.)
+        padding := f32(6.)
+		#reverse for upgrade, u in dice.upgrades{
+		    color := dice.color1
+			upgrade_pos := position + f32(u)*Vector2{icon_size+4*padding, 0.}
+            ts := TextureFaceSize
+            tp := ts.yx * {0., 1.}  // Standard question mark...
+           	upgrade_type_string := reflect.enum_string(upgrade.type)
+           	if upgrade_type_string in app.sub_textures {
+                tp = ts.yx * app.sub_textures[upgrade_type_string].yx
+            } else if upgrade.type == .CardNone {
+                // show the numbers...
+                tp = ts.yx * Vector2{f32(dice.faces[u]-1), 0}
+                color /= 2
+            }
+
+           	dest := rl.Rectangle{x=upgrade_pos.x, y=upgrade_pos.y, width=icon_size, height=icon_size}
+           	draw_box({dest.x, dest.y}-padding/2, {}+icon_size+2*padding/2, fill=color)
+           	rl.DrawTexturePro(app.textures[0], {x=tp.x, y=tp.y, width=ts.x, height=ts.y}, dest, {}, 0., rl.BLACK)
+
+            hovered := rl.CheckCollisionPointRec(mouse_pos, dest)
+            if upgrade.type != .CardNone && hovered {
+                draw_card(upgrade, upgrade_pos, static=true)
+            }
+        }
 	}
 
 	if len(app.antagonist.story_id) > 0 {
@@ -1517,15 +1590,35 @@ draw :: proc(power: f32) {
 		text := "Choose one of these cards"
 		draw_text(text, {screen_width/2., screen_height - 150}, app.gui.font_size1, rl.RAYWHITE, anchor=.CENTER)
 
+		n_cards: f32
+		for card in app.cards_offer do if card.type != .CardNone do n_cards += 1
+
+
+		W : f32 = 1000 // screen width
+		N : f32 = 4    // number of elements
+		X : f32 = 100  // element width
+		M : f32 = 50   // left/right margin
+
+		// margin :f32= 800
+
+		// spacing between elements
+		// spacing := ((app.gui.width - 2*margin) - (n_cards * CARD_SIZE.x)) / (n_cards - 1)
+		margin :f32= 400
 		for &card, c in app.cards_offer{
 			if card.type == .CardNone do continue
 
-			position := rl.Vector2{(app.gui.width-app.gui.card_size.x)/2., 300}
-			position += {0, f32(c)*(30+app.gui.card_size.y)}
+			position := Vector2{
+			    margin+(f32(c)+1)*(app.gui.width-2.*margin)/(n_cards+1)-CARD_SIZE.x/2.,
+				// margin + f32(c) * (CARD_SIZE.x + spacing),
+				(app.gui.height-CARD_SIZE.y)/2.
+			}
+			// margin :f32= c == int(n_cards/2.) ? 0. : (position.x<app.gui.width/2.) ? 200 : -200
+			// position.x += margin
+
 			actions := []string{"KEEP", "ACTIVATE"}
 			if card.category == .DICE do actions = {"KEEP", "ASSIGN"}
 			else if card.category == .CYCLE do actions = {"ACTIVATE"}
-			action := draw_card(card, position, actions=actions)
+			_, action := draw_card(card, position, actions=actions)
 			if action == 1 {
 				if card.category == .ROLL{
 					card_activate(human, &card)
@@ -1549,14 +1642,14 @@ draw :: proc(power: f32) {
 	}
 
 	if app.state == .ASSIGN_CARD {
-		app.card_selected.triggered = dice_selected >= 0 ? 1. : 0.
+		app.card_selected.triggered = app.dice_selected >= 0 ? 1. : 0.
 
 		text := "Choose a dice to assign this card to"
 		draw_text(text, {screen_width/2., screen_height - 150}, app.gui.font_size1, rl.RAYWHITE, anchor=.CENTER)
-		draw_card(app.card_selected, mouse_pos - {app.gui.card_size.x/2, app.gui.card_size.y+50})
+		draw_card(app.card_selected, mouse_pos - {CARD_SIZE.x/2, CARD_SIZE.y+50})
 
-		if dice_selected >= 0 && app.dices[dice_selected].player == 0 {
-			dice := &app.dices[dice_selected]
+		if app.dice_selected >= 0 && app.dices[app.dice_selected].player == 0 {
+			dice := &app.dices[app.dice_selected]
 			could_upgrade := false
 			for &upgrade, i in dice.upgrades{
 				if upgrade.type == .CardNone {
@@ -1601,5 +1694,8 @@ state_switch :: proc(new_state: GameState, timer: f32=0.) {
 	app.state = new_state
 	app.state_timer = timer
 
-	if new_state == .CHARGING do app.camera3d.desired_target = {}
+	if new_state == .CHARGING {
+	    app.camera3d.desired_target = {}
+		app.dice_selected = -1
+	}
 }

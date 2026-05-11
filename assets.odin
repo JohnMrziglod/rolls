@@ -12,7 +12,9 @@ get_text_string_int :: proc(id: string, key: i32) -> string{
 get_text_id_string :: proc(id: any, key: string) -> string{
 	return app.texts[fmt.tprintf("%v/%v", id, key)]
 }
-
+has_text :: proc(id: any, key: string) -> bool{
+	return fmt.tprintf("%v/%v", id, key) in app.texts
+}
 
 load_data :: proc(texts_buffer: ^string, path: string) {
 	file, file_ok := os.read_entire_file(path)

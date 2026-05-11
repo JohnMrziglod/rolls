@@ -21,7 +21,7 @@ CardRoll_GraveRoll
 /description="Your GHOST DICE will be rerolled."
 CardRoll_HappyHour
 /title="HAPPY HOUR"
-/description="X2 your ROLL SCORE."
+/description="+2 to your ROLL MULTIPLIER."
 CardRoll_Immortality
 /title="IMMORTALITY"
 /description="Your DICE cannot die during this ROLL."
@@ -33,7 +33,7 @@ CardRoll_Revenge
 /description="If you have a lower ROLL SCORE than your antagonist, swap them."
 CardRoll_Suidice
 /title="SUIDICE"
-/description="Your DICE with the highest number explodes and eliminates all of your ANTAGONIST'S DICE."
+/description="Your highest DIE explodes and eliminates all of your ANTAGONIST'S DICE."
 CardRoll_WhiteElephant
 /title="WHITE ELEPHANT"
 /description="Your antagonist gets all your GHOST DICE of this ROLL."
@@ -43,39 +43,59 @@ CardRoll_TombRaider
 # DICE CARDS
 CardDice_Assassin
 /title="ASSASSIN"
-/description="Attacks ANTAGONIST's highest die.[n][h]PASSIVE:[h] Has +2 ATTACK."
+/description="+2 ATTACK."
+/description2="When [h]ACTIVE[h], attacks ANTAGONIST's highest die."
 /texture_id=[1,1]
+CardDice_Blind
+/title="BLIND"
+/description="Attacks closest antagonist's die regardless of its number."
 CardDice_Tank
 /title="TANK"
-/description="Multiply DIE's SCORE by its HEALTH.[n][h]PASSIVE:[h] Has +2 HEALTH."
+/description="+2 HEALTH"
+/description2="When [h]ACTIVE[h], +1 HEALTH for surrounding DICE."
 /texture_id=[1,2]
 CardDice_Antenna
 /title="ANTENNA"
 /description="Multiply DIE's SCORE with the SCORE of other DICE with ANTENNA."
+/texture_id=[1,4]
 CardDice_Optimist
 /title="OPTIMIST"
-/description="All sides of this DIE show one number higher (MAX. 6)."
+/description="This die only shows the numbers [h]4[h], [h]5[h], and [h]6[h]."
+/description2="When [h]ACTIVE[h], add the numbers of your other dice above [h]3[h] to its own SCORE."
+/texture_id=[1,9]
 CardDice_Pessimist
 /title="PESSIMIST"
-/description="All sides of this DIE show one number lower (MIN. 1)."
+/description="This die only shows the numbers [h]1[h], [h]2[h], and [h]3[h]."
+/description2="When [h]ACTIVE[h], multiply its own SCORE by the numbers of your other dice below [h]4[h]."
+/texture_id=[1,8]
 CardDice_General
 /title="GENERAL"
-/description="Adds number of your surviving DICE to its SCORE."
+/description="Adds NUMBERs of your surviving DICE to its SCORE."
 CardDice_Journalist
 /title="JOURNALIST"
-/description="X2 your ROLL SCORE."
+/description="+2 ROLL MULTIPLIER."
+/texture_id=[1,6]
 CardDice_Influencer
 /title="INFLUENCER"
-/description="Create a ROLL CARD if it survives and shows a 1."
+/description1="---"
+/description2="When [h]ACTIVE[h], creates a ROLL CARD."
+/texture_id=[1,7]
 CardDice_Engineer
 /title="ENGINEER"
-/description="Create a DICE CARD if it survives and shows a 1."
+# /description="---"
+/description2="When [h]ACTIVE[h], creates a DICE CARD."
 CardDice_Medium
 /title="MEDIUM"
 /description="Adds number of your GHOST DICE to its SCORE."
+CardDice_PlusOne
+/title="PLUS ONE"
+/description="+1 to its SCORE"
+/description2="When [h]ACTIVE[h], +1 to its SCORE for each friendly, surviving DICE."
+/texture_id=[1,5]
 CardDice_Investor
 /title="INVESTOR"
-/description="Add its SAVINGS to its SCORE.[n][h]PASSIVE:[h] Saves its own SCORE with 10% interest."
+/description="Saves its own SCORE with 10% interest."
+/description2="When [h]ACTIVE[h], adds its SAVINGS to the ROLL SCORE."
 /texture_id=[1,3]
 CardDice_PowerDice
 /title="POWER UP"
@@ -83,15 +103,23 @@ CardDice_PowerDice
 CardDice_ShortSighted
 /title="SHORT-SIGHTED"
 /description="Attacks farthest antagonist's dice regardless of its number."
-CardDice_Blind
-/title="BLIND"
-/description="Attacks closest antagonist's dice regardless of its number."
 CardDice_Historian
 /title="HISTORIAN"
 /description="Gains +1 SCORE when alive and activating a ROLL CARD."
+/texture_id=[1,13]
 CardDice_Librarian
 /title="LIBRARIAN"
 /description="Gains +1 SCORE when alive and assigning DICE CARD."
+/texture_id=[1,12]
+CardDice_Researcher
+/title="RESEARCHER"
+/description="Gains +1 ROLL MULTIPLIER when alive and activating a CYCLE CARD."
+/texture_id=[1,10]
+CardDice_Train
+/title="TRAIN"
+/description="Add numbers of your other dice higher than itself to the SCORE."
+/texture_id=[1,11]
+# CYCLE CARDS
 CardCycle_ExtraDice
 /title="EXTRA DICE"
 /description="Add +1 DICE to your army."

@@ -96,9 +96,9 @@ dice_button :: proc(number: i32, position: rl.Vector2, size: f32,
 	return hovered && rl.IsMouseButtonPressed(.LEFT)
 }
 
-draw_die_face :: proc(face: int, size: f32, texture: rl.Texture, tc: Vector2, ts: Vector2, color: rl.Color, small:bool=false){
-    size := small ? size+0.05 : size
-    size2 := small ? size*0.75 :  size
+draw_die_face :: proc(face: int, size: f32, texture: rl.Texture, tc: Vector2, ts: Vector2, color: rl.Color, scale:f32=1.){
+    size := size + (0.2*(1.-scale))
+    size2 := size*scale
     rlgl.Color4ub(color.r, color.g, color.b, color.a)
 
 	// Front face (1)
@@ -190,16 +190,18 @@ draw_die :: proc(dice: Dice, hoverable:bool=false) -> bool {
 			continue
 		}
 
-		// draw small numbers on the borders
-		draw_die_face(f, size, texture, {f32(7+f)*fs.x, 0.}, fs, color/2)
-
 		card_type := reflect.enum_string(dice.upgrades[f].type)
 		if card_type in app.sub_textures {
 		    texture_id := app.sub_textures[card_type]
-			draw_die_face(f, size, texture, fs.yx*app.sub_textures[card_type].yx, fs, color, small=true)
+			draw_die_face(f, size, texture, fs.yx*app.sub_textures[card_type].yx, fs, color)
 		} else {
-            draw_die_face(f, size, texture, {0., fs.y}, fs, color, small=true)
+            draw_die_face(f, size, texture, {0., fs.y}, fs, color)
 		}
+
+		// draw small numbers on the borders
+		// draw_die_face(f, size, texture, {f32(7+f)*fs.x, 0.}, fs, color/2)
+		draw_die_face(f, size, texture, {f32(13)*fs.x, 0}, fs, rl.ColorAlpha(color, 0.8), scale=0.6)
+		draw_die_face(f, size, texture, {f32(n-1)*fs.x, 0.}, fs, rl.BLACK, scale=0.5)
 	}
 
 	return hoverable && collision.hit
@@ -231,24 +233,24 @@ add_particles :: proc(position: Vector3, color: rl.Color){
 add_text :: proc{add_text_vec3, add_text_vec3_vec2, add_text_vec2, add_text_vec2_vec2}
 add_text_vec3_vec2 :: proc (
 		start: Vector3, end: rl.Vector2, text: string, color: rl.Color,
-		lifetime:f32=2.0, font_size:f32=30, anchor:TextAnchor=.CENTER) {
+		lifetime:f32=2.0, font_size:f32=-1, anchor:TextAnchor=.CENTER) {
 	start_2d := rl.GetWorldToScreen(start, app.camera3d)
 	add_text_vec2_vec2(start_2d, {f32(end.x), f32(end.y)}, text, color, lifetime, font_size, anchor)
 }
 add_text_vec3 :: proc (
 		start: Vector3, text: string, color: rl.Color, lifetime:f32=2.0,
-		font_size:f32=30, anchor:TextAnchor=.CENTER) {
+		font_size:f32=-1, anchor:TextAnchor=.CENTER) {
 	start_2d := rl.GetWorldToScreen(start, app.camera3d)
 	add_text_vec2_vec2(start_2d, start_2d + Vector2{0, -100}, text, color, lifetime, font_size, anchor)
 }
 add_text_vec2 :: proc (
 		start: Vector2, text: string, color: rl.Color, lifetime:f32=2.0,
-		font_size: f32=30, anchor:TextAnchor=.CENTER) {
+		font_size: f32=-1, anchor:TextAnchor=.CENTER) {
 	add_text_vec2_vec2(start, start + Vector2{0, -100}, text, color, lifetime, font_size, anchor)
 }
 add_text_vec2_vec2 :: proc (
 		start, end: Vector2, text: string, color: rl.Color, lifetime:f32=2.0,
-		font_size: f32=30, anchor:TextAnchor=.CENTER) {
+		font_size: f32=-1, anchor:TextAnchor=.CENTER) {
 	for &t in app.text_animations{
 		if t.visible do continue
 
@@ -260,7 +262,7 @@ add_text_vec2_vec2 :: proc (
 			start_lifetime = lifetime,
 			lifetime = lifetime,
 			visible = true,
-			font_size=font_size,
+			font_size=font_size < 0 ? app.gui.font_size2 : font_size,
 			anchor=anchor,
 		}
 		return
@@ -273,12 +275,18 @@ measure_text :: proc(text: string, font_size: f32, spacing:f32=1.0, max_width:f3
 
 draw_text :: proc(text: string, position: rl.Vector2, font_size: f32,
 		color: rl.Color=rl.RAYWHITE, spacing:f32=1.0, line_spacing:f32=1.2, max_width:f32=9999,
-		strikethrough:bool=false, overline:bool=false,
+		strikethrough:bool=false, overline:bool=false, boxed:rl.Color=rl.BLANK, box_width:f32=-1, padding:f32=10,
 		anchor:TextAnchor=.LEFT, draw:bool=true, highlight_color:rl.Color=rl.RAYWHITE) -> rl.Vector2{
 
 	position := position
-	if anchor == .RIGHT do position.x -= measure_text(text, font_size).x
-	if anchor == .CENTER do position.x -= measure_text(text, font_size).x / 2.
+	if anchor == .RIGHT do position.x -= measure_text(text, font_size, spacing, max_width).x
+	if anchor == .CENTER do position.x -= measure_text(text, font_size, spacing, max_width).x / 2.
+	if boxed != rl.BLANK {
+	    box_size := measure_text(text, font_size, spacing, max_width)+2*padding
+		if box_width > 0 do box_size.x = box_width
+	    draw_box(position - padding, box_size, boxed)
+        // position += {padding, padding}
+	}
 
 	font := app.font
 	text_size := rl.Vector2{0, 0}
@@ -339,7 +347,7 @@ draw_text :: proc(text: string, position: rl.Vector2, font_size: f32,
 			if strings.is_space(nr) do break
 		}
 
-		if draw && !strings.is_space(r) {
+		if draw {
 		    if highlighted{
           		// rl.DrawTextCodepoint(
          			// font, r,
@@ -349,10 +357,12 @@ draw_text :: proc(text: string, position: rl.Vector2, font_size: f32,
                     position + rl.Vector2{text_offset_x, text_offset_y},
                     {glyph_width, font_size}, rl.BLACK)
 			}
-			rl.DrawTextCodepoint(
+			if !strings.is_space(r) {
+			    rl.DrawTextCodepoint(
 				font, r,
 				position + rl.Vector2{text_offset_x, text_offset_y},
-				font_size, highlighted ? highlight_color : color)
+				font_size, highlighted ? rl.RAYWHITE : color)
+			}
 		}
 
 		if text_offset_x != 0. || !strings.is_space(r) {
@@ -383,8 +393,7 @@ draw_text :: proc(text: string, position: rl.Vector2, font_size: f32,
 	return text_size
 }
 
-draw_box :: proc(position: rl.Vector2, size: rl.Vector2,
-					fill:rl.Color=rl.BLANK, outline:rl.Color=rl.BLACK, thickness:f32=4.) {
+draw_box :: proc(position, size: rl.Vector2, fill:rl.Color=rl.BLANK, outline:rl.Color=rl.BLACK, thickness:f32=4.) {
 	if fill != rl.BLANK {
 		rl.DrawRectangleV(position, size, fill)
 	}
@@ -401,15 +410,21 @@ color_brighten :: proc(color: rl.Color, factor: f32) -> rl.Color {
 	}
 }
 
-draw_card :: proc(card: Card, position: rl.Vector2, color:rl.Color=rl.BLANK, actions:[]string={}) -> i32{
-	size := app.gui.card_size
+draw_box_outline :: proc(position, size: Vector2, color:rl.Color=rl.BLACK, thickness:f32=4.){
+    rl.DrawRectangleLinesEx({position.x-thickness, position.y-thickness, size.x+2*thickness, size.y+2*thickness}, thickness, color)
+}
+
+draw_card :: proc(card: Card, position: rl.Vector2, color:rl.Color=rl.BLANK, actions:[]string={}, static:bool=false) -> (bool, i32){
+    size := CARD_SIZE
 	hovered := rl.CheckCollisionPointRec(rl.GetMousePosition(), {x=position.x, y=position.y, width=f32(size.x), height=f32(size.y)})
 
 	color := color
 	if color == rl.BLANK do color = COLOR_CARDS[card.category]
 
 	position := position
-	if hovered {
+	if position.y+CARD_SIZE.y+300 > app.gui.height do position.y -= CARD_SIZE.y + 20
+
+	if hovered && !static{
 		color = rl.ColorBrightness(color, 0.1)
 		position.y += -10. //math.sin(f32(rl.GetTime())*10)*5	// make the button float up and down a bit
 	}
@@ -420,11 +435,11 @@ draw_card :: proc(card: Card, position: rl.Vector2, color:rl.Color=rl.BLANK, act
 		color = rl.ColorBrightness(color, -0.3)
 	}
 
-	if card.triggered > 0.{
+	if card.triggered > 0. && !static{
 		position.y += math.sin(f32(rl.GetTime())*20)*10
 	}
 
-	font_size :f32= app.gui.font_size2
+	font_size :f32= 25 // app.gui.font_size2
 	padding :f32= 10
 	header_height := font_size+2*padding
 	lt :f32= 4. // line_thickness
@@ -453,29 +468,41 @@ draw_card :: proc(card: Card, position: rl.Vector2, color:rl.Color=rl.BLANK, act
 	tp = ts.yx * {0., 1.}
 	card_type_string := reflect.enum_string(card.type)
 	if card_type_string in app.sub_textures do tp = ts.yx * app.sub_textures[card_type_string].yx
-	tint := rl.ColorBrightness(color, -0.2)
-	icon_size = size.y-header_height-2*padding
+	icon_size = min(size.x, size.y)-2*padding
 	dest := rl.Rectangle{x=position.x+padding, y=position.y+header_height+padding, width=icon_size, height=icon_size}
-	rl.DrawRectangleV({dest.x, dest.y}, {dest.width, dest.width}, tint)
-	rl.DrawTexturePro(texture, {x=tp.x, y=tp.y, width=ts.x, height=ts.y}, dest, {}, 0., color)
+	tint := rl.ColorBrightness(color, -0.2)
+	if hovered do tint.a /= 2
+	// rl.DrawCircleV({dest.x+dest.width/2, dest.y+dest.height/2}, dest.width/2-20., tint)
+	inner_padding :f32=40
+	rl.DrawRectangleV({dest.x, dest.y}+inner_padding, {}+dest.width-2*inner_padding, tint)
+	tint = color
+	if hovered do tint.a /= 2
+	rl.DrawTexturePro(texture, {x=tp.x, y=tp.y, width=ts.x, height=ts.y}, dest, {}, 0., tint)
 
 	// Title
-	text_pos := position + padding
-	draw_text(get_text(card.type, "title"), text_pos, font_size, rl.RAYWHITE, max_width=size.x-2*padding)
-
-	// Description
-	text_pos += {icon_size+padding, header_height}
-	draw_text(get_text(card.type, "description"), text_pos, font_size, rl.BLACK,
-	    max_width=size.x-(text_pos.x-position.x), highlight_color=color)
+	draw_text(get_text(card.type, "title"), position + padding, font_size, rl.RAYWHITE, max_width=size.x-2*padding)
 
 	if hovered {
 		button_pos := position + size + {-10, -45}
 
 		for action, i in actions {
-			if button(action, button_pos, font_size=font_size, anchor=.RIGHT) do return i32(i)
-			button_pos += {-100, 0}
+			if button(action, button_pos, font_size=font_size, anchor=.RIGHT) do return hovered, i32(i)
+			button_pos += {-20-measure_text(action, font_size).x, 0}
 		}
 	}
 
-	return -1
+	// Description
+	text_pos := position + {0., CARD_SIZE.y+padding}+padding
+	if hovered && has_text(card.type, "description") {
+        text_size := draw_text(get_text(card.type, "description"), text_pos, font_size, rl.BLACK,
+            max_width=size.x-(text_pos.x-position.x), highlight_color=color, boxed=color, box_width=CARD_SIZE.x)
+        text_pos.y += text_size.y + 3*padding
+	}
+	if hovered && has_text(card.type, "description2") {
+        text_size := draw_text(get_text(card.type, "description2"), text_pos, font_size, rl.BLACK,
+            max_width=size.x-(text_pos.x-position.x), highlight_color=color, boxed=color, box_width=CARD_SIZE.x)
+        text_pos.y += text_size.y + 3*padding
+	}
+
+	return hovered, -1
 }
