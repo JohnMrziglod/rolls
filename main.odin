@@ -116,8 +116,10 @@ Cycle :: struct {
 Camera3D :: struct{
 	using raylib: rl.Camera3D,
 	desired_target: rl.Vector3,
+	desired_position: rl.Vector3,
 	timer: f64,
 	angle: f32,
+	trauma: f32,
 }
 
 BattleState :: enum{Over, Fighting, Retreating}
@@ -175,6 +177,11 @@ antagonist_story_continue :: proc(){
 		app.antagonist.story_id = ""
 		app.antagonist.index = 0
 	}
+}
+
+camera_shake :: proc(intensity: f32, duration: f32) {
+	app.camera3d.trauma = math.max(app.camera3d.trauma, intensity)
+	app.camera3d.timer = 0.
 }
 
 main :: proc() {
@@ -245,6 +252,7 @@ main :: proc() {
 	CAMERA_HEIGHT: f32 = 65.0
 	app.camera3d = {}
 	app.camera3d.position = rl.Vector3{30, CAMERA_HEIGHT, 0.}
+	app.camera3d.desired_position = rl.Vector3{30, CAMERA_HEIGHT, 0.}
 	app.camera3d.target = rl.Vector3{0.0, 0.0, 0.0}
 	app.camera3d.up = rl.Vector3{0.0, 1.0, 0.0}
 	app.camera3d.fovy = f32(30) // Camera field-of-view Y
@@ -312,15 +320,21 @@ main :: proc() {
 		for file in files do defer delete(file)
 	}
 
-	app.antagonist.tutorial = 2
-	// antagonist_story("antagonist_intro1")
+	app.antagonist.tutorial = 0
+	antagonist_story("antagonist_intro1")
 
 	// Main game loop
 	for !rl.WindowShouldClose() {
 		dt := rl.GetFrameTime()
 		app.state_timer += dt
 
-		app.camera3d.target = linalg.lerp(app.camera3d.target, app.camera3d.desired_target, f32(dt)*5)
+		app.camera3d.trauma = math.max(0., app.camera3d.trauma - dt*2)
+		camera_target := app.camera3d.trauma*random_vector(-1, 1) + app.camera3d.desired_target
+		app.camera3d.target = linalg.lerp(app.camera3d.target, camera_target, f32(dt)*5)
+		camera_position := app.camera3d.desired_position + app.camera3d.trauma*random_vector(-1, 1)
+		app.camera3d.position = linalg.lerp(app.camera3d.position, camera_position, f32(dt)*5)
+
+		 // Update the camera
 
 		if rl.IsKeyPressed(rl.KeyboardKey.ESCAPE) {
 			if app.state == .GHOST_BOARD {
@@ -367,19 +381,20 @@ main :: proc() {
 				dices_reset(power=power)
 				app.state_timer = 0.0
 				app.state = .PRE_ROLLING
+				camera_shake(2.0, 0.5)
 		}
 
 		// Zoom in and out:
 		mouse_wheel := rl.GetMouseWheelMove()
 		if mouse_wheel != 0.0 {
-			app.camera3d.position.y += 200. * mouse_wheel * dt
+			app.camera3d.desired_position.y += 200. * mouse_wheel * dt
 		}
 
 		if rl.IsMouseButtonDown(.MIDDLE){
 			// app.camera_rotat
 			delta := rl.GetMouseDelta()
 			app.camera3d.angle += (delta.x+delta.y) * math.RAD_PER_DEG * dt * 5
-			app.camera3d.position = {math.cos(app.camera3d.angle)*30., app.camera3d.position.y, math.sin(app.camera3d.angle)*30.}
+			app.camera3d.desired_position = {math.cos(app.camera3d.angle)*30., app.camera3d.desired_position.y, math.sin(app.camera3d.angle)*30.}
 		}
 
 		// update app.particles:
@@ -1018,6 +1033,7 @@ dices_scoring :: proc(dt: real) {
 			if dice.current_score != 0 {
 				add_text(dice.position, app.gui.score_positions[p],
 						 fmt.aprintf("+%.f", dice.current_score), dice.color1, wait_time, font_size=app.gui.font_size1)
+				// camera_shake(2.0, 0.5)
 			}
 
 			return
@@ -1122,9 +1138,9 @@ scoring_summary :: proc(dt: real) {
 		}
 	}
 
-	if app.players[0].total_score > 350{
+	if app.players[0].total_score > 1000{
 		antagonist_story("antagonist_lost")
-	} else if app.players[1].total_score > 350{
+	} else if app.players[1].total_score > 1000{
 		antagonist_story("antagonist_wins")
 	}
 
@@ -1189,6 +1205,10 @@ wait_for_ai :: proc(){
 	// Only use ghosts if we expect a high score or if we might lose our ghosts...
 	if best_score > 0. && (best_score > 20 || len(ai.ghosts) > 7){
 		ai.roll.score += best_score // @TODO: Add it to roll score
+
+		// cards_generate(ai.cards[:1], .RollCards)
+		// card_activate(ai, &ai.cards[0])
+
 		ghosts_copy := make([dynamic]i32, len(ai.ghosts), cap(ai.ghosts))
 		defer delete(ghosts_copy)
 		copy(ghosts_copy[:], ai.ghosts[:])
@@ -1198,7 +1218,6 @@ wait_for_ai :: proc(){
 			if !contains(best_indices[:5], i32(index)) do append(&ai.ghosts, ghost)
 		}
 	}
-
 
     app.state = .WAIT_FOR_ROLL
 	app.state_timer = 0
@@ -1380,9 +1399,10 @@ draw :: proc(power: f32) {
                 color /= 2
             }
 
+            upgraded := upgrade.type != .CardNone
            	dest := rl.Rectangle{x=upgrade_pos.x, y=upgrade_pos.y, width=icon_size, height=icon_size}
-           	draw_box({dest.x, dest.y}-padding/2, {}+icon_size+2*padding/2, fill=color)
-           	rl.DrawTexturePro(app.textures[0], {x=tp.x, y=tp.y, width=ts.x, height=ts.y}, dest, {}, 0., rl.BLACK)
+           	draw_box({dest.x, dest.y}-padding/2, {}+icon_size+2*padding/2, fill=upgraded ? color : color/2, thickness=2)
+           	rl.DrawTexturePro(app.textures[0], {x=tp.x, y=tp.y, width=ts.x, height=ts.y}, dest, {}, 0., upgraded ? rl.BLACK : rl.RAYWHITE/2)
 
             hovered := rl.CheckCollisionPointRec(mouse_pos, dest)
             if upgrade.type != .CardNone && hovered {
@@ -1593,27 +1613,14 @@ draw :: proc(power: f32) {
 		n_cards: f32
 		for card in app.cards_offer do if card.type != .CardNone do n_cards += 1
 
-
-		W : f32 = 1000 // screen width
-		N : f32 = 4    // number of elements
-		X : f32 = 100  // element width
-		M : f32 = 50   // left/right margin
-
-		// margin :f32= 800
-
-		// spacing between elements
-		// spacing := ((app.gui.width - 2*margin) - (n_cards * CARD_SIZE.x)) / (n_cards - 1)
-		margin :f32= 400
+		margin :f32= 10
 		for &card, c in app.cards_offer{
 			if card.type == .CardNone do continue
 
 			position := Vector2{
 			    margin+(f32(c)+1)*(app.gui.width-2.*margin)/(n_cards+1)-CARD_SIZE.x/2.,
-				// margin + f32(c) * (CARD_SIZE.x + spacing),
 				(app.gui.height-CARD_SIZE.y)/2.
 			}
-			// margin :f32= c == int(n_cards/2.) ? 0. : (position.x<app.gui.width/2.) ? 200 : -200
-			// position.x += margin
 
 			actions := []string{"KEEP", "ACTIVATE"}
 			if card.category == .DICE do actions = {"KEEP", "ASSIGN"}
