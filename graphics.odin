@@ -201,7 +201,7 @@ draw_die :: proc(dice: Dice, hoverable:bool=false) -> bool {
 		// draw small numbers on the borders
 		// draw_die_face(f, size, texture, {f32(7+f)*fs.x, 0.}, fs, color/2)
 		draw_die_face(f, size, texture, {f32(13)*fs.x, 0}, fs, rl.ColorAlpha(color, 0.8), scale=0.6)
-		draw_die_face(f, size, texture, {f32(n-1)*fs.x, 0.}, fs, rl.BLACK, scale=0.5)
+		draw_die_face(f, size, texture, {f32(n-1)*fs.x, 0.}, fs, rl.BLACK, scale=0.3)
 	}
 
 	return hoverable && collision.hit

@@ -1239,7 +1239,7 @@ draw :: proc(power: f32) {
 		hoverable := app.state != .ROLLING && (app.state != .ASSIGN_CARD || dice.player == 0)
 		if draw_die(dice, hoverable=hoverable) {
 			dice_hovered = d
-			if app.state != rl.IsMouseButtonPressed(.LEFT) {
+			if rl.IsMouseButtonPressed(.LEFT) {
 				app.dice_selected = i32(d)
 				// app.camera3d.desired_target = dice.position
 			}
