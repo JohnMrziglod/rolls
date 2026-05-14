@@ -47,10 +47,15 @@ Dice :: struct {
 Antagonist :: struct {
 	story_id: string,
 	index: i32,
-	tutorial: i32,		// step through the tutorial...
+	tutorial2: bool,
+	tutorial_ghost_board: bool,
+	tutorial_cards: bool,
+	tutorial_cycles: bool,
 }
 
 GameState :: enum {
+	EXIT,
+	MENU,
 	TUTORIAL,
 	WAIT_FOR_ROLL,
 	CHARGING,
@@ -148,6 +153,7 @@ Application :: struct {
 
 	// game world
 	state: GameState,
+	state_before: GameState,
 	state_timer: f32,
 	players: [N_PLAYERS]Player,
 	current_player: u8,
@@ -211,7 +217,8 @@ main :: proc() {
 	app = {
 		// font = rl.LoadFont("assets/j_audio_cassette.otf"),
 		font = rl.LoadFont("assets/fonts/Paperlogy-6SemiBold.ttf"),
-		state = .PRE_ROLLING,
+		state = .MENU,
+		state_before = .PRE_ROLLING,
 		players = {
 			{
 				color=COLOR_PLAYERS[0], id=0, n_dices=6,
@@ -251,8 +258,8 @@ main :: proc() {
 
 	CAMERA_HEIGHT: f32 = 65.0
 	app.camera3d = {}
-	app.camera3d.position = rl.Vector3{30, CAMERA_HEIGHT, 0.}
 	app.camera3d.desired_position = rl.Vector3{30, CAMERA_HEIGHT, 0.}
+	app.camera3d.position = {}
 	app.camera3d.target = rl.Vector3{0.0, 0.0, 0.0}
 	app.camera3d.up = rl.Vector3{0.0, 1.0, 0.0}
 	app.camera3d.fovy = f32(30) // Camera field-of-view Y
@@ -306,7 +313,10 @@ main :: proc() {
 			rl.UnloadSound(sound)
 		}
 	}
-	app.textures = {rl.LoadTexture("assets/textures/die.png")}
+	app.textures = {
+		rl.LoadTexture("assets/textures/die.png"),
+		rl.LoadTexture("assets/textures/title.png"),
+	}
 	defer {
 		for texture in app.textures {
 			rl.UnloadTexture(texture)
@@ -320,13 +330,20 @@ main :: proc() {
 		for file in files do defer delete(file)
 	}
 
-	app.antagonist.tutorial = 0
-	antagonist_story("antagonist_intro1")
+	antagonist_story("antagonist_tutorial1")
 
 	// Main game loop
 	for !rl.WindowShouldClose() {
 		dt := rl.GetFrameTime()
 		app.state_timer += dt
+
+		if app.state == .MENU{
+			menu(dt)
+			continue
+		}
+		if app.state == .EXIT{
+			break
+		}
 
 		app.camera3d.trauma = math.max(0., app.camera3d.trauma - dt*2)
 		camera_target := app.camera3d.trauma*random_vector(-1, 1) + app.camera3d.desired_target
@@ -334,16 +351,14 @@ main :: proc() {
 		camera_position := app.camera3d.desired_position + app.camera3d.trauma*random_vector(-1, 1)
 		app.camera3d.position = linalg.lerp(app.camera3d.position, camera_position, f32(dt)*5)
 
-		 // Update the camera
-
+		// Update the camera
 		if rl.IsKeyPressed(rl.KeyboardKey.ESCAPE) {
 			if app.state == .GHOST_BOARD {
 				app.state = .WAIT_FOR_ROLL
 				app.state_timer = 0.
 				app.ghosts_selected = {-1, -1, -1, -1, -1}
 			} else {
-				// quit the game
-				break
+				state_switch(.MENU)
 			}
 		}
 
@@ -459,9 +474,9 @@ main :: proc() {
 			case .WAIT_FOR_AI:
 				wait_for_ai()
 			case .WAIT_FOR_ROLL:
-				if len(app.antagonist.story_id) == 0 && app.antagonist.tutorial == 0 {
-					app.antagonist.tutorial += 1
-					antagonist_story("antagonist_intro2")
+				if len(app.antagonist.story_id) == 0 && !app.antagonist.tutorial2 {
+					app.antagonist.tutorial2 = true
+					antagonist_story("antagonist_tutorial2")
 				}
 			}
 		}
@@ -1402,7 +1417,7 @@ draw :: proc(power: f32) {
             upgraded := upgrade.type != .CardNone
            	dest := rl.Rectangle{x=upgrade_pos.x, y=upgrade_pos.y, width=icon_size, height=icon_size}
            	draw_box({dest.x, dest.y}-padding/2, {}+icon_size+2*padding/2, fill=upgraded ? color : color/2, thickness=2)
-           	rl.DrawTexturePro(app.textures[0], {x=tp.x, y=tp.y, width=ts.x, height=ts.y}, dest, {}, 0., upgraded ? rl.BLACK : rl.RAYWHITE/2)
+           	rl.DrawTexturePro(app.textures[0], {tp.x, tp.y, ts.x, ts.y}, dest, {}, 0., upgraded ? rl.BLACK : rl.RAYWHITE/2)
 
             hovered := rl.CheckCollisionPointRec(mouse_pos, dest)
             if upgrade.type != .CardNone && hovered {
@@ -1580,6 +1595,9 @@ draw :: proc(power: f32) {
 				state_switch(.CARDS_OFFER)
 			}
 		} else if n_scored_combos > 9{
+			if len(app.antagonist.story_id) == 0 && !app.antagonist.tutorial_cycles {
+				antagonist_story("antagonist_tutorial_cycles")
+			}
 			if button("RUSH CYCLE", board_position+board_size-{20, 70}, app.gui.font_size2, anchor=.RIGHT) {
 				add_text(board_position+board_size/2.,
 					fmt.aprint("CYCLE COMPLETED BY RUSHING!"), human.color, 2.,
@@ -1590,6 +1608,11 @@ draw :: proc(power: f32) {
 				human.cycle.scored_combinations = {}
 				state_switch(.CARDS_OFFER)
 			}
+		}
+
+		if len(app.antagonist.story_id) == 0 && !app.antagonist.tutorial_ghost_board {
+			app.antagonist.tutorial_ghost_board = true
+			antagonist_story("antagonist_tutorial_ghost_board")
 		}
 	}
 
@@ -1646,6 +1669,11 @@ draw :: proc(power: f32) {
 				state_switch(.WAIT_FOR_ROLL)
 			}
 		}
+
+		if len(app.antagonist.story_id) == 0 && !app.antagonist.tutorial_cards {
+			app.antagonist.tutorial_cards = true
+			antagonist_story("antagonist_tutorial_cards")
+		}
 	}
 
 	if app.state == .ASSIGN_CARD {
@@ -1698,6 +1726,7 @@ draw :: proc(power: f32) {
 }
 
 state_switch :: proc(new_state: GameState, timer: f32=0.) {
+	app.state_before = app.state
 	app.state = new_state
 	app.state_timer = timer
 

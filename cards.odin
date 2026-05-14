@@ -119,7 +119,7 @@ card_activate :: proc(player: ^Player, card: ^Card){
 		player.max_lifetime_roll_cards += 1
 	case .CardCycle_ExtraDice:
 		// player.n_dices += 1
-		append(&app.dices, Dice{player=player.id, state=.DEAD})
+		append(&app.dices, Dice{player=player.id, state=.DEAD, color1=player.color, color2=rl.BLACK})
 		dice_init(&app.dices[len(app.dices)-1])
 	case .CardCycle_Graveyard:
 		player.ghosts_max += 1

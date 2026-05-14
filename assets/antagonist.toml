@@ -1,14 +1,28 @@
-antagonist_intro1
+antagonist_tutorial1
 /1="Oh... a newcomer!"
 /2="Leave! Run for your lives!"
 /3="Haha.. just kidding."
 /4="You probably don't even know how to play, don't you?"
-antagonist_intro2
+antagonist_tutorial2
 /1="We roll against each other."
 /2="Our dice will attack and kill each other if they show the same number."
 /3="Dead dice become GHOST DICE."
-/4="Use them to score COMBINATIONS and obtain CARDS."
+/4="Use them to score COMBINATIONS[n]and obtain CARDS."
 /5="Whoever reaches 1000 POINTS wins."
+antagonist_tutorial_ghost_board
+/1="You can combine your GHOST DICE to score COMBINATIONS."
+/2="You must select exactly five GHOST DICE to score one COMBINATION."
+/3="A COMBINATION gives you extra POINTS and a CARD."
+antagonist_tutorial_cards
+/1="CARDS give you special abilities that can turn the tide of the game."
+/2="DICE CARDS are RED, you can upgrade your DICE permanently with them."
+/3="ROLL CARDS are GREEN, their effects are limited for a few ROLLs."
+antagonist_tutorial_cycles
+/1="After scoring some COMBINATIONS, you can FINISH or RUSH a CYCLE."
+/2="When FINISHING (scoring all possible combinations), you get a hefty SCORE bonus and can choose a mighty CYCLE CARD."
+/3="CYCLE CARDs are blue and have permanent, powerful effects."
+/4="When RUSHING a cycle, you only have to score ten COMBINATIONS, you get a CYCLE CARD but no SCORE bonus."
+
 antagonist_lost
 /1="How could that..."
 /2="No way, you are playing for the first time!"
