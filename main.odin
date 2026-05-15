@@ -25,6 +25,9 @@ COLOR_PLAYERS := [2]rl.Color{
 	rl.Color{243, 201, 139, 255},
 	rl.Color{156, 246, 246, 255},
 }
+COLOR_SHIFT :: -0.3
+
+CAMERA_HEIGHT :: 75.
 
 N_DICES :: 12
 DICE_HALF_SIZE :: 0.75
@@ -211,11 +214,11 @@ main :: proc() {
     // if we are not full screen, set the window size to match the monitor we are on
     screen_width = rl.GetMonitorWidth(display)
     screen_height = rl.GetMonitorHeight(display)
-    // rl.SetWindowState({rl.ConfigFlag.WINDOW_UNDECORATED})
-    // rl.SetWindowSize(screen_width, screen_height+300)
+    rl.SetWindowState({.WINDOW_UNDECORATED, .BORDERLESS_WINDOWED_MODE})
+    rl.SetWindowSize(screen_width, screen_height+300)
 
     // toggle the state
-    rl.ToggleBorderlessWindowed()
+    // rl.ToggleBorderlessWindowed()
     // rl.MaximizeWindow()
     // rl.SetWindowPosition(0, 30)
     rl.SetExitKey(.KEY_NULL) // we don't want the window to be closed by accident
@@ -242,12 +245,15 @@ main :: proc() {
 		dice_selected = -1,
 	}
 	defer rl.UnloadFont(app.font)
+	rl.GenTextureMipmaps(&app.font.texture)
+	rl.SetTextureFilter(app.font.texture, .TRILINEAR)
+
 	app.gui = {
 		width = f32(screen_width),
 		height = f32(screen_height),
 		font_size1 = 50*1.,
 		font_size2 = 30*1.,
-		bg_color = COLOR_PLAYERS[0]/2,
+		bg_color = rl.ColorBrightness(COLOR_PLAYERS[0], COLOR_SHIFT),
 		score_positions = {
 			{50, f32(screen_height)-200},
 			{f32(screen_width)-50, f32(screen_height)-200},
@@ -266,8 +272,8 @@ main :: proc() {
 	app.camera3d = {}
 	app.camera3d.desired_position = rl.Vector3{30, 65., 0.}
 	app.camera3d.position = {}
-	app.camera3d.target = rl.Vector3{0.0, 0.0, 0.0}
-	app.camera3d.up = rl.Vector3{0.0, 1.0, 0.0}
+	app.camera3d.target = {0.0, 0.0, 0.0}
+	app.camera3d.up = {0.0, 1.0, 0.0}
 	app.camera3d.fovy = f32(30) // Camera field-of-view Y
 	app.camera3d.projection = .PERSPECTIVE // Camera mode type
 
@@ -311,6 +317,10 @@ main :: proc() {
 	app.textures = {
 		rl.LoadTexture("assets/textures/die.png"),
 		rl.LoadTexture("assets/textures/title.png"),
+	}
+	for &texture in app.textures{
+		rl.GenTextureMipmaps(&texture)
+		rl.SetTextureFilter(texture, .TRILINEAR)
 	}
 	defer {
 		for texture in app.textures {
@@ -1229,13 +1239,13 @@ draw :: proc(dt: real) {
 	anti_bg := rl.Color{}
 	if app.state == .WAIT_FOR_ROLL{
 		ratio := app.state_timer / 3.
-		color1 := COLOR_PLAYERS[app.current_player]
-		color2 := COLOR_PLAYERS[(app.current_player+1)%N_PLAYERS]
-		app.gui.bg_color = rl.ColorLerp(color2/2, color1/2, ratio)
-		anti_bg = rl.ColorLerp(color1/2, color2/2, ratio)
+		color1 := rl.ColorBrightness(COLOR_PLAYERS[app.current_player], COLOR_SHIFT)
+		color2 := rl.ColorBrightness(COLOR_PLAYERS[(app.current_player+1)%N_PLAYERS], COLOR_SHIFT)
+		app.gui.bg_color = rl.ColorLerp(color2, color1, ratio)
+		anti_bg = rl.ColorLerp(color1, color2, ratio)
 	} else if app.state == .ROLLING{
-		app.gui.bg_color = COLOR_PLAYERS[app.current_player]/2
-		anti_bg = COLOR_PLAYERS[(app.current_player+1)%N_PLAYERS]/2
+		app.gui.bg_color = rl.ColorBrightness(COLOR_PLAYERS[app.current_player], COLOR_SHIFT)
+		anti_bg = rl.ColorBrightness(COLOR_PLAYERS[(app.current_player+1)%N_PLAYERS], COLOR_SHIFT)
 	}
 	rl.ClearBackground(app.gui.bg_color)
 
