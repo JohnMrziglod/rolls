@@ -217,7 +217,7 @@ main :: proc() {
     // toggle the state
     rl.ToggleBorderlessWindowed()
     // rl.MaximizeWindow()
-    rl.SetWindowPosition(0, 30)
+    // rl.SetWindowPosition(0, 30)
     rl.SetExitKey(.KEY_NULL) // we don't want the window to be closed by accident
 	target_ratio := 1080 / f32(screen_height)
 
