@@ -36,3 +36,10 @@ dice_killed :: proc(victim: ^Dice, killer: ^Dice=nil){
 		slice.sort(player.ghosts[:])
 	}
 }
+
+dice_fight :: proc(die1: ^Dice, die2: ^Dice) {
+    app.battle.dice = {die1, die2}
+    app.battle.previous_positions = {die1.position, die2.position}
+    app.battle.state = .Fighting
+    app.battle.timer = 0.
+}

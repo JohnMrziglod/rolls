@@ -153,6 +153,11 @@ card_activate :: proc(player: ^Player, card: ^Card){
 	}
 }
 
+card_add_to_hand :: proc(player: ^Player, card: Card) {
+	if len(player.cards) >= 10 do return
+	append(&player.cards, card)
+}
+
 card_in_hand :: proc(player: Player, card_type: CardType, start_index:i32=0, only_active:=false) -> Card{
 	for i in start_index..<i32(len(player.cards)) {
 		if player.cards[i].type == card_type && (!only_active || player.cards[i].active) do return player.cards[i]
