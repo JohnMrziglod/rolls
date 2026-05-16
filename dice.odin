@@ -3,7 +3,7 @@ package game
 import "core:fmt"
 import "core:slice"
 
-dice_killed :: proc(victim: ^Dice, killer: ^Dice=nil){
+dice_killed :: proc(victim: ^Die, killer: ^Die=nil){
 	player := &app.players[victim.player]
 
 	if .CardRoll_Immortality in player.roll.effects{
@@ -37,9 +37,16 @@ dice_killed :: proc(victim: ^Dice, killer: ^Dice=nil){
 	}
 }
 
-dice_fight :: proc(die1: ^Dice, die2: ^Dice) {
+dice_fight :: proc(die1: ^Die, die2: ^Die) {
     app.battle.dice = {die1, die2}
     app.battle.previous_positions = {die1.position, die2.position}
     app.battle.state = .Fighting
     app.battle.timer = 0.
+}
+
+die_has_upgrade :: proc(die: Die, card_type: CardType) -> bool{
+	for upgrade in die.upgrades{
+		if upgrade.type == card_type do return true
+	}
+	return false
 }

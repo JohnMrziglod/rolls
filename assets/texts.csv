@@ -35,7 +35,7 @@ description/CardDice_Historian|Gains +0.1 SCORE when surviving an activated roll
 title/CardDice_Librarian|LIBRARIAN
 description/CardDice_Librarian|Gains +0.2 SCORE when surviving an assigned dice card.
 title/CardCycle_ExtraDice|EXTRA DICE
-description/CardCycle_ExtraDice|Add +1 Dice to your army.
+description/CardCycle_ExtraDice|Add +1 Die to your army.
 title/CardCycle_EternalRoll|ETERNAL ROLL
 description/CardCycle_EternalRoll|Your ROLL CARDS' lifetime increases by 1 ROLL.
 title/CardCycle_Graveyard|GRAVEYARD

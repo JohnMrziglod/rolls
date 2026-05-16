@@ -12,7 +12,7 @@ package game
 // 	angle: f32,
 // }
 
-// Dice :: struct {
+// Die :: struct {
 // 	position:      rl.Vector3,
 // 	velocity:      rl.Vector3,
 // 	rotation:      rl.Quaternion,
@@ -133,7 +133,7 @@ package game
 // 		}
 // 	}
 
-// 	dices: [dynamic]Dice
+// 	dices: [dynamic]Die
 
 // 	charging := false
 // 	charge_start_time: f64 = 0.0
@@ -195,7 +195,7 @@ package game
 // 			if first_round {
 // 				// If there are no dices, add some dices before resetting them
 // 				for i in 0 ..< N_DICES * 2 {
-// 					append(&dices, Dice{player = i < N_DICES ? 0 : 1})
+// 					append(&dices, Die{player = i < N_DICES ? 0 : 1})
 // 				}
 // 			}
 

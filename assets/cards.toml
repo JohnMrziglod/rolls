@@ -43,7 +43,7 @@ CardRoll_TombRaider
 # DICE CARDS
 CardDice_Assassin
 /title="ASSASSIN"
-/description="+2 ATTACK."
+/description="+2 ATTACK"
 /description2="When [h]ACTIVE[h], attacks ANTAGONIST's highest die."
 /texture_id=[1,1]
 CardDice_Blind
@@ -52,32 +52,32 @@ CardDice_Blind
 CardDice_Tank
 /title="TANK"
 /description="+2 HEALTH"
-/description2="When [h]ACTIVE[h], +1 HEALTH for surrounding DICE."
+/description2="When [h]ACTIVE[h], +1 HEALTH for surrounding dice."
 /texture_id=[1,2]
 CardDice_Antenna
 /title="ANTENNA"
-/description="Multiply DIE's SCORE with the SCORE of other DICE with ANTENNA."
+/description="Multiplies its SCORE by the product of your other surviving dice with ANTENNA."
 /texture_id=[1,4]
 CardDice_Optimist
 /title="OPTIMIST"
 /description="This die only shows the numbers [h]4[h], [h]5[h], and [h]6[h]."
-/description2="When [h]ACTIVE[h], add the numbers of your other dice above [h]3[h] to its own SCORE."
+/description2="When [h]ACTIVE[h], scores additionally the sum of your surviving dice greater or equal [h]4[h]."
 /texture_id=[1,9]
 CardDice_Pessimist
 /title="PESSIMIST"
 /description="This die only shows the numbers [h]1[h], [h]2[h], and [h]3[h]."
-/description2="When [h]ACTIVE[h], multiply its own SCORE by the numbers of your other dice below [h]4[h]."
+/description2="When [h]ACTIVE[h], multiplies its SCORE by the product of your surviving dice lower or equal [h]3[h]."
 /texture_id=[1,8]
 CardDice_General
 /title="GENERAL"
-/description="Adds NUMBERs of your surviving DICE to its SCORE."
+/description="Adds the sum of your surviving DICE to its SCORE."
 CardDice_Journalist
 /title="JOURNALIST"
 /description="+2 ROLL MULTIPLIER."
 /texture_id=[1,6]
 CardDice_Influencer
 /title="INFLUENCER"
-/description1="---"
+# /description1="---"
 /description2="When [h]ACTIVE[h], creates a ROLL CARD."
 /texture_id=[1,7]
 CardDice_Engineer

@@ -32,7 +32,7 @@ CAMERA_HEIGHT :: 75.
 N_DICES :: 12
 DICE_HALF_SIZE :: 0.75
 EntityState :: enum {NOT_USED, DEAD, ALIVE,}
-Dice :: struct {
+Die :: struct {
 	state: EntityState,
 	using body: RigidBody,
 	player: u8,
@@ -93,7 +93,6 @@ RollState :: struct{
 	score: sco,
 	score_counter: i32,
 	multiplier: sco,
-	antennas: sco,
 	kills: i32,
 	effects: map[CardType]void,
 }
@@ -125,6 +124,7 @@ Camera3D :: struct{
 	using raylib: rl.Camera3D,
 	desired_target: rl.Vector3,
 	desired_position: rl.Vector3,
+	desired_fovy: f32,
 	timer: f64,
 	angle: f32,
 	trauma: f32,
@@ -132,7 +132,7 @@ Camera3D :: struct{
 
 BattleState :: enum{Over, Fighting, Retreating}
 Battle :: struct {
-    dice: [2]^Dice,
+    dice: [2]^Die,
     previous_positions: [2]Vector3,
     timer: f32,
     state: BattleState,
@@ -161,7 +161,7 @@ Application :: struct {
 	state_clock: f32,
 	players: [N_PLAYERS]Player,
 	current_player: u8,
-	dices: [dynamic]Dice,
+	dice: [dynamic]Die,
 	contacts: [dynamic]Contact,
 	battle: Battle,
 	antagonist: Antagonist,
@@ -270,11 +270,10 @@ main :: proc() {
 	app.gui.hand_area_height = app.gui.score_positions[0].y - 100
 
 	app.camera3d = {}
-	app.camera3d.desired_position = rl.Vector3{30, 65., 0.}
-	app.camera3d.position = {}
+	camera_reset()
 	app.camera3d.target = {0.0, 0.0, 0.0}
 	app.camera3d.up = {0.0, 1.0, 0.0}
-	app.camera3d.fovy = f32(30) // Camera field-of-view Y
+	app.camera3d.fovy = f32(30)
 	app.camera3d.projection = .PERSPECTIVE // Camera mode type
 
 	app.camera2d = {}
@@ -358,11 +357,24 @@ main :: proc() {
 			break
 		}
 
+		// Zoom in and out:
+		mouse_wheel := rl.GetMouseWheelMove()
+		if mouse_wheel != 0.0 {
+			app.camera3d.desired_position.y += 200. * mouse_wheel * dt
+		}
+
+		if rl.IsMouseButtonDown(.MIDDLE){
+			// app.camera_rotat
+			delta := rl.GetMouseDelta()
+			app.camera3d.angle += (delta.x+delta.y) * math.RAD_PER_DEG * dt * 5
+		}
+
 		app.camera3d.trauma = math.max(0., app.camera3d.trauma - dt*2)
 		camera_target := app.camera3d.trauma*random_vector(-1, 1) + app.camera3d.desired_target
 		app.camera3d.target = linalg.lerp(app.camera3d.target, camera_target, f32(dt)*5)
 		camera_position := app.camera3d.desired_position + app.camera3d.trauma*random_vector(-1, 1)
 		app.camera3d.position = linalg.lerp(app.camera3d.position, camera_position, f32(dt)*5)
+		app.camera3d.fovy = linalg.lerp(app.camera3d.fovy, app.camera3d.desired_fovy, f32(dt)*5)
 
 		// Update the camera
 		if rl.IsKeyPressed(rl.KeyboardKey.ESCAPE) {
@@ -407,19 +419,6 @@ main :: proc() {
 				dices_reset()
 				state_change(.PRE_ROLLING)
 				camera_shake(2.0, 0.5)
-		}
-
-		// Zoom in and out:
-		mouse_wheel := rl.GetMouseWheelMove()
-		if mouse_wheel != 0.0 {
-			app.camera3d.desired_position.y += 200. * mouse_wheel * dt
-		}
-
-		if rl.IsMouseButtonDown(.MIDDLE){
-			// app.camera_rotat
-			delta := rl.GetMouseDelta()
-			app.camera3d.angle += (delta.x+delta.y) * math.RAD_PER_DEG * dt * 5
-			app.camera3d.desired_position = {math.cos(app.camera3d.angle)*30., app.camera3d.desired_position.y, math.sin(app.camera3d.angle)*30.}
 		}
 
 		for &player, i in app.players {
@@ -470,7 +469,7 @@ main :: proc() {
 	}
 }
 
-dice_init :: proc(dice: ^Dice, position:=Vector3{0, 1000, 0}){
+dice_init :: proc(dice: ^Die, position:=Vector3{0, 1000, 0}){
 	half_size :f32= DICE_HALF_SIZE
 	mass := math.pow(half_size, 3) * 8.
 	orientation := dice.orientation
@@ -503,15 +502,15 @@ dice_init :: proc(dice: ^Dice, position:=Vector3{0, 1000, 0}){
 
 dices_reset :: proc(power:f32=1., first_round:bool=false) {
 	if first_round {
-		clear(&app.dices)
+		clear(&app.dice)
 		for player, p in app.players{
 			for i in 0..<player.n_dices {
-				append(&app.dices, Dice{player=player.id, color1=player.color, color2=rl.BLACK})
+				append(&app.dice, Die{player=player.id, color1=player.color, color2=rl.BLACK})
 			}
 		}
 	}
 
-	for &dice, d in app.dices {
+	for &dice, d in app.dice {
 		if dice.player == app.current_player || first_round
 		{
 			position := random_vector(-AREA_SIZE/8.0, AREA_SIZE/8.0)
@@ -536,7 +535,7 @@ dices_reset :: proc(power:f32=1., first_round:bool=false) {
 }
 
 apply_dice_upgrades :: proc(dt: real){
-	for &dice, d in app.dices{
+	for &dice, d in app.dice{
 		for &upgrade, u in dice.upgrades{
 			#partial switch upgrade.type {
 			case .CardDice_Optimist:
@@ -549,7 +548,7 @@ apply_dice_upgrades :: proc(dt: real){
 }
 
 rolling :: proc(duration: real) {
-	for &dice, d in app.dices{
+	for &dice, d in app.dice{
 		body_integrate(&dice, duration)
 	}
 
@@ -563,7 +562,7 @@ rolling :: proc(duration: real) {
 	}
 
 	clear(&app.contacts)
-	for &dice, d in app.dices{
+	for &dice, d in app.dice{
 		if len(app.contacts) > 1000 do break
 
 		collision_wall := false
@@ -572,7 +571,7 @@ rolling :: proc(duration: real) {
 		}
 
 		collision_other_dice := false
-		for &other_dice, od in app.dices{
+		for &other_dice, od in app.dice{
 			if dice == other_dice || other_dice.state != .ALIVE do continue
 
 			collision_other_dice |= collision_detect_box_box(&dice, &other_dice, &app.contacts)
@@ -599,10 +598,10 @@ rolling :: proc(duration: real) {
 		contact_resolve_contacts(&resolver, app.contacts[:], duration)
 	}
 
-	for &dice, d in app.dices{
+	for &dice, d in app.dice{
 		if dice.state != .ALIVE do continue
 
-		// Either wait until all app.dices are not moving that much anymore
+		// Either wait until all app.dice are not moving that much anymore
 		// or until enough time has past
 		if dice.motion > 0.9 && app.state_clock < 5. {
 			return
@@ -634,7 +633,7 @@ rolling :: proc(duration: real) {
 }
 
 dice_upgrades :: proc (dt: real){
-    for &dice, d in app.dices{
+    for &dice, d in app.dice{
 		if dice.state != .ALIVE do continue
 
 		// Apply dice card effects
@@ -678,13 +677,13 @@ cards_battle :: proc (dt: real) {
 			}
 			#partial switch card.type {
 			case .CardRoll_Attack:
-				for &dice, d in app.dices{
+				for &dice, d in app.dice{
 					if dice.state != .ALIVE || dice.player != u8(p) do continue
 					dice.attack += 2
 					add_text(dice.position, fmt.aprint("+2 ATTACK"), COLOR_CARDS[card.category], lifetime=0.6)
 				}
 			case .CardRoll_Defense:
-				for &dice, d in app.dices{
+				for &dice, d in app.dice{
 					if dice.state != .ALIVE || dice.player != u8(p) do continue
 					dice.health += 2
 					add_text(dice.position, fmt.aprint("+2 HEALTH"), COLOR_CARDS[card.category], lifetime=0.6)
@@ -715,7 +714,7 @@ cards_battle :: proc (dt: real) {
 				player.roll.multiplier += 3
 				add_text(position, fmt.aprint("ROLL SCORE X3"), player.color, lifetime=1.)
 			case .CardRoll_MarketCrash:
-				for &dice, d in app.dices{
+				for &dice, d in app.dice{
 					for &upgrade, u in dice.upgrades{
 						position := dice.position - f32(u) * Vector3{0, 2, 0}
 						text: string
@@ -731,7 +730,7 @@ cards_battle :: proc (dt: real) {
 				// Find dice with highest number
     			suidice_index := -1
     			suidice_number :i32= 0
-    			for &dice, d in app.dices{
+    			for &dice, d in app.dice{
     				if dice.state != .ALIVE || dice.player != u8(p) do continue
 
     				if dice.current_number > suidice_number {
@@ -741,12 +740,12 @@ cards_battle :: proc (dt: real) {
     			}
 
     			if suidice_index != -1{
-    				suidice := &app.dices[suidice_index]
+    				suidice := &app.dice[suidice_index]
 
     				dice_killed(suidice)
     				add_text(suidice.position, fmt.aprint("SUIDICE!"), suidice.color1)
 
-    				for &dice, d in app.dices{
+    				for &dice, d in app.dice{
     					if dice.state != .ALIVE || dice.player == u8(p) do continue
 
     					dice_killed(&dice, suidice)
@@ -821,7 +820,7 @@ dice_battle :: proc(dt: real) {
 
 				sound := app.sounds[5]
 				rl.SetSoundVolume(sound, rand.float32_range(0.8, 1.)) // Set volume based on bounce speed
-				rl.SetSoundPitch(sound, 0.1+f32(app.players[die1.player].roll.kills)/f32(len(app.dices)/2.)) // Add some random pitch variation
+				rl.SetSoundPitch(sound, 0.1+f32(app.players[die1.player].roll.kills)/f32(len(app.dice)/2.)) // Add some random pitch variation
 				rl.PlaySound(sound)
 
 				battle.state = (die1.state == .ALIVE || die2.state == .ALIVE) ? .Retreating : .Over
@@ -841,13 +840,13 @@ dice_battle :: proc(dt: real) {
         return
 	}
 
-	// We eliminate all app.dices from each player that show the same numbers.
-	// E.g. if player 1 has two app.dices showing a 3 and player 2 has one dice showing a 3,
+	// We eliminate all app.dice from each player that show the same numbers.
+	// E.g. if player 1 has two app.dice showing a 3 and player 2 has one dice showing a 3,
 	// one dice each is eliminated and won't give points to either player.
 
-	for &dice, d in app.dices{
+	for &dice, d in app.dice{
 		if dice.state != .ALIVE do continue
-		for &other_dice, o in app.dices{
+		for &other_dice, o in app.dice{
 			if d == o || other_dice.state != .ALIVE || dice.player == other_dice.player do continue
 			if dice.current_number == other_dice.current_number {
 			    dice_fight(&dice, &other_dice)
@@ -861,42 +860,42 @@ dice_battle :: proc(dt: real) {
 }
 
 dices_scoring :: proc(dt: real) {
-	n_dices_alive := 0
-	for dice in app.dices {
-		if dice.state == .ALIVE	do n_dices_alive += 1
-	}
-
 	for &player, p in app.players{
 		other_player := &app.players[(p+1)%N_PLAYERS]
 
 		player.is_scoring = true
 		n_alive := 0
-		for dice in app.dices {
+		for dice in app.dice {
 			if dice.state == .ALIVE && u8(p) == dice.player do n_alive += 1
 		}
 
-		for &dice, d in app.dices {
-			if dice.state != .ALIVE || dice.already_scored || u8(p) != dice.player do continue
+		for &die, d in app.dice {
+			if die.state != .ALIVE || die.already_scored || u8(p) != die.player do continue
 
-			dice.current_score = sco(dice.current_number)
+			die.current_score = sco(die.current_number)
 
 			// Apply dice card effects
-			something_happened := false
-			for &upgrade, u in dice.upgrades{
-			    is_active := dice.current_face == u
-				position := dice.position - f32(u) * Vector3{0, 2, 0}
+			n_events := 0
+			for &upgrade, u in die.upgrades{
+			    is_active := die.current_face == u
 				text: string
 
 				#partial switch upgrade.type {
 				case .CardDice_Antenna:
-					if player.roll.antennas == 0 {
-						player.roll.antennas = dice.current_score
-					} else {
-						player.roll.antennas *= dice.current_score
-					}
-					text = fmt.aprintf("ANTENNA NETWORK %.f!", dice.current_score)
+					multiplier := 0.
+					for other_dice, o in app.dice{
+                        if d == o || other_dice.state != .ALIVE || die.player != other_dice.player do continue
 
-					dice.current_score = 0
+                        if die_has_upgrade(other_dice, .CardDice_Antenna) {
+							// add_text(other_dice.position, fmt.aprint("ANTENNA BOOST!"), COLOR_UPGRADES[.CardDice_Antenna], lifetime=0.6)
+							multiplier += sco(other_dice.current_number)
+						}
+                    }
+                    if multiplier > 0. {
+  						text = fmt.aprintf("ANTENNA: %.f X %.f!", die.current_score, multiplier)
+  						die.current_score *= multiplier
+                    }
+
 				case .CardDice_Journalist:
 					if .CardRoll_FakeNews in player.roll.effects || .CardRoll_FakeNews in other_player.roll.effects{
 						player.roll.multiplier += 0.5
@@ -920,21 +919,21 @@ dices_scoring :: proc(dt: real) {
 				case .CardDice_Investor:
 					if is_active {
 						text = fmt.aprintf("PAYOUT +%.f", upgrade.var1)
-						dice.current_score += math.floor(upgrade.var1)
+						die.current_score += math.floor(upgrade.var1)
 						upgrade.var1 = 0.
 					} else {
-						upgrade.var1 += dice.current_score
+						upgrade.var1 += die.current_score
 						upgrade.var1 *= 1.1
-						dice.current_score = 0
+						die.current_score = 0
 						text = fmt.aprintf("INVESTING +%.1f", upgrade.var1)
 					}
 				case .CardDice_General:
 					text = fmt.aprintf("GENERAL: +%v!", n_alive)
-					dice.current_score += sco(n_alive)
+					die.current_score += sco(n_alive)
 				case .CardDice_Historian:
 				    if upgrade.var1 != 0. {
     					text = fmt.aprintf("HISTORIAN: +%.f!", upgrade.var1)
-    					dice.current_score += upgrade.var1
+    					die.current_score += upgrade.var1
 					}
 				case .CardDice_Researcher:
 				    if upgrade.var1 != 0. {
@@ -943,68 +942,67 @@ dices_scoring :: proc(dt: real) {
 					}
 				case .CardDice_Medium:
 					text = fmt.aprintf("MEDIUM: +%v!", len(player.ghosts))
-					dice.current_score += sco(len(player.ghosts))
+					die.current_score += sco(len(player.ghosts))
 				case .CardDice_Optimist:
 				    if is_active {
 						bonus := 0.
-						for other_dice, o in app.dices{
-                            if d == o || other_dice.state != .ALIVE || dice.player != other_dice.player || other_dice.current_number < 4 do continue
+						for other_dice, o in app.dice{
+                            if d == o || other_dice.state != .ALIVE || die.player != other_dice.player || other_dice.current_number < 4 do continue
                             bonus += sco(other_dice.current_number)
                         }
 						text = fmt.aprintf("OPTIMIST: +%.f!", bonus)
-						dice.current_score += bonus
+						die.current_score += bonus
 					}
 				case .CardDice_PlusOne:
 				    plus_score := 1
 					if is_active do plus_score += n_alive-1
 					text = fmt.aprintf("PLUS ONE: +%v!", plus_score)
-					dice.current_score += sco(plus_score)
+					die.current_score += sco(plus_score)
 				case .CardDice_Pessimist:
 				    if is_active {
 						multiplier := 0.
-						for other_dice, o in app.dices{
-                            if d == o || other_dice.state != .ALIVE || dice.player != other_dice.player || other_dice.current_number > 3 do continue
+						for other_dice, o in app.dice{
+                            if d == o || other_dice.state != .ALIVE || die.player != other_dice.player || other_dice.current_number > 3 do continue
                             multiplier += sco(other_dice.current_number)
                         }
                         if multiplier > 0. {
-    						text = fmt.aprintf("PESSIMIST: %.f X %.f!", dice.current_score, multiplier)
-    						dice.current_score *= multiplier
+    						text = fmt.aprintf("PESSIMIST: %.f X %.f!", die.current_score, multiplier)
+    						die.current_score *= multiplier
                         }
 					}
 				case .CardDice_Train:
 					bonus := 0.
-					for other_dice, o in app.dices{
-                        if d == o || other_dice.state != .ALIVE || dice.player != other_dice.player || other_dice.current_number <= dice.current_number do continue
+					for other_dice, o in app.dice{
+                        if d == o || other_dice.state != .ALIVE || die.player != other_dice.player || other_dice.current_number <= die.current_number do continue
                         bonus += sco(other_dice.current_number)
-                        add_text(other_dice.position, fmt.aprintf("TRAIN: +%v!", other_dice.current_number), dice.color1, 2.0)
+                        add_text(other_dice.position, fmt.aprintf("TRAIN: +%v!", other_dice.current_number), die.color1, 2.0)
                     }
                     if bonus > 0. {
 						text = fmt.aprintf("TRAIN: +%.f!", bonus)
-						dice.current_score += bonus
+						die.current_score += bonus
                     }
 				case .CardDice_Librarian:
     				if upgrade.var1 != 0. {
        					text = fmt.aprintf("LIBRARIAN: +%.f!", upgrade.var1)
-                        dice.current_score += upgrade.var1
+                        die.current_score += upgrade.var1
        	            }
 				case .CardDice_PowerDice:
-					text = fmt.aprintf("POWER UP: %.f X %.f!", dice.current_score, dice.current_score)
-					dice.current_score *= dice.current_score
+					text = fmt.aprintf("POWER UP: %.f X %.f!", die.current_score, die.current_score)
+					die.current_score *= die.current_score
 				case:
 					continue
 				}
-				if len(text) > 0 {
-					add_text(position, text, dice.color1, 2.0)
-					something_happened = true
+				if len(text) > 0{
+					add_text(die.position+{0, f32(n_events)*0.8, 0}, text, die.color1, 2.0, delay=f32(n_events)*0.25)
+					n_events += 1
 				}
 			}
 
-			if dice.current_score != 0 || something_happened {
-				app.camera3d.desired_target = dice.position
-				app.camera3d.desired_position.y = 10
-				app.camera3d.fovy = 25
-				app.players[dice.player].roll.score += dice.current_score
-				dice.already_scored = true
+			if die.current_score != 0 || n_events > 0 {
+				camera_zoom(die.position)
+
+				app.players[die.player].roll.score += die.current_score
+				die.already_scored = true
 				player.roll.score_counter += 1
 
 				sound := app.sounds[6]
@@ -1014,8 +1012,8 @@ dices_scoring :: proc(dt: real) {
 				rl.SetSoundPitch(sound, pitch)
 				rl.PlaySound(sound)
 
-				// add_particles(dice.position, dice.color1)
-				add_text(dice.position, fmt.aprintf("+%.f", dice.current_score), dice.color1)
+				add_text(die.position+{0, f32(n_events)*0.8, 0},
+					fmt.aprintf("+%.f", die.current_score), die.color1, delay=f32(n_events)*0.25)
 				// camera_shake(2.0, 0.5)
 			}
 
@@ -1026,6 +1024,12 @@ dices_scoring :: proc(dt: real) {
 	}
 
 	state_change(.CARDS_SCORING, 0.4)
+}
+
+camera_zoom :: proc(position: Vector3){
+	app.camera3d.desired_target = position
+	app.camera3d.desired_position.y = 10
+	app.camera3d.desired_fovy = 25
 }
 
 cards_scoring :: proc(dt: real) {
@@ -1074,7 +1078,6 @@ play_sound :: proc(sound_id: i32, volume: f32=1., pitch: f32=1.) {
 scoring_summary :: proc(dt: real) {
 	roll_scores := [2]sco{}
 	for &player, p in app.players {
-		player.roll.score += player.roll.antennas
 		if player.roll.multiplier > 0. {
 			player.roll.score *= player.roll.multiplier
 		}
@@ -1124,9 +1127,17 @@ scoring_summary :: proc(dt: real) {
 	app.current_player = (app.current_player + 1) % N_PLAYERS
 	state_change(.WAIT_FOR_AI)
 
-	app.camera3d.desired_target = Vector3{0, 0, 0}
-	app.camera3d.desired_position.y = 65.
-	app.camera3d.fovy = 30
+	camera_reset()
+}
+
+camera_reset :: proc(){
+	app.camera3d.desired_target = {3, 0, 0}
+	app.camera3d.desired_position = {
+		math.cos(app.camera3d.angle)*30.,
+		70,
+		math.sin(app.camera3d.angle)*30.
+	}
+	app.camera3d.desired_fovy = 30
 }
 
 wait_for_ai :: proc(){
@@ -1224,6 +1235,11 @@ draw :: proc(dt: real) {
 	for &text in app.text_animations{
 		if !text.visible do continue
 
+		if text.delay > 0. {
+			text.delay -= dt
+			continue
+		}
+
 		text.lifetime -= dt
 		if text.lifetime < 0.{
 			text.visible = false
@@ -1251,7 +1267,7 @@ draw :: proc(dt: real) {
 
 	rl.BeginMode3D(app.camera3d)
 
-	// Draw a big cube to represent the area where the app.dices can move
+	// Draw a big cube to represent the area where the app.dice can move
 	rl.DrawCube(rl.Vector3{0.0, -.6, 0.0}, AREA_SIZE, 1.0, AREA_SIZE, COLOR_TABLE)
 	rl.DrawCubeWires(rl.Vector3{0.0, -.6, 0.0}, AREA_SIZE, 1.0, AREA_SIZE, rl.BLACK)
 
@@ -1260,7 +1276,7 @@ draw :: proc(dt: real) {
 	}
 
 	dice_hovered := -1
-	for &dice, d in app.dices{
+	for &dice, d in app.dice{
 		if dice.state != .ALIVE do continue
 		hoverable := app.state != .ROLLING && (app.state != .ASSIGN_CARD || dice.player == 0)
 		if draw_die(dice, hoverable=hoverable) {
@@ -1364,7 +1380,7 @@ draw :: proc(dt: real) {
 		text = (p == 0) ? "YOU" : "ANTAGONIST"
 		draw_text(text, {position.x, position.y+100}, app.gui.font_size2, player.color, anchor=(p == 1) ? .RIGHT : .LEFT, overline=true)
 
-		roll_score := player.roll.score+player.roll.antennas
+		roll_score := player.roll.score
 		if app.state == .DICES_SCORING || app.state == .SCORING_SUMMARY || roll_score > 0. {
 
 			font_size := app.gui.font_size1
@@ -1388,7 +1404,7 @@ draw :: proc(dt: real) {
 
 	if dice_hovered != -1 || app.dice_selected != -1 {
 	    selected := app.dice_selected != -1
-		dice := selected ? app.dices[app.dice_selected] : app.dices[dice_hovered]
+		dice := selected ? app.dice[app.dice_selected] : app.dice[dice_hovered]
 		position := selected ? rl.GetWorldToScreen(dice.position, app.camera3d) : mouse_pos + Vector2{10, 10}
 		icon_size := f32(80.)
         padding := f32(6.)
@@ -1677,8 +1693,8 @@ draw :: proc(dt: real) {
 		draw_text(text, {screen_width/2., screen_height - 150}, app.gui.font_size1, rl.RAYWHITE, anchor=.CENTER)
 		draw_card(app.card_selected, mouse_pos - {CARD_SIZE.x/2, CARD_SIZE.y+50})
 
-		if app.dice_selected >= 0 && app.dices[app.dice_selected].player == 0 {
-			dice := &app.dices[app.dice_selected]
+		if app.dice_selected >= 0 && app.dice[app.dice_selected].player == 0 {
+			dice := &app.dice[app.dice_selected]
 			could_upgrade := false
 			for &upgrade, i in dice.upgrades{
 				if upgrade.type == .CardNone {
@@ -1694,7 +1710,8 @@ draw :: proc(dt: real) {
 			}
 
 			if !could_upgrade {
-				add_text(dice.position, fmt.aprint("Dice has no free upgrade slots!"), dice.color1, 1.5)
+				add_text(dice.position, fmt.aprint("Die has no free upgrade slots!"), dice.color1, 1.5)
+				app.dice_selected = -1
 			}
 		} else if rl.IsMouseButtonPressed(.RIGHT) {
 			app.card_selected.triggered = 0.
@@ -1706,7 +1723,7 @@ draw :: proc(dt: real) {
 	}
 
 	for text in app.text_animations{
-		if !text.visible do continue
+		if !text.visible || text.delay > 0. do continue
 
 		start_2d, end_2d: Vector2
 		if start_3d, is_vec3 := text.start.(Vector3); is_vec3 {
@@ -1718,7 +1735,7 @@ draw :: proc(dt: real) {
 		} else do end_2d = text.end.(Vector2)
 
 		// adapt to zoom in
-		font_size := app.gui.font_size2 * 80. / app.camera3d.position.y
+		font_size := app.gui.font_size2 * (1.+(1. - (app.camera3d.fovy-25)/5))
 
 		end_2d = start_2d + {0, -100}
 
@@ -1729,8 +1746,11 @@ draw :: proc(dt: real) {
 		if text.anchor == .CENTER do box_position.x -= text_size.x/2.
 		if text.anchor == .RIGHT do box_position.x -= text_size.x
 		// rl.DrawRectangleV(box_position, {text_size.x+10, text_size.y+10}, text.color)
-		draw_box(box_position, {text_size.x+10, text_size.y+10}, fill=text.color, thickness=2)
-		draw_text(text.text, {x, y}, font_size, rl.BLACK, anchor=text.anchor)
+		alpha := text.lifetime/text.start_lifetime > 0.3 ? 1.0 : text.lifetime/text.start_lifetime/0.3
+		draw_box(box_position, {text_size.x+10, text_size.y+10},
+			fill=rl.ColorAlpha(text.color, alpha), thickness=2,
+			outline=rl.ColorAlpha(rl.BLACK, alpha))
+		draw_text(text.text, {x, y}, font_size, rl.ColorAlpha(rl.BLACK, alpha), anchor=text.anchor)
 	}
 }
 
@@ -1745,7 +1765,7 @@ state_change :: proc(new_state: GameState, wait: f32=0.) {
 	app.state_timer = wait / config.game_speed
 
 	if new_state == .CHARGING {
-	    app.camera3d.desired_target = {}
+		camera_reset()
 		app.dice_selected = -1
 	}
 }

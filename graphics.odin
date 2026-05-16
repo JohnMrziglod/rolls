@@ -37,6 +37,7 @@ TextAnimation :: struct{
 	font_size: f32,
 	lifetime: f32,
 	start_lifetime: f32,
+	delay: f32,
 	anchor: TextAnchor,
 }
 
@@ -97,63 +98,64 @@ dice_button :: proc(number: i32, position: rl.Vector2, size: f32,
 	return hovered && rl.IsMouseButtonPressed(.LEFT)
 }
 
-draw_die_face :: proc(face: int, size: f32, texture: rl.Texture, tc: Vector2, ts: Vector2, color: rl.Color, scale:f32=1.){
-    size := size + (0.2*(1.-scale))
+draw_die_face :: proc(face: int, die_size: f32, texture: rl.Texture, tc, ts: Vector2, color: rl.Color, scale:f32=1.){
+    size := die_size + (0.1*(1.-scale))
     size2 := size*scale
+    offset := scale == 1. ? 0. : die_size/2
     rlgl.Color4ub(color.r, color.g, color.b, color.a)
 
 	// Front face (1)
 	switch face{
 	case 0:
     	rlgl.Normal3f(0.0, 0.0, 1.0) // Normal pointing left
-    	rlgl.TexCoord2f(tc.x,      tc.y+ts.y); rlgl.Vertex3f(-size2, -size2, size) // Bottom-left
-    	rlgl.TexCoord2f(tc.x+ts.x, tc.y+ts.y); rlgl.Vertex3f( size2, -size2, size) // Bottom-right
-    	rlgl.TexCoord2f(tc.x+ts.x, tc.y     ); rlgl.Vertex3f( size2,  size2, size) // Top-right
-    	rlgl.TexCoord2f(tc.x,      tc.y     ); rlgl.Vertex3f(-size2,  size2, size) // Top-left
+    	rlgl.TexCoord2f(tc.x,      tc.y+ts.y); rlgl.Vertex3f(-size2+offset, -size2+offset, size) // Bottom-left
+    	rlgl.TexCoord2f(tc.x+ts.x, tc.y+ts.y); rlgl.Vertex3f( size2+offset, -size2+offset, size) // Bottom-right
+    	rlgl.TexCoord2f(tc.x+ts.x, tc.y     ); rlgl.Vertex3f( size2+offset,  size2+offset, size) // Top-right
+    	rlgl.TexCoord2f(tc.x,      tc.y     ); rlgl.Vertex3f(-size2+offset,  size2+offset, size) // Top-left
 
 	// Left face (2)
 	case 1:
     	rlgl.Normal3f(-1.0, 0.0, 0.0) // Normal pointing left
-    	rlgl.TexCoord2f(tc.x,      tc.y+ts.y); rlgl.Vertex3f(-size, -size2, -size2) // Bottom-left
-    	rlgl.TexCoord2f(tc.x+ts.x, tc.y+ts.y); rlgl.Vertex3f(-size, -size2,  size2) // Bottom-right
-    	rlgl.TexCoord2f(tc.x+ts.x, tc.y     ); rlgl.Vertex3f(-size,  size2,  size2) // Top-right
-    	rlgl.TexCoord2f(tc.x,      tc.y     ); rlgl.Vertex3f(-size,  size2, -size2) // Top-left
+    	rlgl.TexCoord2f(tc.x,      tc.y+ts.y); rlgl.Vertex3f(-size, -size2+offset, -size2+offset) // Bottom-left
+    	rlgl.TexCoord2f(tc.x+ts.x, tc.y+ts.y); rlgl.Vertex3f(-size, -size2+offset,  size2+offset) // Bottom-right
+    	rlgl.TexCoord2f(tc.x+ts.x, tc.y     ); rlgl.Vertex3f(-size,  size2+offset,  size2+offset) // Top-right
+    	rlgl.TexCoord2f(tc.x,      tc.y     ); rlgl.Vertex3f(-size,  size2+offset, -size2+offset) // Top-left
 
 	// // Top face (3)
 	case 2:
     	rlgl.Normal3f(0.0, 1.0, 0.0) // Normal pointing up
-    	rlgl.TexCoord2f(tc.x,      tc.y+ts.y); rlgl.Vertex3f(-size2,  size,  size2) // Bottom-left
-    	rlgl.TexCoord2f(tc.x+ts.x, tc.y+ts.y); rlgl.Vertex3f( size2,  size,  size2) // Bottom-right
-    	rlgl.TexCoord2f(tc.x+ts.x, tc.y     ); rlgl.Vertex3f( size2,  size, -size2) // Top-right
-    	rlgl.TexCoord2f(tc.x,      tc.y     ); rlgl.Vertex3f(-size2,  size, -size2) // Top-lefts
+    	rlgl.TexCoord2f(tc.x,      tc.y+ts.y); rlgl.Vertex3f(-size2+offset,  size,  size2+offset) // Bottom-left
+    	rlgl.TexCoord2f(tc.x+ts.x, tc.y+ts.y); rlgl.Vertex3f( size2+offset,  size,  size2+offset) // Bottom-right
+    	rlgl.TexCoord2f(tc.x+ts.x, tc.y     ); rlgl.Vertex3f( size2+offset,  size, -size2+offset) // Top-right
+    	rlgl.TexCoord2f(tc.x,      tc.y     ); rlgl.Vertex3f(-size2+offset,  size, -size2+offset) // Top-lefts
 
 	// // Bottom face (4)
 	case 3:
     	rlgl.Normal3f(0.0, -1.0, 0.0) // Normal pointing down
-    	rlgl.TexCoord2f(tc.x,      tc.y+ts.y); rlgl.Vertex3f(-size2, -size, -size2) // Bottom-left
-    	rlgl.TexCoord2f(tc.x+ts.x, tc.y+ts.y); rlgl.Vertex3f( size2, -size, -size2) // Bottom-right
-    	rlgl.TexCoord2f(tc.x+ts.x, tc.y     ); rlgl.Vertex3f( size2, -size,  size2) // Top-right
-    	rlgl.TexCoord2f(tc.x,      tc.y     ); rlgl.Vertex3f(-size2, -size,  size2) // Top-left
+    	rlgl.TexCoord2f(tc.x,      tc.y+ts.y); rlgl.Vertex3f(-size2+offset, -size, -size2+offset) // Bottom-left
+    	rlgl.TexCoord2f(tc.x+ts.x, tc.y+ts.y); rlgl.Vertex3f( size2+offset, -size, -size2+offset) // Bottom-right
+    	rlgl.TexCoord2f(tc.x+ts.x, tc.y     ); rlgl.Vertex3f( size2+offset, -size,  size2+offset) // Top-right
+    	rlgl.TexCoord2f(tc.x,      tc.y     ); rlgl.Vertex3f(-size2+offset, -size,  size2+offset) // Top-left
 
 	// // Right face (5)
 	case 4:
     	rlgl.Normal3f(1.0, 0.0, 0.0) // Normal pointing right
-    	rlgl.TexCoord2f(tc.x,      tc.y+ts.y); rlgl.Vertex3f( size, -size2,  size2) // Bottom-left
-    	rlgl.TexCoord2f(tc.x+ts.x, tc.y+ts.y); rlgl.Vertex3f( size, -size2, -size2) // Bottom-right
-    	rlgl.TexCoord2f(tc.x+ts.x, tc.y     ); rlgl.Vertex3f( size,  size2, -size2) // Top-right
-    	rlgl.TexCoord2f(tc.x,      tc.y     ); rlgl.Vertex3f( size,  size2,  size2) // Top-left
+    	rlgl.TexCoord2f(tc.x,      tc.y+ts.y); rlgl.Vertex3f( size, -size2+offset,  size2+offset) // Bottom-left
+    	rlgl.TexCoord2f(tc.x+ts.x, tc.y+ts.y); rlgl.Vertex3f( size, -size2+offset, -size2+offset) // Bottom-right
+    	rlgl.TexCoord2f(tc.x+ts.x, tc.y     ); rlgl.Vertex3f( size,  size2+offset, -size2+offset) // Top-right
+    	rlgl.TexCoord2f(tc.x,      tc.y     ); rlgl.Vertex3f( size,  size2+offset,  size2+offset) // Top-left
 
 	// // Back face (6)
 	case 5:
     	rlgl.Normal3f(0.0, 0.0, -1.0) // Normal pointing away from viewer
-    	rlgl.TexCoord2f(tc.x,      tc.y+ts.y); rlgl.Vertex3f( size2, -size2, -size) // Bottom-right
-    	rlgl.TexCoord2f(tc.x+ts.x, tc.y+ts.y); rlgl.Vertex3f(-size2, -size2, -size) // Bottom-left
-    	rlgl.TexCoord2f(tc.x+ts.x, tc.y     ); rlgl.Vertex3f(-size2,  size2, -size) // Top-left
-    	rlgl.TexCoord2f(tc.x,      tc.y     ); rlgl.Vertex3f( size2,  size2, -size) // Top-right
+    	rlgl.TexCoord2f(tc.x,      tc.y+ts.y); rlgl.Vertex3f( size2+offset, -size2+offset, -size) // Bottom-right
+    	rlgl.TexCoord2f(tc.x+ts.x, tc.y+ts.y); rlgl.Vertex3f(-size2+offset, -size2+offset, -size) // Bottom-left
+    	rlgl.TexCoord2f(tc.x+ts.x, tc.y     ); rlgl.Vertex3f(-size2+offset,  size2+offset, -size) // Top-left
+    	rlgl.TexCoord2f(tc.x,      tc.y     ); rlgl.Vertex3f( size2+offset,  size2+offset, -size) // Top-right
     }
 }
 
-draw_die :: proc(dice: Dice, hoverable:bool=false) -> bool {
+draw_die :: proc(dice: Die, hoverable:bool=false) -> bool {
 	size := dice.shape.(ShapeBox).half_size
 	ray := rl.GetScreenToWorldRay(rl.GetMousePosition(), app.camera3d)
 
@@ -231,27 +233,20 @@ add_particles :: proc(position: Vector3, color: rl.Color){
 	}
 }
 
-add_text :: proc{add_text_vec3, add_text_vec2, add_text_vec_vec}//, add_text_vec3_vec2}
-// add_text_vec3_vec2 :: proc (
-// 		start: Vector3, end: Vector2, text: string, color: rl.Color,
-// 		lifetime:f32=-1., font_size:f32=-1, anchor:TextAnchor=.CENTER) {
-// 	// start_2d := rl.GetWorldToScreen(start, app.camera3d)
-// 	add_text_vec3_vec2(start, end, text, color, lifetime, font_size, anchor)
-// }
+add_text :: proc{add_text_vec3, add_text_vec2, add_text_vec_vec}
 add_text_vec3 :: proc (
 		start: Vector3, text: string, color: rl.Color, lifetime:f32=-1.,
-		font_size:f32=-1, anchor:TextAnchor=.CENTER) {
-	// start_2d := rl.GetWorldToScreen(start, app.camera3d)
-	add_text_vec_vec(start, start+{0, 2, 0}, text, color, lifetime, font_size, anchor)
+		font_size:f32=-1, anchor:TextAnchor=.CENTER, delay:f32=0.) {
+	add_text_vec_vec(start, start+{0, 1, 0}, text, color, lifetime, font_size, anchor, delay)
 }
 add_text_vec2 :: proc (
 		start: Vector2, text: string, color: rl.Color, lifetime:f32=-1.,
-		font_size: f32=-1, anchor:TextAnchor=.CENTER) {
-	add_text_vec_vec(start, start+{0, -100}, text, color, lifetime, font_size, anchor)
+		font_size: f32=-1, anchor:TextAnchor=.CENTER, delay:f32=0.) {
+	add_text_vec_vec(start, start+{0, -100}, text, color, lifetime, font_size, anchor, delay)
 }
 add_text_vec_vec :: proc (
 		start, end: Vector, text: string, color: rl.Color, lifetime:f32=-1.,
-		font_size: f32=-1, anchor:TextAnchor=.CENTER) {
+		font_size: f32=-1, anchor:TextAnchor=.CENTER, delay:f32=0.) {
 
 	for &t in app.text_animations{
 		if t.visible do continue
@@ -266,6 +261,7 @@ add_text_vec_vec :: proc (
 			visible = true,
 			font_size=font_size < 0 ? app.gui.font_size2 : font_size,
 			anchor=anchor,
+			delay=delay
 		}
 		return
 	}

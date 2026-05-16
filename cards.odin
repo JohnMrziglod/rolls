@@ -119,8 +119,8 @@ card_activate :: proc(player: ^Player, card: ^Card){
 		player.max_lifetime_roll_cards += 1
 	case .CardCycle_ExtraDice:
 		// player.n_dices += 1
-		append(&app.dices, Dice{player=player.id, state=.DEAD, color1=player.color, color2=rl.BLACK})
-		dice_init(&app.dices[len(app.dices)-1])
+		append(&app.dice, Die{player=player.id, state=.DEAD, color1=player.color, color2=rl.BLACK})
+		dice_init(&app.dice[len(app.dice)-1])
 	case .CardCycle_Graveyard:
 		player.ghosts_max += 1
 	case .CardCycle_GhostDiscount:
@@ -128,7 +128,7 @@ card_activate :: proc(player: ^Player, card: ^Card){
 		if player.ghosts_costs_per_combination < 1 do player.ghosts_costs_per_combination=1
 	}
 
-	for &dice, d in app.dices{
+	for &dice, d in app.dice{
 		if dice.player != player.id || dice.state != .ALIVE do continue
 
 		for &upgrade in dice.upgrades{
