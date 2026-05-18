@@ -928,8 +928,10 @@ dices_scoring :: proc(dt: real) {
 						text = fmt.aprintf("INVESTING +%.1f", upgrade.var1)
 					}
 				case .CardDice_General:
-					text = fmt.aprintf("GENERAL: +%v!", n_alive)
-					die.current_score += sco(n_alive)
+					if n_alive > 1{
+						text = fmt.aprintf("GENERAL: %.f X %v!", die.current_score, n_alive)
+						die.current_score *= sco(n_alive)
+					}
 				case .CardDice_Historian:
 				    if upgrade.var1 != 0. {
     					text = fmt.aprintf("HISTORIAN: +%.f!", upgrade.var1)

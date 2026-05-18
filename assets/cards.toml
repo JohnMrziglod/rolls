@@ -70,7 +70,7 @@ CardDice_Pessimist
 /texture_id=[1,8]
 CardDice_General
 /title="GENERAL"
-/description="Adds the sum of your surviving DICE to its SCORE."
+/description="Multiplies its SCORE by the number your surviving DICE."
 CardDice_Journalist
 /title="JOURNALIST"
 /description="+2 ROLL MULTIPLIER."
@@ -84,6 +84,7 @@ CardDice_Engineer
 /title="ENGINEER"
 # /description="---"
 /description2="When [h]ACTIVE[h], creates a DICE CARD."
+/texture_id=[1,14]
 CardDice_Medium
 /title="MEDIUM"
 /description="Adds number of your GHOST DICE to its SCORE."
