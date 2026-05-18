@@ -1,8 +1,9 @@
 package game
 
+import "core:fmt"
 import rl "vendor:raylib"
 
-menu :: proc(dt: real){
+menu :: proc(dt:real=0., loading:bool=false){
 	if rl.IsKeyPressed(rl.KeyboardKey.SPACE) || rl.IsMouseButtonPressed(rl.MouseButton.LEFT) {
 		app.state = app.state_before
 	}
@@ -19,5 +20,7 @@ menu :: proc(dt: real){
 	rl.DrawTextureV(texture,
 		{(app.gui.width-f32(texture.width))/2., (app.gui.height-f32(texture.height))/2.}, rl.WHITE)
 
-	draw_text("Press SPACE to continue", {app.gui.width/2, app.gui.height-100}, font_size=app.gui.font_size1, color=rl.WHITE, anchor=.CENTER)
+	text := fmt.tprint("Press SPACE to continue")
+	if loading do text = fmt.tprint("Loading...")
+	draw_text(text, {app.gui.width/2, app.gui.height-100}, font_size=app.gui.font_size1, color=rl.WHITE, anchor=.CENTER)
 }

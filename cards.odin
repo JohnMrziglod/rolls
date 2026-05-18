@@ -63,26 +63,34 @@ Card :: struct{
 
 CardGenerateTypes :: enum{AllCards, RollCards, RollAndDiceCards, DiceCards, CycleCards}
 cards_generate :: proc(cards: []Card, types:CardGenerateTypes){
+	lower_bound := i32(CardType.CardNone)+1
+	upper_bound := i32(CardType.CardCycles)
+	switch types {
+	case .AllCards:
+		// do nothing, we want all cards
+	case .DiceCards:
+		lower_bound = i32(CardType.CardRolls)+1
+		upper_bound = i32(CardType.CardDices)
+	case .RollCards:
+		upper_bound = i32(CardType.CardRolls)
+	case .RollAndDiceCards:
+		upper_bound = i32(CardType.CardDices)
+	case .CycleCards:
+		lower_bound = i32(CardType.CardDices)+1
+		upper_bound = i32(CardType.CardCycles)
+	}
+
+	generated_types := bit_set[CardType]{}
 	for i in 0..<len(cards) {
-		lower_bound := i32(CardType.CardNone)+1
-		upper_bound := i32(CardType.CardCycles)
-		switch types {
-		case .AllCards:
-			// do nothing, we want all cards
-		case .DiceCards:
-			lower_bound = i32(CardType.CardRolls)+1
-			upper_bound = i32(CardType.CardDices)
-		case .RollCards:
-			upper_bound = i32(CardType.CardRolls)
-		case .RollAndDiceCards:
-			upper_bound = i32(CardType.CardDices)
-		case .CycleCards:
-			lower_bound = i32(CardType.CardDices)+1
-			upper_bound = i32(CardType.CardCycles)
+		card_type: CardType
+
+		for (card_type == .CardNone || card_type in generated_types) {
+			card_type = CardType(rand.int32_range(lower_bound, upper_bound))
 		}
-		card_type := CardType(rand.int32_range(lower_bound, upper_bound))
+
 		if card_type == .CardRolls do card_type = CardType(i32(card_type)-1)
 		cards[i] = Card{type=card_type, category=card_category(card_type)}
+		generated_types += {card_type}
 	}
 }
 

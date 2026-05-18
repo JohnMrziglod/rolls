@@ -216,6 +216,7 @@ main :: proc() {
     screen_height = rl.GetMonitorHeight(display)
     rl.SetWindowState({.WINDOW_UNDECORATED, .BORDERLESS_WINDOWED_MODE})
     rl.SetWindowSize(screen_width, screen_height+300)
+    rl.SetTargetFPS(60)
 
     // toggle the state
     // rl.ToggleBorderlessWindowed()
@@ -269,26 +270,20 @@ main :: proc() {
 	}
 	app.gui.hand_area_height = app.gui.score_positions[0].y - 100
 
-	app.camera3d = {}
-	camera_reset()
-	app.camera3d.target = {0.0, 0.0, 0.0}
-	app.camera3d.up = {0.0, 1.0, 0.0}
-	app.camera3d.fovy = f32(30)
-	app.camera3d.projection = .PERSPECTIVE // Camera mode type
-
-	app.camera2d = {}
-    app.camera2d.target = {f32(screen_width)/2.0, f32(screen_height)/2.0 }
-    app.camera2d.offset = {f32(screen_width)/2.0, f32(screen_height)/2.0 }
-    // camera.rotation = 0.0f;
-    // app.camera2d.zoom = target_ratio
-
-    config.game_speed = 2.
-
-	rl.BeginDrawing()
-	rl.ClearBackground(COLOR_TABLE)
-	rl.EndDrawing()
-
-	rl.SetTargetFPS(60)
+	app.textures = {
+		rl.LoadTexture("assets/textures/die.png"),
+		rl.LoadTexture("assets/textures/title.png"),
+	}
+	for &texture in app.textures{
+		rl.GenTextureMipmaps(&texture)
+		rl.SetTextureFilter(texture, .TRILINEAR)
+	}
+	defer {
+		for texture in app.textures {
+			rl.UnloadTexture(texture)
+		}
+	}
+	menu(loading=true)
 
 	rl.InitAudioDevice()
 	defer rl.CloseAudioDevice()
@@ -313,19 +308,6 @@ main :: proc() {
 			rl.UnloadSound(sound)
 		}
 	}
-	app.textures = {
-		rl.LoadTexture("assets/textures/die.png"),
-		rl.LoadTexture("assets/textures/title.png"),
-	}
-	for &texture in app.textures{
-		rl.GenTextureMipmaps(&texture)
-		rl.SetTextureFilter(texture, .TRILINEAR)
-	}
-	defer {
-		for texture in app.textures {
-			rl.UnloadTexture(texture)
-		}
-	}
 
 	files: [2]string
 	load_data(&files[0], "assets/cards.toml")
@@ -334,14 +316,29 @@ main :: proc() {
 		for file in files do defer delete(file)
 	}
 
+	config.game_speed = 1.5
+
+	app.camera3d = {}
+	camera_reset()
+	app.camera3d.target = {0.0, 0.0, 0.0}
+	app.camera3d.up = {0.0, 1.0, 0.0}
+	app.camera3d.fovy = f32(30)
+	app.camera3d.projection = .PERSPECTIVE // Camera mode type
+
+	app.camera2d = {}
+    app.camera2d.target = {f32(screen_width)/2.0, f32(screen_height)/2.0 }
+    app.camera2d.offset = {f32(screen_width)/2.0, f32(screen_height)/2.0 }
+    // camera.rotation = 0.0f;
+    // app.camera2d.zoom = target_ratio
+
 	app.power = 2.
 	dices_reset(first_round=true)
 
-	app.antagonist.tutorial2 = true
-	app.antagonist.tutorial_cards = true
-	app.antagonist.tutorial_ghost_board = true
-	app.antagonist.tutorial_cycles = true
-	//antagonist_story("antagonist_tutorial1")
+	// app.antagonist.tutorial2 = true
+	// app.antagonist.tutorial_cards = true
+	// app.antagonist.tutorial_ghost_board = true
+	// app.antagonist.tutorial_cycles = true
+	antagonist_story("antagonist_tutorial1")
 
 	// Main game loop
 	for !rl.WindowShouldClose() {
@@ -469,18 +466,18 @@ main :: proc() {
 	}
 }
 
-dice_init :: proc(dice: ^Die, position:=Vector3{0, 1000, 0}){
+dice_init :: proc(die: ^Die, position:=Vector3{0, 1000, 0}){
 	half_size :f32= DICE_HALF_SIZE
 	mass := math.pow(half_size, 3) * 8.
-	orientation := dice.orientation
-	rotation := dice.rotation
-	acceleration := dice.acceleration
+	orientation := die.orientation
+	rotation := die.rotation
+	acceleration := die.acceleration
 
-	dice ^= {
+	die ^= {
 		state=.DEAD,
 		shape=ShapeBox{half_size=half_size},
 		position=position,
-		velocity=dice.velocity,
+		velocity=die.velocity,
 		orientation=random_orientation(),
 		rotation=random_vector(-20.0, 20.0),
 		acceleration=Vector3{0.0, -50.0, 0.0},
@@ -488,14 +485,14 @@ dice_init :: proc(dice: ^Die, position:=Vector3{0, 1000, 0}){
 		angular_damping=0.9,
 		inverse_mass=1./mass,
 		can_sleep=true,
-		player=dice.player,
-		color1=dice.color1,
-		color2=dice.color2,
+		player=die.player,
+		color1=die.color1,
+		color2=die.color2,
 		current_number=0,
 		current_score=0,
 		attack=1,
 		health=1,
-		upgrades=dice.upgrades,
+		upgrades=die.upgrades,
 		faces={1, 2, 3, 4, 5, 6},
 	}
 }
@@ -829,7 +826,7 @@ dice_battle :: proc(dt: real) {
         case .Retreating:
             for &die, d in app.battle.dice{
                 if die.state == .ALIVE do continue
-                die^.position = linalg.lerp(clash_position, battle.previous_positions[d], battle.timer/target_time)
+                die.position = linalg.lerp(die.position, battle.previous_positions[d], battle.timer/target_time)
                 body_calculate_derived_data(die)     // to update the transformation matrix, etc...
             }
             if battle.timer > target_time {
@@ -974,10 +971,12 @@ dices_scoring :: proc(dt: real) {
 					}
 				case .CardDice_Train:
 					bonus := 0.
+					n_dice := 0
 					for other_dice, o in app.dice{
                         if d == o || other_dice.state != .ALIVE || die.player != other_dice.player || other_dice.current_number <= die.current_number do continue
                         bonus += sco(other_dice.current_number)
-                        add_text(other_dice.position, fmt.aprintf("TRAIN: +%v!", other_dice.current_number), die.color1, 2.0)
+                        n_dice += 1
+                        add_text(other_dice.position, fmt.aprintf("TRAIN: +%v!", other_dice.current_number), die.color1, delay=0.25*f32(n_dice))
                     }
                     if bonus > 0. {
 						text = fmt.aprintf("TRAIN: +%.f!", bonus)
@@ -1017,9 +1016,10 @@ dices_scoring :: proc(dt: real) {
 				add_text(die.position+{0, f32(n_events)*0.8, 0},
 					fmt.aprintf("+%.f", die.current_score), die.color1, delay=f32(n_events)*0.25)
 				// camera_shake(2.0, 0.5)
+				//
+				wait(1.0)
 			}
 
-			wait(1.0)
 			return
 		}
 		player.is_scoring = false
