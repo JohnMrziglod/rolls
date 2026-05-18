@@ -88,7 +88,7 @@ CardDice_Historian
 CardDice_Librarian
 /title="LIBRARIAN"
 /description="Gains +1 SCORE when alive and assigning DICE CARD."
-CardCycle_ExtraDice
+CardCycle_ExtraDie
 /title="EXTRA DICE"
 /description="Add +1 DICE to your army."
 CardCycle_EternalRoll

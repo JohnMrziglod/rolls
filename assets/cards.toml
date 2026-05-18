@@ -128,15 +128,21 @@ CardDice_Train
 /description="Adds the sum of your other dice higher than this die to its score."
 /texture_id=[1,11]
 # CYCLE CARDS
-CardCycle_ExtraDice
-/title="EXTRA DICE"
-/description="Add +1 DICE to your army."
+CardCycle_ExtraDie
+/title="EXTRA DIE"
+/description="+1 DIE to your army."
 CardCycle_EternalRoll
 /title="ETERNAL ROLL"
 /description="Your ROLL CARDS' lifetime increases by 1 ROLL."
 CardCycle_GhostDiscount
 /title="GHOST DISCOUNT"
-/description="When scoring a combination, you'll get one GHOST DICE back (MAX. 4)."
+/description="After scoring a combination, you'll get one GHOST DIE back (MAX. 4)."
 CardCycle_Graveyard
 /title="GRAVEYARD"
-/description="+1 SPACE for GHOST DICE."
+/description="+2 SPACES for GHOST DICE."
+CardCycle_Supermarket
+/title="SUPERMARKET"
+/description="+1 CARD is shown after scoring a combination."
+CardCycle_Recycle
+/title="RECYCLE"
+/description="You can redraw the CARDS SELECTION after scoring combinations by using GHOST DICE."

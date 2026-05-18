@@ -44,10 +44,12 @@ CardType :: enum i32{
 	CardDice_Tank,
 	CardDice_Train,
 		CardDices,				// <- Until we got upgrade cards
-	CardCycle_ExtraDice,
+	CardCycle_ExtraDie,
 	CardCycle_EternalRoll,
 	CardCycle_Graveyard,
 	CardCycle_GhostDiscount,
+	CardCycle_Recycle,
+	CardCycle_Supermarket,
 		CardCycles,				// <- Until we got cycle cards
 }
 Card :: struct{
@@ -127,7 +129,7 @@ card_activate :: proc(player: ^Player, card: ^Card){
 	#partial switch card.type {
 	case .CardCycle_EternalRoll:
 		player.max_lifetime_roll_cards += 1
-	case .CardCycle_ExtraDice:
+	case .CardCycle_ExtraDie:
 		// player.n_dices += 1
 		append(&app.dice, Die{player=player.id, state=.DEAD, color1=player.color, color2=rl.BLACK})
 		dice_init(&app.dice[len(app.dice)-1])
