@@ -271,10 +271,12 @@ measure_text :: proc(text: string, font_size: f32, spacing:f32=1.0, max_width:f3
 	return draw_text(text, {0, 0}, font_size, spacing=spacing, max_width=max_width, draw=false)
 }
 
-draw_text :: proc(text: string, position: rl.Vector2, font_size: f32,
+draw_text :: proc(text: string, position: rl.Vector2, font_size: f32=-1.,
 		color: rl.Color=rl.RAYWHITE, spacing:f32=1.0, line_spacing:f32=1.2, max_width:f32=9999,
 		strikethrough:bool=false, overline:bool=false, boxed:rl.Color=rl.BLANK, box_width:f32=-1, padding:f32=10,
 		anchor:TextAnchor=.LEFT, draw:bool=true, highlight_color:rl.Color=rl.RAYWHITE) -> rl.Vector2{
+
+	font_size := font_size > 0. ? font_size : app.gui.font_size2
 
 	position := position
 	if anchor == .RIGHT do position.x -= measure_text(text, font_size, spacing, max_width).x

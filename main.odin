@@ -1,3 +1,4 @@
+#+feature dynamic-literals
 package game
 
 import "core:fmt"
@@ -76,19 +77,6 @@ GameState :: enum {
 	ASSIGN_CARD,
 }
 
-GUI :: struct {
-	font_size1: f32,
-	font_size2: f32,
-	score_positions: [N_PLAYERS]rl.Vector2,
-	hand_positions: [N_PLAYERS]rl.Vector2,
-	hand_area_height: f32,
-	card_size: rl.Vector2,
-	ghost_positions: [N_PLAYERS]rl.Vector2,
-	width: f32,
-	height: f32,
-	bg_color: rl.Color,
-}
-
 RollState :: struct{
 	score: sco,
 	score_counter: i32,
@@ -138,6 +126,18 @@ Battle :: struct {
     state: BattleState,
 }
 
+GUI :: struct {
+	font_size1: f32,
+	font_size2: f32,
+	score_positions: [N_PLAYERS]rl.Vector2,
+	hand_positions: [N_PLAYERS]rl.Vector2,
+	hand_area_height: f32,
+	card_size: rl.Vector2,
+	ghost_positions: [N_PLAYERS]rl.Vector2,
+	width: f32,
+	height: f32,
+	bg_color: rl.Color,
+}
 Application :: struct {
 	// resources
 	font: rl.Font,
@@ -233,12 +233,12 @@ main :: proc() {
 			{
 				color=COLOR_PLAYERS[0], id=0, n_dices=6,
 				ghosts_max=10, ghosts_costs_per_combination=5,
-				max_lifetime_roll_cards=2,
+				max_lifetime_roll_cards=2, //ghosts={1, 2, 3, 4, 5}
 			},
 			{
 				color=COLOR_PLAYERS[1], id=1, n_dices=6,
 				ghosts_costs_per_combination=5, ghosts_max=10,
-				max_lifetime_roll_cards=2,
+				max_lifetime_roll_cards=2, //ghosts={1, 2, 3, 4, 5}
 			},
 		},
 		ghosts_selected = {-1, -1, -1, -1, -1},
@@ -260,7 +260,7 @@ main :: proc() {
 		},
 		hand_positions = {
 			{50, 50},
-			{f32(screen_width)-450, 50},
+			{f32(screen_width)-50-CARD_SIZE.x, 50},
 		},
 		ghost_positions = {
 			{50, f32(screen_height)-320},
@@ -409,10 +409,8 @@ main :: proc() {
 
 		if app.state == .WAIT_FOR_ROLL && rl.IsKeyPressed(rl.KeyboardKey.SPACE) {
 			state_change(.CHARGING)
+			app.power = rand.float32_range(0.5, 1.)
 		}
-
-		// Max power is reached after 3 seconds of charging)
-		app.power = f32(math.min(1.0, app.state_clock / 0.25))
 		if app.state == .CHARGING &&
 			((app.current_player == 0 && (rl.IsKeyReleased(rl.KeyboardKey.SPACE) || rl.IsMouseButtonReleased(.LEFT))) ||
 			(app.current_player == 1 && app.power >= 1.0)) {
@@ -420,6 +418,8 @@ main :: proc() {
 				state_change(.PRE_ROLLING)
 				camera_shake(2.0, 0.5)
 		}
+		// Max power is reached after 3 seconds of charging)
+		app.power = f32(math.min(1.0, app.state_clock / 0.25))
 
 		for &player, i in app.players {
 			for &card, c in player.cards{
@@ -701,7 +701,7 @@ cards_battle :: proc (dt: real) {
 						ghost = rand.int32_range(1, 7)
 					}
 					slice.sort(player.ghosts[:])
-					add_text(position, fmt.aprint("REROLLED YOUR GHOSTS!"), player.color, lifetime=1.)
+					add_text(position, fmt.aprint("REROLLED GHOSTS!"), player.color, lifetime=1.)
 				} else {
 					add_text(position, fmt.aprint("NO GHOSTS TO REROLL!"), player.color, lifetime=1.)
 				}
@@ -711,8 +711,8 @@ cards_battle :: proc (dt: real) {
 				player.roll.score += ghost_score
 				add_text(position, fmt.aprintf("+%.f FROM GHOSTS!", ghost_score), COLOR_CARDS[card.category], lifetime=1.)
 			case .CardRoll_HappyHour:
-				player.roll.multiplier += 3
-				add_text(position, fmt.aprint("ROLL SCORE X3"), player.color, lifetime=1.)
+				player.roll.multiplier += 2
+				add_text(position, fmt.aprint("ROLL SCORE X2"), player.color, lifetime=1.)
 			case .CardRoll_MarketCrash:
 				for &dice, d in app.dice{
 					for &upgrade, u in dice.upgrades{
@@ -722,7 +722,7 @@ cards_battle :: proc (dt: real) {
 						#partial switch upgrade.type {
 						case .CardDice_Investor:
 							upgrade.var1 *= 0.5
-							add_text(dice.position, fmt.aprint("MARKET CRASH: LOSING 50%"), COLOR_CARDS[card.category], lifetime=0.6)
+							add_text(dice.position, fmt.aprint("MARKET CRASH: LOSING 50%"), COLOR_CARDS[card.category])
 						}
 					}
 				}
@@ -1033,37 +1033,6 @@ camera_zoom :: proc(position: Vector3){
 }
 
 cards_scoring :: proc(dt: real) {
-	for &player, p in app.players {
-		for &card, c in player.cards{
-			if !card.active || card.already_scored do continue
-
-			#partial switch card.type {
-			case .CardRoll_HappyHour:
-				player.roll.multiplier += 3
-				position := app.gui.hand_positions[p]+CARD_SIZE/2.
-				if len(player.cards) > 5 {
-					position.y += app.gui.hand_area_height/f32(len(player.cards))*f32(c)
-				} else {
-					position.y += f32(c)*(30+CARD_SIZE.y)
-				}
-
-				add_text(position, app.gui.score_positions[p], fmt.aprint("X2"), COLOR_CARDS[card.category], lifetime=0.4)
-				card.triggered = 1.0
-			case:
-			    continue
-			}
-
-			player.roll.score_counter += 1
-
-			play_sound(rand.int32_range(6, 10),
-				pitch=1.0 + ((p == 0) ? 0.1 : -0.1) * f32(player.roll.score_counter))
-
-			card.triggered = 1.0
-			card.already_scored = true
-			return
-		}
-	}
-
 	state_change(.SCORING_SUMMARY, wait=0.4)
 }
 
@@ -1144,71 +1113,117 @@ wait_for_ai :: proc(){
     // Some actions that the AI could do...
     ai := &app.players[1]
 
-    if len(ai.ghosts) < 5 {
-		state_change(.WAIT_FOR_ROLL)
-		return
-    }
+    if len(ai.ghosts) >= 5 {
+	    // @TODO: how do we find the best selection of dice?
+	    counter := [6]i32{}	// dice number -> count
+	    for ghost_number, i in ai.ghosts{
+	    	counter[ghost_number-1] += 1
+	    }
+	    lower_straight := slice.min(counter[:5]) > 0
+	    upper_straight := slice.min(counter[1:]) > 0
+	    has_pairs := slice.max(counter[:]) > 1
 
-    // @TODO: how do we find the best selection of dices?
-    counter := [6]i32{}	// dice number -> count
-    for ghost_number, i in ai.ghosts{
-    	counter[ghost_number-1] += 1
-    }
-    lower_straight := slice.min(counter[:5]) > 1
-    upper_straight := slice.min(counter[1:]) > 1
+	    best_indices := [dynamic]i32{}
+	    defer delete(best_indices)
 
-    best_indices := [dynamic]i32{}
-    defer delete(best_indices)
+	    if lower_straight || upper_straight {
+			// If we have a straight, we want to keep all the numbers that are part
+			// of the straight and get rid of the others
+			last_number :i32= 0
+			for ghost_number, i in ai.ghosts{
+				if ghost_number > last_number {
+					append(&best_indices, i32(i))
+					last_number = ghost_number
+				}
+			}
+	    } else if has_pairs {
+	    	// If we have pairs, we want to keep all the numbers that are part of a pair
+			#reverse for ghost_number, i in ai.ghosts{
+				if counter[ghost_number-1] > 1 && len(best_indices) < 5 {
+					append(&best_indices, i32(i))
+				}
+			}
 
-    if lower_straight || upper_straight {
-		// If we have a straight, we want to keep all the numbers that are part
-		// of the straight and get rid of the others
-		last_number :i32= 0
-		for ghost_number, i in ai.ghosts{
-			if ghost_number > last_number {
-				append(&best_indices, i32(i))
-				last_number = ghost_number
+			// Fill up with other dice:
+			#reverse for ghost_number, i in ai.ghosts{
+				if len(best_indices) < 5 && !contains(best_indices[:], i32(i)) {
+					append(&best_indices, i32(i))
+				}
+			}
+	    } else {
+	    	// Choose random dices...
+		    for i in 0..<len(ai.ghosts) do append(&best_indices, i32(i))
+		    rand.shuffle(best_indices[:])
+	    }
+
+	    best_numbers := [5]i32{}
+	    for index, i in best_indices[:5] do best_numbers[i] = ai.ghosts[index]
+
+	    best_score := 0.
+	    best_combo :CombinationType= .None
+	    highlighted := [5]bool{}
+
+		for combo_type, c in CombinationType{
+			if combo_type == .None do continue
+
+			match, score := test_combination(combo_type, best_numbers[:], &highlighted)
+			if match && score > best_score {
+				best_score = score
+				best_combo = combo_type
 			}
 		}
-    } else {
-    	// Choose random dices...
-	    for i in 0..<len(ai.ghosts) do append(&best_indices, i32(i))
-	    rand.shuffle(best_indices[:])
+
+		// Only use ghosts if we expect a high score or if we might lose our ghosts...
+		// If there are many dice left, the chances are high that there are many ghost
+		// dice next round
+		n_alive :i32= 0
+		for &die, d in app.dice{
+			// The max number of ghosts next round, is the number of ghosts we have now
+			// + the number of alive dice of the defensive player (roll cards not included)
+			if die.state == .ALIVE && die.player != app.current_player do n_alive += 1
+		}
+		if best_score > 0 && (best_score > 20 || i32(len(ai.ghosts))+n_alive > ai.ghosts_max) {
+			ai.roll.score += best_score
+
+			cards := [1]Card{}
+			cards_generate(cards[:], .RollAndDiceCards)
+			append(&ai.cards, cards[0])
+
+			ghosts_copy := make([dynamic]i32, len(ai.ghosts), cap(ai.ghosts))
+			defer delete(ghosts_copy)
+			copy(ghosts_copy[:], ai.ghosts[:])
+			clear(&ai.ghosts)
+
+			for ghost, index in ghosts_copy{
+				if !contains(best_indices[:5], i32(index)) do append(&ai.ghosts, ghost)
+			}
+		}
     }
 
-    best_numbers := [5]i32{}
-    for index, i in best_indices[:5] do best_numbers[i] = ai.ghosts[index]
+    if len(ai.cards) > 0{
+    	cards_to_discard := [dynamic]i32{}
+     	defer delete(cards_to_discard)
+    	for &card, c in ai.cards{
+     		if card.active do continue
 
-    best_score := 0.
-    best_combo :CombinationType= .None
-    highlighted := [5]bool{}
+       		#partial switch card.category{
+         	case .ROLL:
+				card_activate(ai, &card)
+			case .DICE:
+				for &die in app.dice{
+					if die.state != .ALIVE || die.player != 1 do continue
+					if card_assign(&die, card) {
+						append(&cards_to_discard, i32(c))
+						break
+					}
+				}
+			}
+     	}
 
-	for combo_type, c in CombinationType{
-		if combo_type == .None do continue
-
-		match, score := test_combination(combo_type, best_numbers[:], &highlighted)
-		if match && score > best_score {
-			best_score = score
-			best_combo = combo_type
-		}
-	}
-
-	// Only use ghosts if we expect a high score or if we might lose our ghosts...
-	if best_score > 0. && (best_score > 20 || len(ai.ghosts) > 7){
-		ai.roll.score += best_score // @TODO: Add it to roll score
-
-		// cards_generate(ai.cards[:1], .RollCards)
-		// card_activate(ai, &ai.cards[0])
-
-		ghosts_copy := make([dynamic]i32, len(ai.ghosts), cap(ai.ghosts))
-		defer delete(ghosts_copy)
-		copy(ghosts_copy[:], ai.ghosts[:])
-		clear(&ai.ghosts)
-
-		for ghost, index in ghosts_copy{
-			if !contains(best_indices[:5], i32(index)) do append(&ai.ghosts, ghost)
-		}
-	}
+      	#reverse for index in cards_to_discard{
+	 		ordered_remove(&ai.cards, index)
+	 	}
+    }
 
 	state_change(.WAIT_FOR_ROLL)
 }
@@ -1318,13 +1333,13 @@ draw :: proc(dt: real) {
 		// We draw them in reverse, so we don't get a z-order problem with the cards (the hovered one should be on top)
 		#reverse for &card, c in player.cards{
 			position := app.gui.hand_positions[p]
-			if len(player.cards) > 5 {
+			if f32(len(player.cards))*(CARD_SIZE.y+30) > app.gui.hand_area_height {
 				position += {0, app.gui.hand_area_height/f32(len(player.cards))*f32(c)}
 			} else {
 				position += {0, f32(c)*(30+CARD_SIZE.y)}
 			}
 			actions := []string{}
-			if app.state == .WAIT_FOR_ROLL {
+			if app.state == .WAIT_FOR_ROLL && p == 0 {
 				if card.category == .ROLL do actions = card.active ? {"DISCARD"} : {"DISCARD", "ACTIVATE"}
 				else if card.category == .DICE do actions = {"DISCARD", "ASSIGN"}
 				else if card.category == .CYCLE do actions = {"DISCARD", "ACTIVATE"}
@@ -1402,7 +1417,8 @@ draw :: proc(dt: real) {
 		}
 	}
 
-	if dice_hovered != -1 || app.dice_selected != -1 {
+	info := app.state == .WAIT_FOR_ROLL || app.state == .ASSIGN_CARD
+	if info && (dice_hovered != -1 || app.dice_selected != -1) {
 	    selected := app.dice_selected != -1
 		dice := selected ? app.dice[app.dice_selected] : app.dice[dice_hovered]
 		position := selected ? rl.GetWorldToScreen(dice.position, app.camera3d) : mouse_pos + Vector2{10, 10}
@@ -1476,8 +1492,8 @@ draw :: proc(dt: real) {
 	}
 
 	if app.state == .GHOST_BOARD {
-		board_size := rl.Vector2{920, screen_height-150}
-		board_position := rl.Vector2{(screen_width-board_size.x)/2., 50}
+		board_size := rl.Vector2{920, app.gui.height-150}
+		board_position := rl.Vector2{(app.gui.width-board_size.x)/2., 50}
 		board_color := COLOR_PLAYERS[0]/2
 		board_color.a = 255
 
@@ -1616,6 +1632,9 @@ draw :: proc(dt: real) {
 				human.cycle.scored_combinations = {}
 				state_change(.CARDS_OFFER)
 			}
+		} else {
+			draw_text(fmt.tprintf("%v/15 combinations scored", n_scored_combos),
+				board_position+board_size-{20, 70}, anchor=.RIGHT)
 		}
 
 		if len(app.antagonist.story_id) == 0 && !app.antagonist.tutorial_ghost_board {
@@ -1694,25 +1713,15 @@ draw :: proc(dt: real) {
 		draw_card(app.card_selected, mouse_pos - {CARD_SIZE.x/2, CARD_SIZE.y+50})
 
 		if app.dice_selected >= 0 && app.dice[app.dice_selected].player == 0 {
-			dice := &app.dice[app.dice_selected]
-			could_upgrade := false
-			for &upgrade, i in dice.upgrades{
-				if upgrade.type == .CardNone {
-					upgrade = app.card_selected
-					card_activate(human, &upgrade)
-					apply_dice_upgrades(0.)	// @FIXME: Is that good?
-					app.card_selected = {}
-					could_upgrade = true
-					add_text(dice.position, fmt.aprintf("Upgraded to %v!", get_text(upgrade.type, "title")), dice.color1, 1.5)
-					state_change(.WAIT_FOR_ROLL)
-					break
-				}
-			}
+			die := &app.dice[app.dice_selected]
+			could_upgrade := card_assign(die, app.card_selected)
+			app.card_selected = {}
 
 			if !could_upgrade {
-				add_text(dice.position, fmt.aprint("Die has no free upgrade slots!"), dice.color1, 1.5)
+				add_text(die.position, fmt.aprint("Die has no free upgrade slots!"), die.color1, 1.5)
 				app.dice_selected = -1
 			}
+			state_change(.WAIT_FOR_ROLL)
 		} else if rl.IsMouseButtonPressed(.RIGHT) {
 			app.card_selected.triggered = 0.
 			append(&human.cards, app.card_selected)

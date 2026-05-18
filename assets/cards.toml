@@ -99,7 +99,7 @@ CardDice_Investor
 /texture_id=[1,3]
 CardDice_PowerDice
 /title="POWER UP"
-/description="Multiply dice's SCORE with its own SCORE again."
+/description="Multiplies die's SCORE with its own SCORE again."
 CardDice_ShortSighted
 /title="SHORT-SIGHTED"
 /description="Attacks farthest antagonist's dice regardless of its number."
@@ -117,7 +117,7 @@ CardDice_Researcher
 /texture_id=[1,10]
 CardDice_Train
 /title="TRAIN"
-/description="Add numbers of your other dice higher than itself to the SCORE."
+/description="Adds the sum of your other dice higher than itself to its score."
 /texture_id=[1,11]
 # CYCLE CARDS
 CardCycle_ExtraDice

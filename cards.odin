@@ -97,7 +97,7 @@ card_discard :: proc(player: ^Player, index: i32, silent:bool=false){
 	if index < 0 || index >= i32(len(player.cards)) do return // Invalid index, do nothing
 	ordered_remove(&player.cards, index)
 
-	if silent do return
+	if silent || player.id != 0 do return
 	sound := app.sounds[11]
 	rl.SetSoundVolume(sound, 1.)
 	rl.PlaySound(sound)
@@ -110,9 +110,11 @@ card_activate :: proc(player: ^Player, card: ^Card){
 		card.lifetime = player.max_lifetime_roll_cards
 	}
 
-	sound := app.sounds[10]
-	rl.SetSoundVolume(sound, 1.)
-	rl.PlaySound(sound)
+	if player.id == 0 {
+		sound := app.sounds[10]
+		rl.SetSoundVolume(sound, 1.)
+		rl.PlaySound(sound)
+	}
 
 	#partial switch card.type {
 	case .CardCycle_EternalRoll:
@@ -151,6 +153,23 @@ card_activate :: proc(player: ^Player, card: ^Card){
 			}
 		}
 	}
+}
+
+card_assign :: proc(die: ^Die, card: Card) -> bool{
+	could_upgrade := false
+	for &upgrade, i in die.upgrades{
+		if upgrade.type == .CardNone {
+			upgrade = card
+			card_activate(&app.players[die.player], &upgrade)
+			apply_dice_upgrades(0.)	// @FIXME: Is that good?
+			add_text(die.position,
+				fmt.aprintf("Upgraded with %v!", get_text(upgrade.type, "title")),
+				die.color1, 1.5)
+			return true
+		}
+	}
+
+	return false
 }
 
 card_add_to_hand :: proc(player: ^Player, card: Card) {
@@ -281,14 +300,14 @@ test_combination :: proc(combination: CombinationType, dices: []i32, highlight: 
 	case .RollRoyal:
 		match = five
 		if !match do return
-		score = 60 // fixed score
+		score = 70 // fixed score
 		for number, j in dices {
 			highlight[j] = true
 		}
 	case .FullHouse:
 		match = full_house
 		if !match do return
-		score = 40 // fixed score
+		score = 35 // fixed score
 		for number, j in dices {
 			highlight[j] = true
 		}
