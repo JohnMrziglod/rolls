@@ -17,8 +17,8 @@ has_text :: proc(id: any, key: string) -> bool{
 }
 
 load_data :: proc(texts_buffer: ^string, path: string) {
-	file, file_ok := os.read_entire_file(path)
-	if !file_ok{
+	file, file_ok := os.read_entire_file(path, context.allocator)
+	if file_ok != nil{
 		fmt.println("Error loading texts!")
 		os.exit(1)
 	}

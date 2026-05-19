@@ -5,6 +5,7 @@ import "core:fmt"
 import "core:math"
 import "core:math/rand"
 import "core:math/linalg"
+import "core:os"
 import "core:reflect"
 import "core:slice"
 import "core:strings"
@@ -51,6 +52,7 @@ Die :: struct {
 Antagonist :: struct {
 	story_id: string,
 	index: i32,
+	wanted_power: f32,
 	tutorial2: bool,
 	tutorial_ghost_board: bool,
 	tutorial_cards: bool,
@@ -68,7 +70,7 @@ GameState :: enum {
 	DICE_UPGRADES,
 	CARDS_BATTLE,
 	DICES_BATTLE,
-	DICES_SCORING,
+	DICE_SCORING,
 	CARDS_SCORING,
 	SCORING_SUMMARY,	// only for the animations (all points are flying in)
 	WAIT_FOR_AI,
@@ -144,6 +146,7 @@ Application :: struct {
 	textures: []rl.Texture2D,
 	sub_textures: map[string]Vector2,
 	sounds: []rl.Sound,
+	musics: []rl.Music,
 	texts: map[string]string,
 
 	// gui
@@ -308,6 +311,24 @@ main :: proc() {
 			rl.UnloadSound(sound)
 		}
 	}
+	music_files, music_files_ok := os.glob("C:/projects/rolls/assets/music/*.mp3", context.temp_allocator)
+	if music_files_ok != nil{
+		fmt.panicf("%v", music_files_ok)
+		// os.exit(1)
+	}
+	current_music_file := strings.clone_to_cstring(rand.choice(music_files[:]))
+	fmt.printfln("Playing music: %s", current_music_file)
+	defer delete(current_music_file)
+	app.musics = {
+		rl.LoadMusicStream(current_music_file),
+		// rl.LoadMusicStream("assets/sounds/music_2.ogg"),
+	}
+	rl.PlayMusicStream(app.musics[0])
+	defer {
+		for music in app.musics {
+			rl.UnloadMusicStream(music)
+		}
+	}
 
 	files: [2]string
 	load_data(&files[0], "assets/cards.toml")
@@ -318,12 +339,11 @@ main :: proc() {
 
 	config.game_speed = 1.5
 
-	app.camera3d = {}
+	app.camera3d = {
+		up={0.0, 0.0, -1.},
+		projection=.ORTHOGRAPHIC,
+	}
 	camera_reset()
-	app.camera3d.target = {0.0, 0.0, 0.0}
-	app.camera3d.up = {0.0, 1.0, 0.0}
-	app.camera3d.fovy = f32(30)
-	app.camera3d.projection = .PERSPECTIVE // Camera mode type
 
 	app.camera2d = {}
     app.camera2d.target = {f32(screen_width)/2.0, f32(screen_height)/2.0 }
@@ -334,15 +354,26 @@ main :: proc() {
 	app.power = 2.
 	dices_reset(first_round=true)
 
-	// app.antagonist.tutorial2 = true
-	// app.antagonist.tutorial_cards = true
-	// app.antagonist.tutorial_ghost_board = true
-	// app.antagonist.tutorial_cycles = true
-	antagonist_story("antagonist_tutorial1")
+	app.antagonist.tutorial2 = true
+	app.antagonist.tutorial_cards = true
+	app.antagonist.tutorial_ghost_board = true
+	app.antagonist.tutorial_cycles = true
+	// antagonist_story("antagonist_tutorial1")
 
 	// Main game loop
 	for !rl.WindowShouldClose() {
 		dt := rl.GetFrameTime()
+
+		if (!rl.IsWindowFocused())
+        {
+            rl.MinimizeWindow();
+            rl.BeginDrawing();
+            rl.EndDrawing();
+            continue;
+        }
+
+		rl.UpdateMusicStream(app.musics[0])
+
 		app.state_timer = max(0., app.state_timer-dt)
 		app.state_clock += dt
 
@@ -355,10 +386,10 @@ main :: proc() {
 		}
 
 		// Zoom in and out:
-		mouse_wheel := rl.GetMouseWheelMove()
-		if mouse_wheel != 0.0 {
-			app.camera3d.desired_position.y += 200. * mouse_wheel * dt
-		}
+		// mouse_wheel := rl.GetMouseWheelMove()
+		// if mouse_wheel != 0.0 {
+		// 	app.camera3d.desired_position.y += 200. * mouse_wheel * dt
+		// }
 
 		if rl.IsMouseButtonDown(.MIDDLE){
 			// app.camera_rotat
@@ -378,6 +409,8 @@ main :: proc() {
 			if app.state == .GHOST_BOARD {
 				state_change(.WAIT_FOR_ROLL)
 				app.ghosts_selected = {-1, -1, -1, -1, -1}
+			} else if app.state == .ASSIGN_CARD || app.state == .CARDS_OFFER {
+				// @FIXME: we have to solve this better..
 			} else {
 				state_change(.MENU)
 			}
@@ -406,17 +439,18 @@ main :: proc() {
 
 		if app.state == .WAIT_FOR_ROLL && rl.IsKeyPressed(rl.KeyboardKey.SPACE) {
 			state_change(.CHARGING)
-			app.power = rand.float32_range(0.5, 1.)
+			app.antagonist.wanted_power = rand.float32_range(0.3, 1.)
 		}
+		// Max power is reached after 3 seconds of charging)
+		app.power = f32(math.min(1.0, app.state_clock / 0.25))
 		if app.state == .CHARGING &&
 			((app.current_player == 0 && (rl.IsKeyReleased(rl.KeyboardKey.SPACE) || rl.IsMouseButtonReleased(.LEFT))) ||
-			(app.current_player == 1 && app.power >= 1.0)) {
+			(app.current_player == 1 && app.power >= app.antagonist.wanted_power)) {
 				dices_reset()
 				state_change(.PRE_ROLLING)
 				camera_shake(2.0, 0.5)
 		}
-		// Max power is reached after 3 seconds of charging)
-		app.power = f32(math.min(1.0, app.state_clock / 0.25))
+
 
 		for &player, i in app.players {
 			for &card, c in player.cards{
@@ -442,8 +476,8 @@ main :: proc() {
 				cards_battle(dt)
 			case .DICES_BATTLE:
 				dice_battle(dt)
-			case .DICES_SCORING:
-				dices_scoring(dt)
+			case .DICE_SCORING:
+				dice_scoring(dt)
 			case .CARDS_SCORING:
 				cards_scoring(dt)
 			case .SCORING_SUMMARY:
@@ -853,10 +887,10 @@ dice_battle :: proc(dt: real) {
 	}
 
 	// We move to the next app.state
-	state_change(.DICES_SCORING)
+	state_change(.DICE_SCORING)
 }
 
-dices_scoring :: proc(dt: real) {
+dice_scoring :: proc(dt: real) {
 	for &player, p in app.players{
 		other_player := &app.players[(p+1)%N_PLAYERS]
 
@@ -972,11 +1006,11 @@ dices_scoring :: proc(dt: real) {
 				case .CardDice_Train:
 					bonus := 0.
 					n_dice := 0
-					for other_dice, o in app.dice{
-                        if d == o || other_dice.state != .ALIVE || die.player != other_dice.player || other_dice.current_number <= die.current_number do continue
-                        bonus += sco(other_dice.current_number)
+					for die2, d2 in app.dice{
+                        if d == d2 || die2.state != .ALIVE || die.player != die2.player || die2.current_number <= die.current_number do continue
+                        bonus += sco(die2.current_number)
                         n_dice += 1
-                        add_text(other_dice.position, fmt.aprintf("TRAIN: +%v!", other_dice.current_number), die.color1, delay=0.25*f32(n_dice))
+                        add_text(die2.position, fmt.aprintf("TRAIN: +%v!", die2.current_number), die2.color1, delay=0.25*f32(n_dice))
                     }
                     if bonus > 0. {
 						text = fmt.aprintf("TRAIN: +%.f!", bonus)
@@ -994,7 +1028,8 @@ dices_scoring :: proc(dt: real) {
 					continue
 				}
 				if len(text) > 0{
-					add_text(die.position+{0, f32(n_events)*0.8, 0}, text, die.color1, 2.0, delay=f32(n_events)*0.25)
+					position, anchor := ring_position_3d(n_events+1, 2.0)
+					add_text(die.position+position, text, die.color1, 2.0, delay=f32(n_events)*0.25, anchor=anchor)
 					n_events += 1
 				}
 			}
@@ -1013,7 +1048,7 @@ dices_scoring :: proc(dt: real) {
 				rl.SetSoundPitch(sound, pitch)
 				rl.PlaySound(sound)
 
-				add_text(die.position+{0, f32(n_events)*0.8, 0},
+				add_text(die.position,
 					fmt.aprintf("+%.f", die.current_score), die.color1, delay=f32(n_events)*0.25)
 				// camera_shake(2.0, 0.5)
 				//
@@ -1028,11 +1063,6 @@ dices_scoring :: proc(dt: real) {
 	state_change(.CARDS_SCORING, 0.4)
 }
 
-camera_zoom :: proc(position: Vector3){
-	app.camera3d.desired_target = position
-	app.camera3d.desired_position.y = 10
-	app.camera3d.desired_fovy = 25
-}
 
 cards_scoring :: proc(dt: real) {
 	state_change(.SCORING_SUMMARY, wait=0.4)
@@ -1099,16 +1129,6 @@ scoring_summary :: proc(dt: real) {
 	state_change(.WAIT_FOR_AI)
 
 	camera_reset()
-}
-
-camera_reset :: proc(){
-	app.camera3d.desired_target = {3, 0, 0}
-	app.camera3d.desired_position = {
-		math.cos(app.camera3d.angle)*30.,
-		70,
-		math.sin(app.camera3d.angle)*30.
-	}
-	app.camera3d.desired_fovy = 30
 }
 
 wait_for_ai :: proc(){
@@ -1285,8 +1305,8 @@ draw :: proc(dt: real) {
 	rl.BeginMode3D(app.camera3d)
 
 	// Draw a big cube to represent the area where the app.dice can move
-	rl.DrawCube(rl.Vector3{0.0, -.6, 0.0}, AREA_SIZE, 1.0, AREA_SIZE, COLOR_TABLE)
-	rl.DrawCubeWires(rl.Vector3{0.0, -.6, 0.0}, AREA_SIZE, 1.0, AREA_SIZE, rl.BLACK)
+	rl.DrawCube(rl.Vector3{0.0, -.6, .0}, AREA_SIZE, 1.0, AREA_SIZE, COLOR_TABLE)
+	rl.DrawCubeWires(rl.Vector3{0.0, -.6, .0}, AREA_SIZE, 1.0, AREA_SIZE, rl.BLACK)
 
 	if app.state == .WAIT_FOR_ROLL && (rl.IsMouseButtonPressed(.LEFT) || rl.IsMouseButtonPressed(.RIGHT)){
 		app.dice_selected = -1
@@ -1320,7 +1340,8 @@ draw :: proc(dt: real) {
 	}
 	rl.EndMode3D()
 
-	// rl.BeginMode2D(app.camera2d)
+	// rl.BeginMode2D()
+	// defer rl.EndMode2D()
 
 	rl.DrawFPS(10, 10)
 
@@ -1398,7 +1419,7 @@ draw :: proc(dt: real) {
 		draw_text(text, {position.x, position.y+100}, app.gui.font_size2, player.color, anchor=(p == 1) ? .RIGHT : .LEFT, overline=true)
 
 		roll_score := player.roll.score
-		if app.state == .DICES_SCORING || app.state == .SCORING_SUMMARY || roll_score > 0. {
+		if app.state == .DICE_SCORING || app.state == .SCORING_SUMMARY || roll_score > 0. {
 
 			font_size := app.gui.font_size1
 			if player.is_scoring && roll_score > 0. {
@@ -1422,13 +1443,22 @@ draw :: proc(dt: real) {
 	info := app.state == .WAIT_FOR_ROLL || app.state == .ASSIGN_CARD
 	if info && (dice_hovered != -1 || app.dice_selected != -1) {
 	    selected := app.dice_selected != -1
-		dice := selected ? app.dice[app.dice_selected] : app.dice[dice_hovered]
-		position := selected ? rl.GetWorldToScreen(dice.position, app.camera3d) : mouse_pos + Vector2{10, 10}
+		die := selected ? app.dice[app.dice_selected] : app.dice[dice_hovered]
+		position := rl.GetWorldToScreen(die.position, app.camera3d)
 		icon_size := f32(80.)
         padding := f32(6.)
-		#reverse for upgrade, u in dice.upgrades{
-		    color := dice.color1
-			upgrade_pos := position + f32(u)*Vector2{icon_size+4*padding, 0.}
+		#reverse for upgrade, u in die.upgrades{
+		    color := die.color1
+			upgrade_pos, anchor := ring_position_2d(u+1, icon_size+4*padding)//f32(u)*Vector2{icon_size+4*padding, 0.}
+			upgrade_pos += position
+			switch anchor{
+			case .CENTER:
+				upgrade_pos -= icon_size/2.
+			case .RIGHT:
+				upgrade_pos -= {icon_size, icon_size/2.}
+			case .LEFT:
+				upgrade_pos -= {0, icon_size/2.}
+			}
             ts := TextureFaceSize
             tp := ts.yx * {0., 1.}  // Standard question mark...
            	upgrade_type_string := reflect.enum_string(upgrade.type)
@@ -1436,7 +1466,7 @@ draw :: proc(dt: real) {
                 tp = ts.yx * app.sub_textures[upgrade_type_string].yx
             } else if upgrade.type == .CardNone {
                 // show the numbers...
-                tp = ts.yx * Vector2{f32(dice.faces[u]-1), 0}
+                tp = ts.yx * Vector2{f32(die.faces[u]-1), 0}
                 color /= 2
             }
 
@@ -1483,13 +1513,13 @@ draw :: proc(dt: real) {
 		// }
 	}
 
-	if app.state == .CHARGING && app.current_player == 0 {
+	if app.state == .CHARGING{
 		// Draw a power bar at the center of the screen
 		width: f32 = 800.
 		height: f32 = 80.
 		x := (f32(screen_width) - width) / 2.
 		y := (f32(screen_height) - height) / 2.
-		rl.DrawRectangleV({x, y}, {app.power * width, height}, human.color)
+		rl.DrawRectangleV({x, y}, {app.power * width, height}, app.players[app.current_player].color)
 		rl.DrawRectangleLinesEx({x, y, width, height}, 2., rl.BLACK)
 	}
 
@@ -1521,17 +1551,24 @@ draw :: proc(dt: real) {
 
 			if dice_button(ghost_number, position, ghost_size, active_color=human.color, active=active, clickable=true) {
 				free_index := -1
-				for &slot, s in app.ghosts_selected{
-					if slot == -1 && free_index == -1 {
-						free_index = s
-					}
+				for &slot, slot_index in app.ghosts_selected{
 					if slot == i32(ghost_index) {
 						slot = -1 // deselect if already selected
-						free_index = -1
+						free_index = -1 // no further action
+						break
+					}
+					if slot == -1 {
+						free_index = slot_index
 						break
 					}
 				}
-				if free_index != -1 {
+				// if free_index == -1 {
+				// 	// We didn't find any empty slot, we move all selected ghosts
+				// 	// to the left and remove the left-most
+				// 	slice.rotate_left(app.ghosts_selected[:], 1)
+				// 	app.ghosts_selected[4] = i32(ghost_index)
+				// } else
+				if free_index >= 0 {
 					app.ghosts_selected[free_index] = i32(ghost_index)
 				}
 			}
@@ -1724,11 +1761,11 @@ draw :: proc(dt: real) {
 				app.dice_selected = -1
 			}
 			state_change(.WAIT_FOR_ROLL)
-		} else if rl.IsMouseButtonPressed(.RIGHT) {
+		} else if rl.IsMouseButtonPressed(.RIGHT) || rl.IsKeyPressed(.ESCAPE) {
 			app.card_selected.triggered = 0.
 			append(&human.cards, app.card_selected)
 			app.card_selected = {}
-			add_text(mouse_pos, fmt.aprint("Keep card in hand!"), rl.RAYWHITE, 1.5)
+			add_text(mouse_pos, fmt.aprint("Keep card in hand!"), human.color, 1.5)
 			state_change(.WAIT_FOR_ROLL)
 		}
 	}
@@ -1748,7 +1785,7 @@ draw :: proc(dt: real) {
 		// adapt to zoom in
 		font_size := app.gui.font_size2 * (1.+(1. - (app.camera3d.fovy-25)/5))
 
-		end_2d = start_2d + {0, -100}
+		end_2d = start_2d + {0, -20}
 
 		x := math.lerp(start_2d.x, end_2d.x, 1.-text.lifetime/text.start_lifetime)
 		y := math.lerp(start_2d.y, end_2d.y, 1.-text.lifetime/text.start_lifetime)
