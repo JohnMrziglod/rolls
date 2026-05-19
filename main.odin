@@ -337,7 +337,7 @@ main :: proc() {
 		for file in files do defer delete(file)
 	}
 
-	config.game_speed = 1.5
+	config.game_speed = 1.
 
 	app.camera3d = {
 		up={0.0, 0.0, -1.},
@@ -1783,7 +1783,10 @@ draw :: proc(dt: real) {
 		} else do end_2d = text.end.(Vector2)
 
 		// adapt to zoom in
-		font_size := app.gui.font_size2 * (1.+(1. - (app.camera3d.fovy-25)/5))
+		font_size := app.gui.font_size2// * (1.+(1. - (app.camera3d.fovy-25)/5))
+
+		life_ratio := text.lifetime / text.start_lifetime
+		font_size *= math.exp(life_ratio)
 
 		end_2d = start_2d + {0, -20}
 
