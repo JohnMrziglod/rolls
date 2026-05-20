@@ -20,8 +20,8 @@ TextAnchor :: enum {
 }
 
 Particles :: struct{
-	positions: [9]Vector3,
-	velocities: [9]Vector3,
+	positions: [12]Vector3,
+	velocities: [12]Vector3,
 	color: rl.Color,
 	visible: bool,
 	lifetime: f32
@@ -460,17 +460,23 @@ draw_texture_by_string :: proc(texture_id: string, position: Vector2, size: f32,
 
 draw_card :: proc(card: Card, position: rl.Vector2, color:rl.Color=rl.BLANK, actions:[]string={}, static:bool=false, with_icon:bool=true) -> (bool, i32){
     size := CARD_SIZE
+   	font_size :f32= 25 // app.gui.font_size2
+	padding :f32= 10
+	margin: f32 = 10
+	header_height := font_size+2*padding
+
+    if !with_icon do size.y = header_height
 	hovered := with_icon && rl.CheckCollisionPointRec(rl.GetMousePosition(), {x=position.x, y=position.y, width=f32(size.x), height=f32(size.y)})
 
 	color := color
 	if color == rl.BLANK do color = COLOR_CARDS[card.category]
 
 	position := position
-	if position.y+CARD_SIZE.y+300 > app.gui.height do position.y -= CARD_SIZE.y + 20
+	if position.y+size.y+300 > app.gui.height do position.y -= size.y + 20
 
 	if hovered && !static{
 		color = rl.ColorBrightness(color, 0.1)
-		position.y += -10. //math.sin(f32(rl.GetTime())*10)*5	// make the button float up and down a bit
+		position.y += -10. //math.sin(f32(rl.GetTime())*10)*5
 	}
 
 	if card.active {
@@ -483,9 +489,6 @@ draw_card :: proc(card: Card, position: rl.Vector2, color:rl.Color=rl.BLANK, act
 		position.y += math.sin(f32(rl.GetTime())*20)*10
 	}
 
-	font_size :f32= 25 // app.gui.font_size2
-	padding :f32= 10
-	header_height := font_size+2*padding
 	lt :f32= 4. // line_thickness
 	lc := rl.BLACK // color / 2 // line color
 	lc.a = color.a
@@ -513,7 +516,7 @@ draw_card :: proc(card: Card, position: rl.Vector2, color:rl.Color=rl.BLANK, act
 		rl.DrawRectangleV(icon_position+40, {}+icon_size-2*40, rl.ColorBrightness(icon_color, -0.2))
 		draw_texture(reflect.enum_string(card.type), icon_position, icon_size, icon_color)
 	} else {
-		size.y = header_height
+		margin = 0.
 	}
 
 	if hovered {
@@ -527,16 +530,16 @@ draw_card :: proc(card: Card, position: rl.Vector2, color:rl.Color=rl.BLANK, act
 
 	// Description
 	show_description := hovered || !with_icon
-	text_pos := position + {0., size.y+padding}+padding
+	text_pos := position + {0., size.y+margin}+padding
 	if show_description && has_text(card.type, "description") {
         text_size := draw_text(get_text(card.type, "description"), text_pos, font_size, rl.BLACK,
             max_width=size.x-(text_pos.x-position.x), highlight_color=color, boxed=color, box_width=size.x)
-        text_pos.y += text_size.y + 3*padding
+        text_pos.y += text_size.y + 2*padding + margin
 	}
 	if show_description && has_text(card.type, "description2") {
         text_size := draw_text(get_text(card.type, "description2"), text_pos, font_size, rl.BLACK,
             max_width=size.x-(text_pos.x-position.x), highlight_color=color, boxed=color, box_width=size.x)
-        text_pos.y += text_size.y + 3*padding
+        text_pos.y += text_size.y + 2*padding + margin
 	}
 
 	return hovered, -1

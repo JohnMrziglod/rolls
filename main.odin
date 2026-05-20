@@ -52,6 +52,7 @@ Antagonist :: struct {
 	story_id: string,
 	index: i32,
 	wanted_power: f32,
+	goal_score: sco,
 	tutorial2: bool,
 	tutorial_ghost_board: bool,
 	tutorial_cards: bool,
@@ -62,6 +63,8 @@ GameState :: enum {
 	EXIT,
 	MENU,
 	TUTORIAL,
+	VICTORY,
+	LOST,
 	WAIT_FOR_ROLL,
 	CHARGING,
 	PRE_ROLLING,
@@ -81,6 +84,7 @@ GameState :: enum {
 RollState :: struct{
 	score: sco,
 	score_counter: i32,
+	score_timer: f32,
 	multiplier: sco,
 	kills: i32,
 	effects: map[CardType]void,
@@ -488,6 +492,10 @@ main :: proc() {
 					app.antagonist.tutorial2 = true
 					antagonist_story("antagonist_tutorial2")
 				}
+			case .VICTORY:
+				end_of_level(dt)
+			case .LOST:
+				end_of_level(dt)
 			}
 		}
 
@@ -1033,10 +1041,11 @@ dice_scoring :: proc(dt: real) {
 			}
 
 			if die.current_score != 0 || delay > 0 {
-				camera_zoom(die.position)
+				// camera_zoom(die.position)
 
-				app.players[die.player].roll.score += die.current_score
 				die.already_scored = true
+				player.roll.score += die.current_score
+				player.roll.score_timer = 1.
 				player.roll.score_counter += 1
 
 				pitch :f32= 1.0 + ((p == 0) ? 0.1 : -0.1) * f32(player.roll.score_counter)
@@ -1110,16 +1119,45 @@ scoring_summary :: proc(dt: real) {
 		}
 	}
 
-	// if app.players[0].total_score > 1000{
-	// 	antagonist_story("antagonist_lost")
-	// } else if app.players[1].total_score > 1000{
-	// 	antagonist_story("antagonist_wins")
-	// }
+	if app.players[0].total_score >= app.antagonist.goal_score{
+		antagonist_story("antagonist_lost")
+		state_change(.VICTORY)
+		return
+	} else if app.players[1].total_score >= app.antagonist.goal_score{
+		antagonist_story("antagonist_wins")
+		state_change(.LOST)
+		return
+	}
 
 	app.current_player = (app.current_player + 1) % N_PLAYERS
 	state_change(.WAIT_FOR_AI)
 
 	camera_reset()
+}
+
+end_of_level :: proc(dt: real){
+	if app.state_timer != 0. do return
+	app.state_timer = 0.5
+
+	victor: u8= app.state == .VICTORY ? 0 : 1
+	loser: u8= app.state == .LOST ? 0 : 1
+	for &die, d in app.dice{
+		if die.state != .ALIVE do continue
+		if die.player == loser {
+			die.state = .DEAD
+		} else {
+			add_particles(die.position, die.color1)
+		}
+	}
+	for i in 0..<10{
+		particles := &app.particles[i]
+		if !particles.visible || particles.lifetime > .7 do continue
+		for position, p in particles.positions{
+			add_particles(position, particles.color)
+			if p > 1 do break
+		}
+	}
+	// state_change(.WAIT_FOR_ROLL)
 }
 
 wait_for_ai :: proc(){
@@ -1410,17 +1448,17 @@ draw :: proc(dt: real) {
 		text = (p == 0) ? "YOU" : "ANTAGONIST"
 		draw_text(text, {position.x, position.y+100}, app.gui.font_size2, player.color, anchor=(p == 1) ? .RIGHT : .LEFT, overline=true)
 
-		roll_score := player.roll.score
-		if app.state == .DICE_SCORING || app.state == .SCORING_SUMMARY || roll_score > 0. {
+		if app.state == .DICE_SCORING || app.state == .SCORING_SUMMARY || player.roll.score > 0. {
 
-			font_size := app.gui.font_size1
-			if player.is_scoring && roll_score > 0. {
+			font_size := app.gui.font_size1 * (1.+0.5*splash(player.roll.score_timer))
+			player.roll.score_timer -= dt
+			if player.is_scoring && player.roll.score > 0. {
 				font_size += math.max((0.3-app.state_clock), 0.1) * 100
 			}
 			if player.roll.multiplier > 0 {
-				text = fmt.tprintf("+ %.f X %.f", roll_score, player.roll.multiplier)
+				text = fmt.tprintf("+ %.f X %.f", player.roll.score, player.roll.multiplier)
 			} else {
-				text = fmt.tprintf("+ %.f", roll_score)
+				text = fmt.tprintf("+ %.f", player.roll.score)
 			}
 
 			if p == 1{
