@@ -63,8 +63,6 @@ GameState :: enum {
 	EXIT,
 	MENU,
 	TUTORIAL,
-	VICTORY,
-	LOST,
 	WAIT_FOR_ROLL,
 	CHARGING,
 	PRE_ROLLING,
@@ -79,6 +77,8 @@ GameState :: enum {
 	GHOST_BOARD,
 	CARDS_OFFER,
 	UPGRADE_DIE,
+	VICTORY,
+	DEFEAT,
 }
 
 RollState :: struct{
@@ -357,10 +357,13 @@ main :: proc() {
 	app.power = 2.
 	dices_reset(first_round=true)
 
-	app.antagonist.tutorial2 = true
-	app.antagonist.tutorial_cards = true
-	app.antagonist.tutorial_ghost_board = true
-	app.antagonist.tutorial_cycles = true
+	app.antagonist = {
+		goal_score = 1000,
+		tutorial2 = true,
+		tutorial_cards = true,
+		tutorial_ghost_board = true,
+		tutorial_cycles = true,
+	}
 	// antagonist_story("antagonist_tutorial1")
 
 	// Main game loop
@@ -444,6 +447,7 @@ main :: proc() {
 			state_change(.CHARGING)
 			app.antagonist.wanted_power = rand.float32_range(0.3, 1.)
 		}
+
 		// Max power is reached after 3 seconds of charging)
 		app.power = f32(math.min(1.0, app.state_clock / 0.25))
 		if app.state == .CHARGING &&
@@ -465,8 +469,19 @@ main :: proc() {
 		if len(app.antagonist.story_id) > 0 {
 			if rl.IsKeyPressed(rl.KeyboardKey.SPACE) {
 				antagonist_story_continue()
+				continue
 			}
-		} else if app.state_timer == 0.{
+		}
+
+		if app.state >= .VICTORY && rl.IsKeyPressed(rl.KeyboardKey.SPACE) {
+			app.antagonist.goal_score *= app.state == .VICTORY ? 10. : 1.
+			text := fmt.aprintf("Next score is %v!", app.antagonist.goal_score)
+			add_text(Vector2{app.gui.width/2., app.gui.height/2.}, text,
+						font_size=app.gui.font_size1, color=rl.RAYWHITE)
+			state_change(.WAIT_FOR_ROLL)
+		}
+
+		if app.state_timer == 0.{
 			#partial switch app.state{
 			case .PRE_ROLLING:
 				apply_dice_upgrades(dt)
@@ -494,7 +509,7 @@ main :: proc() {
 				}
 			case .VICTORY:
 				end_of_level(dt)
-			case .LOST:
+			case .DEFEAT:
 				end_of_level(dt)
 			}
 		}
@@ -1120,12 +1135,12 @@ scoring_summary :: proc(dt: real) {
 	}
 
 	if app.players[0].total_score >= app.antagonist.goal_score{
-		antagonist_story("antagonist_lost")
+		antagonist_story("antagonist_defeat")
 		state_change(.VICTORY)
 		return
 	} else if app.players[1].total_score >= app.antagonist.goal_score{
 		antagonist_story("antagonist_wins")
-		state_change(.LOST)
+		state_change(.DEFEAT)
 		return
 	}
 
@@ -1136,11 +1151,10 @@ scoring_summary :: proc(dt: real) {
 }
 
 end_of_level :: proc(dt: real){
-	if app.state_timer != 0. do return
 	app.state_timer = 0.5
 
 	victor: u8= app.state == .VICTORY ? 0 : 1
-	loser: u8= app.state == .LOST ? 0 : 1
+	loser: u8= app.state == .DEFEAT ? 0 : 1
 	for &die, d in app.dice{
 		if die.state != .ALIVE do continue
 		if die.player == loser {
@@ -1800,6 +1814,12 @@ draw :: proc(dt: real) {
 			state_change(.WAIT_FOR_ROLL)
 		}
 		app.die_selected = -1
+	}
+
+	if app.state == .VICTORY || app.state == .DEFEAT {
+		text := "Press <SPACE> to continue"
+		draw_text(text, {app.gui.width/2., app.gui.height - 150},
+					font_size=app.gui.font_size1, color=rl.RAYWHITE, anchor=.CENTER)
 	}
 
 	for &animation in app.animations{
