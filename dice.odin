@@ -12,7 +12,7 @@ dice_killed :: proc(victim: ^Die, killer: ^Die=nil){
 	}
 
 	add_particles(victim.position, victim.color1)
-	add_text(victim.position, fmt.aprint("GHOST!"), victim.color1, 1.5, font_size=app.gui.font_size2)
+	add_text(victim.position, app.gui.ghost_positions[victim.player], fmt.aprint("GHOST!"), victim.color1, 1.5, font_size=app.gui.font_size2)
 
 	victim.state = .DEAD
 	victim.position.y = 1000.

@@ -3,6 +3,7 @@ package game
 import "core:fmt"
 import "core:math"
 import "core:math/rand"
+import "core:reflect"
 import rl "vendor:raylib"
 
 CARD_SIZE :: [2]f32{300, 350}
@@ -130,7 +131,7 @@ card_activate :: proc(player: ^Player, card: ^Card){
 	case .CardCycle_EternalRoll:
 		player.max_lifetime_roll_cards += 1
 	case .CardCycle_ExtraDie:
-		// player.n_dices += 1
+		// player.n_dice += 1
 		append(&app.dice, Die{player=player.id, state=.DEAD, color1=player.color, color2=rl.BLACK})
 		dice_init(&app.dice[len(app.dice)-1])
 	case .CardCycle_Graveyard:
@@ -171,10 +172,11 @@ card_assign :: proc(die: ^Die, card: Card) -> bool{
 		if upgrade.type == .CardNone {
 			upgrade = card
 			card_activate(&app.players[die.player], &upgrade)
+			upgrade.triggered = 0.
 			apply_dice_upgrades(0.)	// @FIXME: Is that good?
 			add_text(die.position,
-				fmt.aprintf("Upgraded with %v!", get_text(upgrade.type, "title")),
-				die.color1, 1.5)
+				"",// fmt.aprintf("Upgraded with %v!", get_text(upgrade.type, "title")),
+				die.color1, 1.5, icon_id=icon_index_from_id(reflect.enum_string(upgrade.type)))
 			return true
 		}
 	}
@@ -216,6 +218,49 @@ Combination :: struct {
 	type: CombinationType,
 	score: i32,
 	n_cards: i32,
+}
+CombinationSet :: bit_set[CombinationType]
+
+possible_combinations :: proc(dice: []i32) -> CombinationSet{
+	combinations := CombinationSet{}
+	if len(dice) < 5 do return combinations // Invalid number of dice, return empty set
+
+	counter := [6]i32{}
+	for number in dice {
+		if number < 1 || number > 6 do continue // Invalid dice number, skip
+		counter[number-1] += 1
+	}
+
+	pair, double_pair, three, four, five := false, false, false, false, false
+	for count in counter {
+		if count >= 2 {
+			if pair do double_pair = true
+			pair = true
+		}
+		if count >= 3 do three = true
+		if count >= 4 do four = true
+		if count >= 5 do five = true
+	}
+	full_house := double_pair && three
+	lower_straight := counter == [6]i32{1, 1, 1, 1, 1, 0}
+	upper_straight := counter == [6]i32{0, 1, 1, 1, 1, 1}
+
+	if pair do combinations += {.Pair}
+	if double_pair do combinations += {.DoublePair}
+	if three do combinations += {.RollOfThree}
+	if four do combinations += {.RollOfFour}
+	if five do combinations += {.RollRoyal}
+	if full_house do combinations += {.FullHouse}
+	if lower_straight do combinations += {.LowerStraight}
+	if upper_straight do combinations += {.UpperStraight}
+
+	combinations += {.AllTogether}
+
+	for i in 0..<6 {
+		if counter[i] > 0 do combinations += {CombinationType(u8(i) + u8(CombinationType.OnlyOnes))}
+	}
+
+	return combinations
 }
 
 test_combination :: proc(combination: CombinationType, dices: []i32, highlight: ^[5]bool) -> (match:bool=false, score:f64=0) {
