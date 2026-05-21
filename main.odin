@@ -314,7 +314,7 @@ main :: proc() {
 			rl.UnloadSound(sound)
 		}
 	}
-	music_files, music_files_ok := os.glob("C:/projects/rolls/assets/music/*.mp3", context.temp_allocator)
+	music_files, music_files_ok := os.glob("assets/music/*.mp3", context.temp_allocator)
 	if music_files_ok != nil{
 		fmt.panicf("%v", music_files_ok)
 		// os.exit(1)
@@ -340,7 +340,7 @@ main :: proc() {
 		for file in files do defer delete(file)
 	}
 
-	config.game_speed = 1.
+	config.game_speed = 4.
 
 	app.camera3d = {
 		up={0.0, 0.0, -1.},
@@ -378,7 +378,7 @@ main :: proc() {
             continue;
         }
 
-		// rl.UpdateMusicStream(app.musics[0])
+		rl.UpdateMusicStream(app.musics[0])
 
 		app.state_timer = max(0., app.state_timer-dt)
 		app.state_clock += dt
