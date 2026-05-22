@@ -378,7 +378,7 @@ main :: proc() {
             continue;
         }
 
-		rl.UpdateMusicStream(app.musics[0])
+		// rl.UpdateMusicStream(app.musics[0])
 
 		app.state_timer = max(0., app.state_timer-dt)
 		app.state_clock += dt
@@ -475,6 +475,10 @@ main :: proc() {
 
 		if app.state >= .VICTORY && rl.IsKeyPressed(rl.KeyboardKey.SPACE) {
 			app.antagonist.goal_score *= app.state == .VICTORY ? 10. : 1.
+			app.players[0].total_score = 0
+			app.players[0].roll = {}
+			app.players[1].total_score = 0
+			app.players[1].roll = {}
 			text := fmt.aprintf("Next score is %v!", app.antagonist.goal_score)
 			add_text(Vector2{app.gui.width/2., app.gui.height/2.}, text,
 						font_size=app.gui.font_size1, color=rl.RAYWHITE)
@@ -1250,9 +1254,16 @@ wait_for_ai :: proc(){
 		if best_score > 0 && (best_score > 20 || i32(len(ai.ghosts))+n_alive > ai.ghosts_max) {
 			ai.roll.score += best_score
 
-			cards := [1]Card{}
+			not_wanted_cards := bit_set[CardType]{
+				.CardRoll_FakeNews, .CardRoll_MarketCrash, .CardRoll_WhiteElephant
+			}
+			cards := [3]Card{}
 			cards_generate(cards[:], .RollAndDiceCards)
-			append(&ai.cards, cards[0])
+			for card in cards{
+				if card.type in not_wanted_cards do continue
+				append(&ai.cards, card)
+				break
+			}
 
 			ghosts_copy := make([dynamic]i32, len(ai.ghosts), cap(ai.ghosts))
 			defer delete(ghosts_copy)
@@ -1488,43 +1499,7 @@ draw :: proc(dt: real) {
 	if info && app.die_selected != -1 {
 	    selected := app.die_selected != -1
 		die := selected ? app.dice[app.die_selected] : app.dice[dice_hovered]
-		position := rl.GetWorldToScreen(die.position, app.camera3d)
-		icon_size := f32(80.)
-        padding := f32(6.)
-		#reverse for upgrade, u in die.upgrades{
-		    color := die.color1
-			upgrade_pos, anchor := ring_position_2d(u+1, icon_size+4*padding)//f32(u)*Vector2{icon_size+4*padding, 0.}
-			upgrade_pos += position
-			switch anchor{
-			case .CENTER:
-				upgrade_pos -= icon_size/2.
-			case .RIGHT:
-				upgrade_pos -= {icon_size, icon_size/2.}
-			case .LEFT:
-				upgrade_pos -= {0, icon_size/2.}
-			}
-            ts := TextureFaceSize
-            tp := ts.yx * {0., 1.}  // Standard question mark...
-           	upgrade_type_string := reflect.enum_string(upgrade.type)
-           	if upgrade_type_string in app.sub_textures {
-                tp = ts.yx * app.sub_textures[upgrade_type_string].yx
-            } else if upgrade.type == .CardNone {
-                // show the numbers...
-                tp = ts.yx * Vector2{f32(die.faces[u]-1), 0}
-                color /= 2
-            }
-
-            upgraded := upgrade.type != .CardNone
-           	dest := rl.Rectangle{x=upgrade_pos.x, y=upgrade_pos.y, width=icon_size, height=icon_size}
-           	draw_box({dest.x, dest.y}-padding/2, {}+icon_size+2*padding/2, fill=upgraded ? color : color/2, thickness=2)
-           	rl.DrawTexturePro(app.textures[0], {tp.x, tp.y, ts.x, ts.y}, dest, {}, 0., upgraded ? rl.BLACK : rl.RAYWHITE/2)
-
-            hovered := rl.CheckCollisionPointRec(mouse_pos, dest)
-            if upgrade.type != .CardNone && hovered {
-            	card_position := upgrade_pos + {-CARD_SIZE.x/2.+icon_size/2., icon_size+10}
-                draw_card(upgrade, card_position, with_icon=false)
-            }
-        }
+		draw_die_info(die)
 	}
 
 	if len(app.antagonist.story_id) > 0 {
@@ -1790,20 +1765,28 @@ draw :: proc(dt: real) {
 	}
 
 	if app.state == .UPGRADE_DIE {
+		selected_die: ^Die
+		selected_face :i32= -1
+		for &die in app.dice{
+			if die.state != .ALIVE || die.player != 0 do continue
+			hovered_face := draw_die_info(die)
+			if hovered_face != -1 {
+				selected_die = &die
+				selected_face = hovered_face
+			}
+		}
 		// app.card_selected.triggered = app.die_selected >= 0 ? 1. : 0.
 
 		text := "Choose a dice to assign this card to"
 		draw_text(text, {screen_width/2., screen_height - 150}, app.gui.font_size1, rl.RAYWHITE, anchor=.CENTER)
 		draw_card(app.card_selected, mouse_pos - {CARD_SIZE.x/2, CARD_SIZE.y+50})
 
-		if app.die_selected >= 0 && app.dice[app.die_selected].player == 0 {
-			die := &app.dice[app.die_selected]
-			could_upgrade := card_assign(die, app.card_selected)
+		if rl.IsMouseButtonPressed(.LEFT) && selected_face != -1 {
+			could_upgrade := card_assign(selected_die, app.card_selected, selected_face)
 			app.card_selected = {}
 
 			if !could_upgrade {
-				add_text(die.position, fmt.aprint("Die has no free upgrade slots!"), die.color1, 1.5)
-				app.die_selected = -1
+				add_text(selected_die.position, fmt.aprint("Die has no free upgrade slots!"), selected_die.color1, 1.5)
 			}
 			state_change(.WAIT_FOR_ROLL)
 		} else if rl.IsMouseButtonPressed(.RIGHT) || rl.IsKeyPressed(.ESCAPE) {
@@ -1813,7 +1796,6 @@ draw :: proc(dt: real) {
 			add_text(mouse_pos, fmt.aprint("Keep card in hand!"), human.color, 1.5)
 			state_change(.WAIT_FOR_ROLL)
 		}
-		app.die_selected = -1
 	}
 
 	if app.state == .VICTORY || app.state == .DEFEAT {

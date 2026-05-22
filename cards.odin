@@ -166,19 +166,28 @@ card_activate :: proc(player: ^Player, card: ^Card){
 	}
 }
 
-card_assign :: proc(die: ^Die, card: Card) -> bool{
+card_assign :: proc(die: ^Die, card: Card, index:i32=-1) -> bool{
 	could_upgrade := false
-	for &upgrade, i in die.upgrades{
-		if upgrade.type == .CardNone {
-			upgrade = card
-			card_activate(&app.players[die.player], &upgrade)
-			upgrade.triggered = 0.
-			apply_dice_upgrades(0.)	// @FIXME: Is that good?
-			add_text(die.position,
-				"",// fmt.aprintf("Upgraded with %v!", get_text(upgrade.type, "title")),
-				die.color1, 1.5, icon_id=icon_index_from_id(reflect.enum_string(upgrade.type)))
-			return true
+	index := index
+	if index == -1{
+		for &upgrade, i in die.upgrades{
+			if upgrade.type == .CardNone {
+				index = i32(i)
+				break
+			}
 		}
+	}
+	if index != -1 {
+		add_text(die.position,
+			"",// fmt.aprintf("Upgraded with %v!", get_text(upgrade.type, "title")),
+			die.color1, 1.5, icon_id=icon_index_from_card(card.type))
+
+		die.upgrades[index] = card
+		card_activate(&app.players[die.player], &die.upgrades[index])
+		die.upgrades[index].triggered = 0.
+		apply_dice_upgrades(0.)	// @FIXME: Is that good?
+
+		return true
 	}
 
 	return false

@@ -439,6 +439,10 @@ icon_index_from_id :: proc(texture_id: string) -> Vector2 {
 	return app.sub_textures[texture_id] or_else {1, 0}
 }
 
+icon_index_from_card :: proc(card_type: CardType) -> Vector2 {
+	return app.sub_textures[reflect.enum_string(card_type)] or_else {1, 0}
+}
+
 draw_texture :: proc{draw_texture_by_index, draw_texture_by_string}
 draw_texture_by_index :: proc(texture_id:Vector2={0,1}, position: Vector2, size: f32, tint:rl.Color=rl.BLACK){
 	texture := app.textures[0]
@@ -543,4 +547,42 @@ draw_card :: proc(card: Card, position: rl.Vector2, color:rl.Color=rl.BLANK, act
 	}
 
 	return hovered, -1
+}
+
+draw_die_info :: proc(die: Die) -> i32{
+	hovered_upgrade_index :i32= -1
+	position := rl.GetWorldToScreen(die.position, app.camera3d)
+	icon_size := f32(50.)
+    padding := f32(2.)
+	#reverse for upgrade, u in die.upgrades{
+		// upgrade_pos, anchor := ring_position_2d(u+1, icon_size+4*padding)
+		upgrade_pos := position + f32(u)*Vector2{icon_size+4*padding, 0.}
+		upgraded := upgrade.type != .CardNone
+
+        tp := Vector2{0, f32(die.faces[u]-1)} // Standard face number
+        color: rl.Color
+       	if !upgraded {
+            color = die.color1
+        } else {
+        	color = COLOR_CARDS[.DICE]
+       		tp = icon_index_from_card(upgrade.type)
+        }
+
+        dest := rl.Rectangle{x=upgrade_pos.x, y=upgrade_pos.y, width=icon_size, height=icon_size}
+        hovered := rl.CheckCollisionPointRec(rl.GetMousePosition(), dest)
+        if hovered {
+			if upgraded {
+			  		card_position := upgrade_pos + {-CARD_SIZE.x/2.+icon_size/2., icon_size+10}
+			    draw_card(upgrade, card_position, with_icon=false)
+			} else if app.card_selected.category == .DICE{
+				tp = icon_index_from_card(app.card_selected.type)
+   				color = COLOR_CARDS[.DICE]
+			}
+			hovered_upgrade_index = i32(u)
+        }
+        draw_box({dest.x, dest.y}-padding/2, {}+icon_size+2*padding/2, fill=upgraded ? color : color/2, thickness=2)
+        draw_texture(tp, upgrade_pos, icon_size, tint=upgraded ? rl.BLACK : rl.RAYWHITE/2)
+    }
+
+    return hovered_upgrade_index
 }

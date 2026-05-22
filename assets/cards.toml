@@ -45,7 +45,7 @@ CardRoll_TombRaider
 CardDice_Assassin
 /title="ASSASSIN"
 /description="+2 ATTACK for this die."
-/description2="When [h]ON TOP FACE[h], attacks ANTAGONIST's highest die."
+/description2="When on [h]TOP FACE[h], attacks ANTAGONIST's highest die."
 /texture_id=[1,1]
 CardDice_Blind
 /title="BLIND"
@@ -53,7 +53,7 @@ CardDice_Blind
 CardDice_Tank
 /title="TANK"
 /description="+2 HEALTH for this die."
-/description2="When [h]ON TOP FACE[h], +1 HEALTH for surrounding dice."
+/description2="When on [h]TOP FACE[h], +1 HEALTH for surrounding dice."
 /texture_id=[1,2]
 CardDice_Antenna
 /title="ANTENNA"
@@ -62,12 +62,12 @@ CardDice_Antenna
 CardDice_Optimist
 /title="OPTIMIST"
 /description="This die only shows the numbers [h]4[h], [h]5[h], and [h]6[h]."
-/description2="When [h]ON TOP FACE[h], add the sum of your surviving dice greater or equal [h]4[h] to die's score."
+/description2="When on [h]TOP FACE[h], add the sum of your surviving dice greater or equal [h]4[h] to die's score."
 /texture_id=[1,9]
 CardDice_Pessimist
 /title="PESSIMIST"
 /description="This die only shows the numbers [h]1[h], [h]2[h], and [h]3[h]."
-/description2="When [h]ON TOP FACE[h], multiplies die's SCORE by the product of your surviving dice lower or equal [h]3[h]."
+/description2="When on [h]TOP FACE[h], multiplies die's SCORE by the product of your surviving dice lower or equal [h]3[h]."
 /texture_id=[1,8]
 CardDice_General
 /title="GENERAL"
@@ -80,12 +80,12 @@ CardDice_Journalist
 CardDice_Influencer
 /title="INFLUENCER"
 # /description1="---"
-/description2="When [h]ON TOP FACE[h], creates a ROLL CARD."
+/description2="When on [h]TOP FACE[h], creates a ROLL CARD."
 /texture_id=[1,7]
 CardDice_Engineer
 /title="ENGINEER"
 # /description="---"
-/description2="When [h]ON TOP FACE[h], creates a DICE CARD."
+/description2="When on [h]TOP FACE[h], creates a DICE CARD."
 /texture_id=[1,14]
 CardDice_Medium
 /title="MEDIUM"
@@ -94,7 +94,7 @@ CardDice_Medium
 CardDice_PlusOne
 /title="PLUS ONE"
 /description="+1 to die's SCORE"
-/description2="When [h]ON TOP FACE[h], +1 to die's SCORE for each of your surviving DICE."
+/description2="When on [h]TOP FACE[h], +1 to die's SCORE for each of your surviving DICE."
 /texture_id=[1,5]
 CardDice_Investor
 /title="INVESTOR"
