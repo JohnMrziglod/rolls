@@ -7,6 +7,7 @@ import "core:math/rand"
 import "core:math/linalg"
 import "core:os"
 import "core:reflect"
+import "core:sort"
 import "core:slice"
 import "core:strings"
 import rl "vendor:raylib"
@@ -105,6 +106,7 @@ Player :: struct {
 	ghosts_max: i32,
 	ghosts_costs_per_combination: i32,
 	cycle: Cycle,
+	dice_sorted: [dynamic]i32, // sorted list of dice indices for better visuals during battles and scoring
 	n_dice: i32,
 }
 
@@ -340,7 +342,7 @@ main :: proc() {
 		for file in files do defer delete(file)
 	}
 
-	config.game_speed = 4.
+	config.game_speed = 1.5
 
 	app.camera3d = {
 		up={0.0, 0.0, -1.},
@@ -653,12 +655,12 @@ rolling :: proc(duration: real) {
 		contact_resolve_contacts(&resolver, app.contacts[:], duration)
 	}
 
-	for &dice, d in app.dice{
-		if dice.state != .ALIVE do continue
+	for &die, d in app.dice{
+		if die.state != .ALIVE do continue
 
 		// Either wait until all app.dice are not moving that much anymore
 		// or until enough time has past
-		if dice.motion > 0.9 && app.state_clock < 5. {
+		if die.motion > 0.9 && app.state_clock < 5. {
 			return
 		}
 
@@ -673,14 +675,38 @@ rolling :: proc(duration: real) {
 
 		highest_face_height :f32= -1.
 		for face, i in faces{
-			height := body_get_point_in_world_space(&dice, face).y
+			height := body_get_point_in_world_space(&die, face).y
 			if height > highest_face_height {
 				highest_face_height = height
-				dice.current_face = i
-				dice.current_number = dice.faces[i]
+				die.current_face = i
+				die.current_number = die.faces[i]
 			}
 		}
-		dice.already_scored = false
+		die.already_scored = false
+	}
+
+	// Get a sorted list from left-to-right for each player, so we have better visuals
+	// for cascading events
+	PositionIndex :: struct{
+		index: i32,
+		position: Vector2,
+	}
+
+	for &player, p in app.players{
+		dice_2d: [dynamic]PositionIndex
+		defer delete(dice_2d)
+		for die, d in app.dice{
+			if die.state != .ALIVE || die.player != u8(p) do continue
+			append(&dice_2d, PositionIndex{index=i32(d), position=Vector2{die.position.x, die.position.z}})
+		}
+		slice.sort_by(dice_2d[:], proc(a, b: PositionIndex) -> bool{
+			if a.position.x != b.position.x do return a.position.x < b.position.x
+			return a.position.y > b.position.y
+		})
+		player.dice_sorted = {}
+		for pi in dice_2d{
+			append(&player.dice_sorted, pi.index)
+		}
 	}
 
 	// We move to the next app.state
@@ -688,30 +714,37 @@ rolling :: proc(duration: real) {
 }
 
 dice_upgrades :: proc (dt: real){
-    for &dice, d in app.dice{
-		if dice.state != .ALIVE do continue
+	max_delay: f32
+	duration: f32 = 0.8
+    for &die, d in app.dice{
+		if die.state != .ALIVE do continue
 
 		// Apply dice card effects
-		for &upgrade, u in dice.upgrades{
-			position := dice.position - f32(u) * Vector3{0, 2, 0}
+		delay: f32
+		for &upgrade, u in die.upgrades{
 			text: string
 
 			#partial switch upgrade.type {
 			case .CardDice_Assassin:
-			    dice.attack += 2
-				text = fmt.aprint("ASSASSIN: +2 ATTACK!")
+			    die.attack += 2
+				text = fmt.aprint("+2 ATTACK")
 			case .CardDice_Tank:
-			    dice.health += 2.
-				text = fmt.aprint("TANK: +2 HEALTH!")
+			    die.health += 2.
+				text = fmt.aprint("+2 HEALTH")
 			case:
 				continue
 			}
-			add_text(position, text, dice.color1)
-			wait(1.0)
+			add_text(die.position, text, die.color1,
+					delay=delay, lifetime=duration,
+					icon_id=icon_index_from_card(upgrade.type))
+
+			delay += duration
 		}
+		max_delay = max(max_delay, delay)
 	}
 
-	state_change(.CARDS_BATTLE, wait=0.5)
+	fmt.printfln("Max delay: %f", max_delay)
+	state_change(.CARDS_BATTLE, wait=max_delay)
 }
 
 cards_battle :: proc (dt: real) {
@@ -839,7 +872,7 @@ cards_battle :: proc (dt: real) {
 dice_battle :: proc(dt: real) {
 	if app.battle.state != .Over{
 	    battle := &app.battle
-        battle.timer += dt
+        battle.timer += dt * config.game_speed
         target_time :f32= 0.3
 
         clash_position := (battle.previous_positions[0] + battle.previous_positions[1]) / 2.
@@ -916,12 +949,13 @@ dice_scoring :: proc(dt: real) {
 
 		player.is_scoring = true
 		n_alive := 0
-		for dice in app.dice {
-			if dice.state == .ALIVE && u8(p) == dice.player do n_alive += 1
+		for die in app.dice {
+			if die.state == .ALIVE && u8(p) == die.player do n_alive += 1
 		}
 
-		for &die, d in app.dice {
-			if die.state != .ALIVE || die.already_scored || u8(p) != die.player do continue
+		for d in player.dice_sorted {
+			die := &app.dice[d]
+			if die.state != .ALIVE || die.already_scored do continue
 
 			die.current_score = sco(die.current_number)
 
@@ -936,12 +970,13 @@ dice_scoring :: proc(dt: real) {
 				#partial switch upgrade.type {
 				case .CardDice_Antenna:
 					multiplier := 0.
-					for other_dice, o in app.dice{
-                        if d == o || other_dice.state != .ALIVE || die.player != other_dice.player do continue
+					for d2 in player.dice_sorted {
+						die2 := &app.dice[d2]
+                        if d == d2 || die2.state != .ALIVE do continue
 
-                        if die_has_upgrade(other_dice, .CardDice_Antenna) {
-							// add_text(other_dice.position, fmt.aprint("ANTENNA BOOST!"), COLOR_UPGRADES[.CardDice_Antenna], lifetime=0.6)
-							multiplier += sco(other_dice.current_number)
+                        if die_has_upgrade(die2^, .CardDice_Antenna) {
+							// add_text(die2.position, fmt.aprint("ANTENNA BOOST!"), COLOR_UPGRADES[.CardDice_Antenna], lifetime=0.6)
+							multiplier += sco(die2.current_number)
 						}
                     }
                     if multiplier > 0. {
@@ -1001,9 +1036,10 @@ dice_scoring :: proc(dt: real) {
 				case .CardDice_Optimist:
 				    if is_active {
 						bonus := 0.
-						for other_dice, o in app.dice{
-                            if d == o || other_dice.state != .ALIVE || die.player != other_dice.player || other_dice.current_number < 4 do continue
-                            bonus += sco(other_dice.current_number)
+						for o in player.dice_sorted {
+							other_die := &app.dice[o]
+                            if d == o || other_die.state != .ALIVE || other_die.current_number < 4 do continue
+                            bonus += sco(other_die.current_number)
                         }
 						text = fmt.aprintf("+%.f", bonus)
 						die.current_score += bonus
@@ -1016,9 +1052,10 @@ dice_scoring :: proc(dt: real) {
 				case .CardDice_Pessimist:
 				    if is_active {
 						multiplier := 0.
-						for other_dice, o in app.dice{
-                            if d == o || other_dice.state != .ALIVE || die.player != other_dice.player || other_dice.current_number > 3 do continue
-                            multiplier += sco(other_dice.current_number)
+						for o in player.dice_sorted {
+							other_die := &app.dice[o]
+                            if d == o || other_die.state != .ALIVE || other_die.current_number > 3 do continue
+                            multiplier += sco(other_die.current_number)
                         }
                         if multiplier > 0. {
     						text = fmt.aprintf("x%.f", multiplier)
@@ -1028,8 +1065,9 @@ dice_scoring :: proc(dt: real) {
 				case .CardDice_Train:
 					bonus := 0.
 					n_dice := 0
-					for die2, d2 in app.dice{
-                        if d == d2 || die2.state != .ALIVE || die.player != die2.player || die2.current_number <= die.current_number do continue
+					for d2 in player.dice_sorted {
+						die2 := &app.dice[d2]
+                        if d == d2 || die2.state != .ALIVE || die2.current_number <= die.current_number do continue
                         bonus += sco(die2.current_number)
                         add_text(die2.position, fmt.aprintf("+%v", die2.current_number), die2.color1,
                         	delay=delay, lifetime=duration, icon_id=icon_index_from_id("CardDice_Train"))
@@ -1051,8 +1089,7 @@ dice_scoring :: proc(dt: real) {
 					continue
 				}
 				if len(text) > 0{
-					position, anchor := ring_position_3d(n_events+1, 2.0)
-					add_text(die.position, text, die.color1, anchor=anchor,
+					add_text(die.position, text, die.color1,
 							delay=delay, lifetime=duration,
 							icon_id=icon_index_from_id(reflect.enum_string(upgrade.type)))
 					delay += duration
@@ -1808,11 +1845,11 @@ draw :: proc(dt: real) {
 		if !animation.visible do continue
 
 		if animation.delay > 0. {
-			animation.delay -= dt
+			animation.delay -= dt * config.game_speed
 			continue
 		}
-		animation.lifetime -= dt
-		if animation.lifetime < 0.{
+		animation.lifetime -= dt * config.game_speed
+		if animation.lifetime <= 0.{
 			animation.visible = false
 			delete(animation.text)
 			continue
