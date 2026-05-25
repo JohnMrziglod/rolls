@@ -125,12 +125,18 @@ Camera3D :: struct{
 	trauma: f32,
 }
 
+battle_id :: proc(a, b: int) -> int{
+	// we want a unique id for each combination of two dice, regardless of their order
+	if a < b do return a*1000 + b
+	return b*1000 + a
+}
 BattleState :: enum{Over, Fighting, Retreating}
 Battle :: struct {
     dice: [2]^Die,
     previous_positions: [2]Vector3,
     timer: f32,
     state: BattleState,
+    seen: map[int]bool,
 }
 
 GUI :: struct {
@@ -569,8 +575,8 @@ dices_reset :: proc(power:f32=1., first_round:bool=false) {
 		}
 	}
 
-	for &dice, d in app.dice {
-		if dice.player == app.current_player || first_round
+	for &die, d in app.dice {
+		if die.player == app.current_player || first_round
 		{
 			position := random_vector(-AREA_SIZE/8.0, AREA_SIZE/8.0)
 			position.z += -AREA_SIZE/2.0
@@ -581,15 +587,18 @@ dices_reset :: proc(power:f32=1., first_round:bool=false) {
 				rand.float32_range(-1, 100),
 			}
 
-			dice_init(&dice, position)
-			dice.state = .ALIVE
-			dice.velocity = velocity
+			dice_init(&die, position)
+			die.state = .ALIVE
+			die.velocity = velocity
 		}
-		body_set_awake(&dice)
+		body_set_awake(&die)
 
 		// body_clear_accumulators(&dice)
-		body_set_block_inertia_tensor(&dice, dice.shape.(ShapeBox).half_size, 1./dice.inverse_mass)
-		body_calculate_derived_data(&dice)
+		body_set_block_inertia_tensor(&die, die.shape.(ShapeBox).half_size, 1./die.inverse_mass)
+		body_calculate_derived_data(&die)
+
+		die.health = 1
+		die.attack = 1
 	}
 }
 
@@ -743,7 +752,6 @@ dice_upgrades :: proc (dt: real){
 		max_delay = max(max_delay, delay)
 	}
 
-	fmt.printfln("Max delay: %f", max_delay)
 	state_change(.CARDS_BATTLE, wait=max_delay)
 }
 
@@ -773,8 +781,8 @@ cards_battle :: proc (dt: real) {
 			case .CardRoll_Defense:
 				for &dice, d in app.dice{
 					if dice.state != .ALIVE || dice.player != u8(p) do continue
-					dice.health += 2
-					add_text(dice.position, fmt.aprint("+2 HEALTH"), COLOR_CARDS[card.category], lifetime=0.6)
+					dice.health += 1
+					add_text(dice.position, fmt.aprint("+1 HEALTH"), COLOR_CARDS[card.category], lifetime=0.6)
 				}
 			case .CardRoll_Doppelgeist:
 				ghosts := player.ghosts
@@ -887,32 +895,30 @@ dice_battle :: proc(dt: real) {
             if battle.timer > target_time {
                 die1 := app.battle.dice[0]
                 die2 := app.battle.dice[1]
+				attack_left1 := math.max(die1.attack-die2.health, 0)
+				attack_left2 := math.max(die2.attack-die1.health, 0)
                 die1.health = math.max(die1.health-die2.attack, 0)
-				die2.health = math.max(die2.health-die1.attack, 0)
+                die2.health = math.max(die2.health-die1.attack, 0)
+                die1.attack = attack_left1
+                die2.attack = attack_left2
 
-				if die1.health == 0{
-					dice_killed(die1, killer=die2)
-				} else {
-					add_text(die1.position, fmt.aprint("HIT!"), die1.color1)
-				}
+                if die1.health == 0 do app.players[die2.player].roll.kills += 1
+                if die2.health == 0 do app.players[die1.player].roll.kills += 1
 
-				if die2.health == 0{
-					dice_killed(die2, killer=die1)
-				} else  {
-					add_text(die2.position, fmt.aprint("HIT!"), die2.color1)
-				}
+                add_particles(die1.position, die1.color1)
+                add_particles(die2.position, die2.color1)
+                add_text(die1.position, fmt.aprint("FIGHT!"), rl.RAYWHITE, 1.5)
 
 				sound := app.sounds[5]
 				rl.SetSoundVolume(sound, rand.float32_range(0.8, 1.)) // Set volume based on bounce speed
 				rl.SetSoundPitch(sound, 0.1+f32(app.players[die1.player].roll.kills)/f32(len(app.dice)/2.)) // Add some random pitch variation
 				rl.PlaySound(sound)
 
-				battle.state = (die1.state == .ALIVE || die2.state == .ALIVE) ? .Retreating : .Over
+				battle.state = .Retreating
 				battle.timer = 0.
             }
         case .Retreating:
             for &die, d in app.battle.dice{
-                if die.state == .ALIVE do continue
                 die.position = linalg.lerp(die.position, battle.previous_positions[d], battle.timer/target_time)
                 body_calculate_derived_data(die)     // to update the transformation matrix, etc...
             }
@@ -927,17 +933,29 @@ dice_battle :: proc(dt: real) {
 	// We eliminate all app.dice from each player that show the same numbers.
 	// E.g. if player 1 has two app.dice showing a 3 and player 2 has one dice showing a 3,
 	// one dice each is eliminated and won't give points to either player.
+	for &die, d in app.dice{
+		if die.state != .ALIVE do continue
+		for &die2, d2 in app.dice{
+			bid := battle_id(d, d2)
+			if bid in app.battle.seen || d == d2 || die2.state != .ALIVE || die.player == die2.player do continue
 
-	for &dice, d in app.dice{
-		if dice.state != .ALIVE do continue
-		for &other_dice, o in app.dice{
-			if d == o || other_dice.state != .ALIVE || dice.player == other_dice.player do continue
-			if dice.current_number == other_dice.current_number {
-			    dice_fight(&dice, &other_dice)
+			can_attack := die.current_number == die2.current_number
+			if can_attack && die.attack+die2.attack>0 && die.health+die2.health>0 {
+			    dice_fight(&die, &die2)
+				app.battle.seen[bid] = true
 				return
 			}
 		}
 	}
+
+	// Clean up all the dead dice:
+	for &die, d in app.dice{
+		if die.health > 0 || die.state != .ALIVE do continue
+
+		dice_killed(&die)
+	}
+
+	app.battle.seen = {}
 
 	// We move to the next app.state
 	state_change(.DICE_SCORING, 0.5)
@@ -1292,7 +1310,8 @@ wait_for_ai :: proc(){
 			ai.roll.score += best_score
 
 			not_wanted_cards := bit_set[CardType]{
-				.CardRoll_FakeNews, .CardRoll_MarketCrash, .CardRoll_WhiteElephant
+				.CardRoll_Exorcism, .CardRoll_FakeNews,
+				.CardRoll_MarketCrash, .CardRoll_WhiteElephant
 			}
 			cards := [3]Card{}
 			cards_generate(cards[:], .RollAndDiceCards)

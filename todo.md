@@ -1,6 +1,5 @@
-- sort dice from left to right to get better visuals for battling, scoring, etc.
 - show current factor of upgrade card
 - allow to swap face upgrades of die (but not to current top face?)
-- see upgrades of dice while assigning card
 - veteran: This die gains +1 SCORE each time it survives a roll. Resets when it dies.
 - assasin top face
+- fix assasin
