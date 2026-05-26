@@ -509,7 +509,8 @@ draw_card :: proc(card: Card, position: rl.Vector2, color:rl.Color=rl.BLANK, act
 	icon_position := position+{size.x-icon_size-padding, padding}
 	draw_texture(Vector2{0., 16.+f32(card.category)}, icon_position, icon_size, color)
 	if card.category == .ROLL && card.lifetime > 0 {
-		draw_text(fmt.tprintf("%v", card.lifetime), position+{size.x-padding-icon_size-2, padding}, font_size, rl.RAYWHITE, anchor=.RIGHT)
+		draw_text(fmt.tprintf("%v", card.lifetime),
+			position+{size.x-padding-icon_size-2, padding}, font_size, rl.RAYWHITE, anchor=.RIGHT)
 	}
 
 	// main card icon
@@ -536,12 +537,14 @@ draw_card :: proc(card: Card, position: rl.Vector2, color:rl.Color=rl.BLANK, act
 	show_description := hovered || !with_icon
 	text_pos := position + {0., size.y+margin}+padding
 	if show_description && has_text(card.type, "description") {
-        text_size := draw_text(get_text(card.type, "description"), text_pos, font_size, rl.BLACK,
+		text := card_fill_vars(card, get_text(card.type, "description"))
+        text_size := draw_text(text, text_pos, font_size, rl.BLACK,
             max_width=size.x-(text_pos.x-position.x), highlight_color=color, boxed=color, box_width=size.x)
         text_pos.y += text_size.y + 2*padding + margin
 	}
 	if show_description && has_text(card.type, "description2") {
-        text_size := draw_text(get_text(card.type, "description2"), text_pos, font_size, rl.BLACK,
+		text := card_fill_vars(card, get_text(card.type, "description2"))
+        text_size := draw_text(text, text_pos, font_size, rl.BLACK,
             max_width=size.x-(text_pos.x-position.x), highlight_color=color, boxed=color, box_width=size.x)
         text_pos.y += text_size.y + 2*padding + margin
 	}

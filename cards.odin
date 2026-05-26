@@ -4,6 +4,7 @@ import "core:fmt"
 import "core:math"
 import "core:math/rand"
 import "core:reflect"
+import "core:strings"
 import rl "vendor:raylib"
 
 CARD_SIZE :: [2]f32{300, 350}
@@ -95,6 +96,17 @@ cards_generate :: proc(cards: []Card, types:CardGenerateTypes){
 		cards[i] = Card{type=card_type, category=card_category(card_type)}
 		generated_types += {card_type}
 	}
+}
+
+card_fill_vars :: proc(card: Card, text: string) -> string{
+	new_text: string
+
+	new_text, _ = strings.replace_all(text, "%var1_f", fmt.tprintf("%.1f", card.var1))
+	new_text, _ = strings.replace_all(text, "%var1", fmt.tprintf("%.f", card.var1))
+	new_text, _ = strings.replace_all(new_text, "%var2_f", fmt.tprintf("%.1f", card.var2))
+	new_text, _ = strings.replace_all(new_text, "%var2", fmt.tprintf("%.f", card.var2))
+
+	return new_text
 }
 
 card_category :: proc(type: CardType) -> CardCategory{

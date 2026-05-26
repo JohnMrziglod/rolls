@@ -1101,8 +1101,11 @@ dice_scoring :: proc(dt: real) {
                         die.current_score += upgrade.var1
        	            }
 				case .CardDice_PowerDice:
-					text = fmt.aprintf("X%.f", die.current_score)
-					die.current_score *= die.current_score
+					if is_active{
+						upgrade.var1 += 1.
+					}
+					text = fmt.aprintf("X%.f", upgrade.var1)
+					die.current_score *= upgrade.var1
 				case:
 					continue
 				}

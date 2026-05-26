@@ -1,5 +1,12 @@
 - show current factor of upgrade card
 - allow to swap face upgrades of die (but not to current top face?)
-- veteran: This die gains +1 SCORE each time it survives a roll. Resets when it dies.
-- assasin top face
-- fix assasin
+- assassin top face
+- 
+# upgrades
+- veteran: This die gains +2 SCORE each time it survives a roll. Resets when it dies.
+- war hero: This die gains +1 SCORE each time it kills another die.
+- anarchist: This die ADDS the number of eliminated dice in this roll to its SCORE.
+- spikes: This die eliminates all opponent's dice that it touches
+- copy cat: copies the abilities from the upgrade on its left
+- power up: This die multiplies its score by 2.
+-
