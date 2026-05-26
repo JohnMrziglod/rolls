@@ -194,7 +194,8 @@ draw_die :: proc(dice: Die, hoverable:bool=false) -> bool {
 
 	// Draw background and borders
 	for n, i in dice.faces {
-	    draw_die_face(i, size, texture, {f32(6)*fs.x, 0}, fs, color)
+		icon_col :f32= dice.health > 0 ? 6 : 7
+	    draw_die_face(i, size, texture, {icon_col*fs.x, 0}, fs, color)
 	}
 
 	// Draw numbers or upgrades
@@ -265,7 +266,7 @@ add_text_vec_vec :: proc (
 			end = end,
 			text = text,
 			icon_id=icon_id,
-			icon_size=icon_size > 0 ? icon_size : 300,
+			icon_size=icon_size,
 			color = color,
 			start_lifetime = lifetime < 0. ? 2. : lifetime,
 			lifetime = lifetime < 0. ? 2. : lifetime,
@@ -476,7 +477,7 @@ draw_card :: proc(card: Card, position: rl.Vector2, color:rl.Color=rl.BLANK, act
 	if color == rl.BLANK do color = COLOR_CARDS[card.category]
 
 	position := position
-	if position.y+size.y+300 > app.gui.height do position.y -= size.y + 20
+	// if position.y+size.y+300 > app.gui.height do position.y -= size.y + 20
 
 	if hovered && !static{
 		color = rl.ColorBrightness(color, 0.1)
@@ -556,10 +557,13 @@ draw_die_info :: proc(die: Die) -> i32{
 	hovered_upgrade_index :i32= -1
 	position := rl.GetWorldToScreen(die.position, app.camera3d)
 	icon_size := f32(50.)
-    padding := f32(2.)
+    padding := f32(4.)
+
+    draw_box(position, size={6*(icon_size+2*padding)-padding, icon_size+3*padding+app.gui.font_size2}, fill=die.color1)
+
 	#reverse for upgrade, u in die.upgrades{
 		// upgrade_pos, anchor := ring_position_2d(u+1, icon_size+4*padding)
-		upgrade_pos := position + f32(u)*Vector2{icon_size+4*padding, 0.}
+		upgrade_pos := position + f32(u)*Vector2{icon_size+2*padding, 0.}
 		upgraded := upgrade.type != .CardNone
 
         tp := Vector2{0, f32(die.faces[u]-1)} // Standard face number
@@ -586,6 +590,10 @@ draw_die_info :: proc(die: Die) -> i32{
         draw_box({dest.x, dest.y}-padding/2, {}+icon_size+2*padding/2, fill=upgraded ? color : color/2, thickness=2)
         draw_texture(tp, upgrade_pos, icon_size, tint=upgraded ? rl.BLACK : rl.RAYWHITE/2)
     }
+    text := fmt.tprintf("Attack: %v, Health: %v", die.attack, die.health)
+    text_position := position + padding
+    text_position.y += icon_size + padding
+    draw_text(text, text_position, color=rl.BLACK)
 
     return hovered_upgrade_index
 }

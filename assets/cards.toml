@@ -1,9 +1,11 @@
 CardRoll_Attack
 /title="FULL ATTACK!"
 /description="All your DICE get +1 ATTACK."
+/texture_id=[4,1]
 CardRoll_Defense
 /title="DEFENSE! DEFENSE!"
 /description="All your DICE get +1 HEALTH."
+/texture_id=[4,2]
 CardRoll_Doppelgeist
 /title="DOPPELGEIST"
 /description="Duplicates your GHOST DICE."
@@ -38,6 +40,7 @@ CardRoll_Suidice
 CardRoll_WhiteElephant
 /title="WHITE ELEPHANT"
 /description="Your antagonist gets all your GHOST DICE of this ROLL."
+/texture_id=[4,3]
 CardRoll_TombRaider
 /title="TOMB RAIDER"
 /description="Steal one of your antagonist's GHOST DICE."
@@ -45,11 +48,12 @@ CardRoll_TombRaider
 CardDice_Assassin
 /title="ASSASSIN"
 /description="+2 ATTACK for this die."
-/description2="When on [h]TOP FACE[h], attacks ANTAGONIST's highest die."
+/description2="When on [h]TOP FACE[h], +3 ATTACK for this die."
 /texture_id=[1,1]
-CardDice_Blind
-/title="BLIND"
-/description="Attacks closest antagonist's die regardless of its number."
+CardDice_Drunk
+/title="DRUNK"
+/description="This die attacks antagonist's dice regardless of their numbers."
+/texture_id=[1,18]
 CardDice_Tank
 /title="TANK"
 /description="+2 HEALTH for this die."
@@ -98,12 +102,12 @@ CardDice_PlusOne
 /texture_id=[1,5]
 CardDice_Investor
 /title="INVESTOR"
-/description="Adds die's SCORE with 10% interest to SAVINGS (currently %var1_f)."
+/description="Adds die's SCORE with 10% interest to SAVINGS (currently %VAR1_F)."
 /description2="When on [h]TOP FACE[h], adds die's SAVINGS to the ROLL SCORE and reset SAVINGS to 0."
 /texture_id=[1,3]
 CardDice_PowerDice
 /title="POWER UP"
-/description="This die multiplies its score by a factor (currently %var1)."
+/description="This die multiplies its score by [h]%VAR1[h]."
 /description2="When on [h]TOP FACE[h], increase the factor by 1."
 /texture_id=[1,16]
 CardDice_ShortSighted
@@ -111,19 +115,22 @@ CardDice_ShortSighted
 /description="Attacks farthest antagonist's die regardless of its number."
 CardDice_Historian
 /title="HISTORIAN"
-/description="Gains permanently +1 SCORE when alive and activating a ROLL CARD (currently %var1)."
+/description="Gains permanently +1 SCORE when alive and activating a ROLL CARD (currently %VAR1)."
 /texture_id=[1,13]
 CardDice_Librarian
 /title="LIBRARIAN"
-/description="Gains permanently +1 SCORE when alive and assigning a DICE CARD to another die (currently %var1)."
+/description="Gains permanently +1 SCORE when alive and assigning a DICE CARD to another die (currently %VAR1)."
 /texture_id=[1,12]
 CardDice_Researcher
 /title="RESEARCHER"
-/description="Gains permanently +1 ROLL MULTIPLIER when alive and activating a CYCLE CARD (currently %var1)."
+/description="Gains permanently +1 ROLL MULTIPLIER when alive and activating a CYCLE CARD (currently %VAR1)."
 /texture_id=[1,10]
-CardDice_Survivor
-/title="SURVIVOR"
-/description="Adds the number of ROLLS since last death to die's score."
+CardDice_Veteran
+/title="VETERAN"
+/description="This die gains +2 SCORE each time it survives a roll (currently %VAR1). Resets to 0 when it dies."
+CardDice_WarHero
+/title="WAR HERO"
+/description="This die gains +1 SCORE each time it kills another die (currently [h]%VAR1[h])."
 CardDice_Train
 /title="TRAIN"
 /description="Adds the sum of your other dice higher than this die to its score."

@@ -348,7 +348,7 @@ main :: proc() {
 		for file in files do defer delete(file)
 	}
 
-	config.game_speed = 1.5
+	config.game_speed = 2.
 
 	app.camera3d = {
 		up={0.0, 0.0, -1.},
@@ -431,14 +431,10 @@ main :: proc() {
 		}
 
 		if rl.IsKeyPressed(rl.KeyboardKey.F){
-			app.cards_offer = {}
-			cards_generate(app.cards_offer[:3], .RollAndDiceCards)
-			state_change(.CARDS_OFFER)
+			config.game_speed += .5
 		}
 		if rl.IsKeyPressed(rl.KeyboardKey.D){
-			app.cards_offer = {}
-			cards_generate(app.cards_offer[:1], .RollAndDiceCards)
-			state_change(.CARDS_OFFER)
+			config.game_speed -= .5
 		}
 		if rl.IsKeyPressed(rl.KeyboardKey.G){
 			app.cards_offer = {}
@@ -775,8 +771,8 @@ cards_battle :: proc (dt: real) {
 			case .CardRoll_Attack:
 				for &dice, d in app.dice{
 					if dice.state != .ALIVE || dice.player != u8(p) do continue
-					dice.attack += 2
-					add_text(dice.position, fmt.aprint("+2 ATTACK"), COLOR_CARDS[card.category], lifetime=0.6)
+					dice.attack += 1
+					add_text(dice.position, fmt.aprint("+1 ATTACK"), COLOR_CARDS[card.category], lifetime=0.6)
 				}
 			case .CardRoll_Defense:
 				for &dice, d in app.dice{
@@ -881,7 +877,7 @@ dice_battle :: proc(dt: real) {
 	if app.battle.state != .Over{
 	    battle := &app.battle
         battle.timer += dt * config.game_speed
-        target_time :f32= 0.3
+        target_time :f32= 0.5
 
         clash_position := (battle.previous_positions[0] + battle.previous_positions[1]) / 2.
         clash_position.y += 6.
@@ -895,6 +891,8 @@ dice_battle :: proc(dt: real) {
             if battle.timer > target_time {
                 die1 := app.battle.dice[0]
                 die2 := app.battle.dice[1]
+                die1_alive_before := die1.health > 0
+                die2_alive_before := die2.health > 0
 				attack_left1 := math.max(die1.attack-die2.health, 0)
 				attack_left2 := math.max(die2.attack-die1.health, 0)
                 die1.health = math.max(die1.health-die2.attack, 0)
@@ -902,8 +900,14 @@ dice_battle :: proc(dt: real) {
                 die1.attack = attack_left1
                 die2.attack = attack_left2
 
-                if die1.health == 0 do app.players[die2.player].roll.kills += 1
-                if die2.health == 0 do app.players[die1.player].roll.kills += 1
+				if die1_alive_before && die1.health == 0{
+				   	dice_kills(die2, die1)
+				}
+				if die2_alive_before && die2.health == 0{
+					dice_kills(die1, die2)
+				}
+                // if die1.health == 0 do app.players[die2.player].roll.kills += 1
+                // if die2.health == 0 do app.players[die1.player].roll.kills += 1
 
                 add_particles(die1.position, die1.color1)
                 add_particles(die2.position, die2.color1)
@@ -935,12 +939,14 @@ dice_battle :: proc(dt: real) {
 	// one dice each is eliminated and won't give points to either player.
 	for &die, d in app.dice{
 		if die.state != .ALIVE do continue
+		can_always_attack := die_has_upgrade(die, .CardDice_Drunk)
 		for &die2, d2 in app.dice{
 			bid := battle_id(d, d2)
 			if bid in app.battle.seen || d == d2 || die2.state != .ALIVE || die.player == die2.player do continue
 
 			can_attack := die.current_number == die2.current_number
-			if can_attack && die.attack+die2.attack>0 && die.health+die2.health>0 {
+			can_attack |= can_always_attack
+			if can_attack && die.attack+die.health>0 && die2.attack+die2.health>0 {
 			    dice_fight(&die, &die2)
 				app.battle.seen[bid] = true
 				return
@@ -982,7 +988,7 @@ dice_scoring :: proc(dt: real) {
 			delay: f32
 			duration :f32: 0.8
 			for &upgrade, u in die.upgrades{
-			    is_active := die.current_face == u
+			    on_top := die.current_face == u
 				text: string
 
 				#partial switch upgrade.type {
@@ -1011,19 +1017,19 @@ dice_scoring :: proc(dt: real) {
 						text = fmt.aprint("x2 ROLL SCORE")
 					}
 				case .CardDice_Influencer:
-					if is_active {
+					if on_top {
 						append(&player.cards, Card{})
 						cards_generate(player.cards[len(player.cards)-1:], .RollCards)
 						text = fmt.aprint("+1 ROLL CARD")
 					}
 				case .CardDice_Engineer:
-					if is_active {
+					if on_top {
 						append(&player.cards, Card{})
 						cards_generate(player.cards[len(player.cards)-1:], .DiceCards)
 						text = fmt.aprint("+1 DICE CARD")
 					}
 				case .CardDice_Investor:
-					if is_active {
+					if on_top {
 						text = fmt.aprintf("PAYOUT +%.f", upgrade.var1)
 						die.current_score += math.floor(upgrade.var1)
 						upgrade.var1 = 0.
@@ -1052,7 +1058,7 @@ dice_scoring :: proc(dt: real) {
 					text = fmt.aprintf("+%v", len(player.ghosts))
 					die.current_score += sco(len(player.ghosts))
 				case .CardDice_Optimist:
-				    if is_active {
+				    if on_top {
 						bonus := 0.
 						for o in player.dice_sorted {
 							other_die := &app.dice[o]
@@ -1064,11 +1070,11 @@ dice_scoring :: proc(dt: real) {
 					}
 				case .CardDice_PlusOne:
 				    plus_score := 1
-					if is_active do plus_score += n_alive-1
+					if on_top do plus_score += n_alive-1
 					text = fmt.aprintf("+%v", plus_score)
 					die.current_score += sco(plus_score)
 				case .CardDice_Pessimist:
-				    if is_active {
+				    if on_top {
 						multiplier := 0.
 						for o in player.dice_sorted {
 							other_die := &app.dice[o]
@@ -1101,25 +1107,30 @@ dice_scoring :: proc(dt: real) {
                         die.current_score += upgrade.var1
        	            }
 				case .CardDice_PowerDice:
-					if is_active{
+					if on_top{
 						upgrade.var1 += 1.
 					}
 					text = fmt.aprintf("X%.f", upgrade.var1)
 					die.current_score *= upgrade.var1
+				case .CardDice_Veteran:
+	    			upgrade.var1 += 2
+					text = fmt.aprintf("+%.f", upgrade.var1)
+					die.current_score += sco(upgrade.var1)
+				case .CardDice_WarHero:
+					text = fmt.aprintf("+%.f", upgrade.var1)
+					die.current_score += sco(upgrade.var1)
 				case:
 					continue
 				}
 				if len(text) > 0{
 					add_text(die.position, text, die.color1,
 							delay=delay, lifetime=duration,
-							icon_id=icon_index_from_id(reflect.enum_string(upgrade.type)))
+							icon_id=icon_index_from_card(upgrade.type))
 					delay += duration
 				}
 			}
 
 			if die.current_score != 0 || delay > 0 {
-				// camera_zoom(die.position)
-
 				die.already_scored = true
 				player.roll.score += die.current_score
 				player.roll.score_timer = 1.
@@ -1130,8 +1141,8 @@ dice_scoring :: proc(dt: real) {
 
 				add_text(die.position,
 					fmt.aprintf("+%.f", die.current_score), die.color1,
-					delay=delay, lifetime=duration*1.2)
-				wait(delay + 1.2*duration)
+					delay=delay, lifetime=duration*1.1)
+				wait(delay + 1.1*duration)
 			}
 
 			return
@@ -1873,7 +1884,7 @@ draw :: proc(dt: real) {
 		animation.lifetime -= dt * config.game_speed
 		if animation.lifetime <= 0.{
 			animation.visible = false
-			delete(animation.text)
+			if len(animation.text) > 0 do delete(animation.text)
 			continue
 		}
 
@@ -1891,7 +1902,8 @@ draw :: proc(dt: real) {
 
 		life_ratio := animation.lifetime / animation.start_lifetime
 		alpha := life_ratio > 0.3 ? 1.0 : life_ratio/0.3
-		font_size *= splash(life_ratio)
+		size_factor := splash(life_ratio)
+		font_size *= size_factor
 
 		// end_2d = start_2d// + {0, -20}
 
@@ -1900,7 +1912,7 @@ draw :: proc(dt: real) {
 
 		icon_id, has_icon := animation.icon_id.?
 		if has_icon{
-			icon_size :f32= font_size * 4
+			icon_size :f32= animation.icon_size > 0. ? animation.icon_size*size_factor : font_size * 4
 			draw_texture(icon_id, {x-icon_size/2, y-icon_size/2}, icon_size,
 				rl.ColorAlpha(animation.color, alpha)
 			)

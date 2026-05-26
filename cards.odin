@@ -28,6 +28,7 @@ CardType :: enum i32{
 		CardRolls,				// <- Until here we got roll cards
 	CardDice_Antenna,
 	CardDice_Assassin,
+	CardDice_Drunk,
 	CardDice_Engineer,
 	CardDice_Journalist,
 	CardDice_General,
@@ -38,13 +39,13 @@ CardType :: enum i32{
 	CardDice_Pessimist,
 	CardDice_PlusOne,
 	CardDice_PowerDice,
-	// CardDice_ShortSighted,
-	// CardDice_Blind,
 	CardDice_Historian,
 	CardDice_Librarian,
 	CardDice_Researcher,
 	CardDice_Tank,
 	CardDice_Train,
+	CardDice_Veteran,
+	CardDice_WarHero,
 		CardDices,				// <- Until we got upgrade cards
 	CardCycle_ExtraDie,
 	CardCycle_EternalRoll,
@@ -88,11 +89,10 @@ cards_generate :: proc(cards: []Card, types:CardGenerateTypes){
 	for i in 0..<len(cards) {
 		card_type: CardType
 
-		for (card_type == .CardNone || card_type in generated_types) {
+		for (card_type == .CardNone || card_type == .CardRolls || card_type in generated_types) {
 			card_type = CardType(rand.int32_range(lower_bound, upper_bound))
 		}
 
-		if card_type == .CardRolls do card_type = CardType(i32(card_type)-1)
 		cards[i] = Card{type=card_type, category=card_category(card_type)}
 		generated_types += {card_type}
 	}
@@ -101,10 +101,13 @@ cards_generate :: proc(cards: []Card, types:CardGenerateTypes){
 card_fill_vars :: proc(card: Card, text: string) -> string{
 	new_text: string
 
-	new_text, _ = strings.replace_all(text, "%var1_f", fmt.tprintf("%.1f", card.var1))
-	new_text, _ = strings.replace_all(text, "%var1", fmt.tprintf("%.f", card.var1))
-	new_text, _ = strings.replace_all(new_text, "%var2_f", fmt.tprintf("%.1f", card.var2))
-	new_text, _ = strings.replace_all(new_text, "%var2", fmt.tprintf("%.f", card.var2))
+	allocator := context.allocator
+	context.allocator = context.temp_allocator
+	new_text, _ = strings.replace_all(text, "%VAR1_F", fmt.tprintf("%.1f", card.var1))
+	new_text, _ = strings.replace_all(new_text, "%VAR1", fmt.tprintf("%.f", card.var1))
+	new_text, _ = strings.replace_all(new_text, "%VAR2_F", fmt.tprintf("%.1f", card.var2))
+	new_text, _ = strings.replace_all(new_text, "%VAR2", fmt.tprintf("%.f", card.var2))
+	context.allocator = allocator
 
 	return new_text
 }
