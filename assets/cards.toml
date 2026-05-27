@@ -120,9 +120,10 @@ CardDice_PowerDice
 /description="This die multiplies its score by [h]%VAR1[h]."
 /description2="When on [h]TOP FACE[h], increase the factor by 1."
 /texture_id=[1,16]
-CardDice_ShortSighted
-/title="SHORT-SIGHTED"
-/description="Attacks farthest antagonist's die regardless of its number."
+CardDice_Train
+/title="TRAIN"
+/description="Adds the sum of your other dice higher than this die to its score."
+/texture_id=[1,11]
 CardDice_Historian
 /title="HISTORIAN"
 /description="Gains permanently +1 SCORE when alive and activating a ROLL CARD (currently %VAR1)."
@@ -131,6 +132,10 @@ CardDice_Librarian
 /title="LIBRARIAN"
 /description="Gains permanently +1 SCORE when alive and assigning a DICE CARD to another die (currently %VAR1)."
 /texture_id=[1,12]
+CardDice_Pirate
+/title="PIRATE"
+/description="Always scores the same amount like antagonist's highest scoring die."
+/texture_id=[2,1]
 CardDice_Researcher
 /title="RESEARCHER"
 /description="Gains permanently +1 ROLL MULTIPLIER when alive and activating a CYCLE CARD (currently %VAR1)."
@@ -144,10 +149,6 @@ CardDice_WarHero
 /title="WAR HERO"
 /description="This die gains +1 SCORE each time it kills another die (currently [h]%VAR1[h])."
 /texture_id=[2,0]
-CardDice_Train
-/title="TRAIN"
-/description="Adds the sum of your other dice higher than this die to its score."
-/texture_id=[1,11]
 # CYCLE CARDS
 CardCycle_ExtraDie
 /title="EXTRA DIE"

@@ -41,6 +41,7 @@ CardType :: enum i32{
 	CardDice_PowerDice,
 	CardDice_Historian,
 	CardDice_Librarian,
+	CardDice_Pirate,
 	CardDice_Researcher,
 	CardDice_Tank,
 	CardDice_Train,
