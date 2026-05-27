@@ -1,6 +1,5 @@
 - allow to swap face upgrades of die (but not to current top face?)
-- assassin top face
-- 
+
 # upgrades
 - war hero: This die gains +1 SCORE each time it kills another die.
 - anarchist: This die adds the number of eliminated dice in this roll to its SCORE.

@@ -724,10 +724,10 @@ dice_upgrades :: proc (dt: real){
     for &die, d in app.dice{
 		if die.state != .ALIVE do continue
 
-		// Apply dice card effects
 		delay: f32
 		for &upgrade, u in die.upgrades{
 			text: string
+			on_top := die.current_face == u
 
 			#partial switch upgrade.type {
 			case .CardDice_Assassin:
@@ -736,14 +736,21 @@ dice_upgrades :: proc (dt: real){
 			case .CardDice_Tank:
 			    die.health += 2.
 				text = fmt.aprint("+2 HEALTH")
+			case .CardDice_Veteran:
+			    if on_top {
+    			    die.health += 1.
+    				text = fmt.aprint("+1 HEALTH")
+				}
 			case:
 				continue
 			}
-			add_text(die.position, text, die.color1,
-					delay=delay, lifetime=duration,
-					icon_id=icon_index_from_card(upgrade.type))
+			if len(text) > 0{
+    			add_text(die.position, text, die.color1,
+    					delay=delay, lifetime=duration,
+    					icon_id=icon_index_from_card(upgrade.type))
 
-			delay += duration
+    			delay += duration
+			}
 		}
 		max_delay = max(max_delay, delay)
 	}
@@ -1642,7 +1649,7 @@ draw :: proc(dt: real) {
 			if dice_button(ghost_number, position, ghost_size, active_color=human.color, active=active, clickable=true) {
 				free_index := -1
 				for &slot, slot_index in app.ghosts_selected{
-					if slot == i32(ghost_index) {
+					if slot == ghost_index {
 						slot = -1 // deselect if already selected
 						free_index = -1 // no further action
 						break
@@ -1652,14 +1659,8 @@ draw :: proc(dt: real) {
 						break
 					}
 				}
-				// if free_index == -1 {
-				// 	// We didn't find any empty slot, we move all selected ghosts
-				// 	// to the left and remove the left-most
-				// 	slice.rotate_left(app.ghosts_selected[:], 1)
-				// 	app.ghosts_selected[4] = i32(ghost_index)
-				// } else
 				if free_index >= 0 {
-					app.ghosts_selected[free_index] = i32(ghost_index)
+					app.ghosts_selected[free_index] = ghost_index
 				}
 			}
 		}

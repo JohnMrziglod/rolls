@@ -8,42 +8,52 @@ CardRoll_Defense
 /texture_id=[4,2]
 CardRoll_Doppelgeist
 /title="DOPPELGEIST"
-/description="Duplicates your GHOST DICE."
+/description="This card duplicates your GHOST DICE after each roll."
+/texture_id=[4,4]
 CardRoll_Exorcism
 /title="EXORCISM"
 /description="You won't gain any GHOST DICE after the next ROLL."
+/texture_id=[4,5]
 CardRoll_FakeNews
 /title="FAKE NEWS"
-/description="All JOURNALIST DICE multiply the ROLL SCORE by 0.5 instead of 2."
+/description="All JOURNALIST DICE will only add 0.5 to the ROLL MULTIPLIER."
+/texture_id=[4,7]
 CardRoll_GhostHour
 /title="GHOST HOUR"
 /description="Your GHOST DICE' numbers add to your ROLL SCORE."
+/texture_id=[4,6]
 CardRoll_GraveRoll
 /title="GRAVE ROLL"
-/description="Your GHOST DICE will be rerolled."
+/description="Your GHOST DICE will be rerolled after each roll."
+/texture_id=[4,8]
 CardRoll_HappyHour
 /title="HAPPY HOUR"
 /description="+2 to your ROLL MULTIPLIER."
 /texture_id=[4,0]
 CardRoll_Immortality
 /title="IMMORTALITY"
-/description="Your DICE cannot die during after the next ROLL."
+/description="Your DICE cannot die after the next ROLL."
+/texture_id=[4,12]
 CardRoll_MarketCrash
 /title="MARKET CRASH"
-/description="All INVESTOR DICE lose 50% of their savings."
+/description="All INVESTOR DICE lose 50% of their savings after each roll."
+/texture_id=[4,10]
 CardRoll_Revenge
 /title="REVENGE"
 /description="If you have a lower ROLL SCORE than your antagonist, swap them."
+/texture_id=[4,9]
 CardRoll_Suidice
 /title="SUIDICE"
 /description="Your highest DIE explodes and eliminates all of your ANTAGONIST'S DICE."
+/texture_id=[4,11]
 CardRoll_WhiteElephant
 /title="WHITE ELEPHANT"
-/description="Your antagonist gets all your GHOST DICE of this ROLL."
+/description="Your antagonist gets all your GHOST DICE of the next roll."
 /texture_id=[4,3]
 CardRoll_TombRaider
 /title="TOMB RAIDER"
-/description="Steal one of your antagonist's GHOST DICE."
+/description="Steal one of your antagonist's GHOST DICE after the next roll."
+/texture_id=[4,13]
 # DICE CARDS
 CardDice_Assassin
 /title="ASSASSIN"
@@ -128,9 +138,12 @@ CardDice_Researcher
 CardDice_Veteran
 /title="VETERAN"
 /description="This die gains +2 SCORE each time it survives a roll (currently %VAR1). Resets to 0 when it dies."
+/description2="When on [h]TOP FACE[h], +1 HEALTH for this die."
+/texture_id=[1,19]
 CardDice_WarHero
 /title="WAR HERO"
 /description="This die gains +1 SCORE each time it kills another die (currently [h]%VAR1[h])."
+/texture_id=[2,0]
 CardDice_Train
 /title="TRAIN"
 /description="Adds the sum of your other dice higher than this die to its score."

@@ -215,7 +215,7 @@ draw_die :: proc(dice: Die, hoverable:bool=false) -> bool {
 
 		// we only draw the face on this side if we hover it, so icons are more recognisable
 		if hovered {
-			draw_die_face(f, size, texture, {f32(13)*fs.x, 0}, fs, dice.color1, scale=0.95)
+			draw_die_face(f, size, texture, {f32(15)*fs.x, 0}, fs, dice.color1, scale=0.95)
 			draw_die_face(f, size, texture, {f32(n-1)*fs.x, 0.}, fs, rl.BLACK, scale=0.45)
 		}
 	}
@@ -445,27 +445,28 @@ icon_index_from_card :: proc(card_type: CardType) -> Vector2 {
 }
 
 draw_texture :: proc{draw_texture_by_index, draw_texture_by_string}
-draw_texture_by_index :: proc(texture_id:Vector2={0,1}, position: Vector2, size: f32, tint:rl.Color=rl.BLACK){
+draw_texture_by_index :: proc(texture_id:Vector2={0,1}, position: Vector2, size: f32, tint:rl.Color=rl.BLACK, rotation:f32=0.){
 	texture := app.textures[0]
 	ts := TextureFaceSize
 	tp := ts.yx * texture_id.yx
-	dest := rl.Rectangle{x=position.x, y=position.y, width=size, height=size}
-	rl.DrawTexturePro(texture, {x=tp.x, y=tp.y, width=ts.x, height=ts.y}, dest, {}, 0., tint)
+	dest := rl.Rectangle{x=position.x+size/2., y=position.y+size/2., width=size, height=size}
+	origin := position
+	rl.DrawTexturePro(texture, {x=tp.x, y=tp.y, width=ts.x, height=ts.y}, dest, {}+size/2., rotation, tint)
 }
-draw_texture_by_string :: proc(texture_id: string, position: Vector2, size: f32, tint:rl.Color=rl.BLACK){
+draw_texture_by_string :: proc(texture_id: string, position: Vector2, size: f32, tint:rl.Color=rl.BLACK, rotation:f32=0.){
 	texture := app.textures[0]
 	ts := TextureFaceSize
 	tp := (ts * icon_index_from_id(texture_id) ).yx
 
 	// if texture_id in app.sub_textures do tp = ts.yx * .yx
 
-	dest := rl.Rectangle{x=position.x, y=position.y, width=size, height=size}
-	rl.DrawTexturePro(texture, {x=tp.x, y=tp.y, width=ts.x, height=ts.y}, dest, {}, 0., tint)
+	dest := rl.Rectangle{x=position.x+size/2., y=position.y+size/2., width=size, height=size}
+	rl.DrawTexturePro(texture, {x=tp.x, y=tp.y, width=ts.x, height=ts.y}, dest, {}+size/2., rotation, tint)
 }
 
 draw_card :: proc(card: Card, position: rl.Vector2, color:rl.Color=rl.BLANK, actions:[]string={}, static:bool=false, with_icon:bool=true) -> (bool, i32){
     size := CARD_SIZE
-   	font_size :f32= 25 // app.gui.font_size2
+   	font_size :f32= app.gui.font_size2
 	padding :f32= 10
 	margin: f32 = 10
 	header_height := font_size+2*padding
@@ -520,7 +521,7 @@ draw_card :: proc(card: Card, position: rl.Vector2, color:rl.Color=rl.BLANK, act
 		icon_size = min(size.x, size.y)-2*padding
 		icon_color := hovered ? rl.ColorAlpha(color, 0.5) : color
 		rl.DrawRectangleV(icon_position+40, {}+icon_size-2*40, rl.ColorBrightness(icon_color, -0.2))
-		draw_texture(reflect.enum_string(card.type), icon_position, icon_size, icon_color)
+		draw_texture(reflect.enum_string(card.type), icon_position, icon_size+math.sin(f32(rl.GetTime())+30*f32(card.type))*3, icon_color, rotation=math.sin(f32(rl.GetTime())+10*f32(card.type))*3)
 	} else {
 		margin = 0.
 	}
@@ -537,17 +538,17 @@ draw_card :: proc(card: Card, position: rl.Vector2, color:rl.Color=rl.BLANK, act
 	// Description
 	show_description := hovered || !with_icon
 	text_pos := position + {0., size.y+margin}+padding
-	if show_description && has_text(card.type, "description") {
-		text := card_fill_vars(card, get_text(card.type, "description"))
-        text_size := draw_text(text, text_pos, font_size, rl.BLACK,
-            max_width=size.x-(text_pos.x-position.x), highlight_color=color, boxed=color, box_width=size.x)
-        text_pos.y += text_size.y + 2*padding + margin
-	}
-	if show_description && has_text(card.type, "description2") {
-		text := card_fill_vars(card, get_text(card.type, "description2"))
-        text_size := draw_text(text, text_pos, font_size, rl.BLACK,
-            max_width=size.x-(text_pos.x-position.x), highlight_color=color, boxed=color, box_width=size.x)
-        text_pos.y += text_size.y + 2*padding + margin
+	if show_description {
+	    ids := []string{"description", "description2"}
+		for id in ids{
+		    if !has_text(card.type, id) do continue
+
+			text := card_fill_vars(card, get_text(card.type, id))
+            text_size := draw_text(
+                    text, text_pos, font_size, rl.BLACK,
+                    max_width=size.x-(text_pos.x-position.x), highlight_color=color, boxed=color, box_width=size.x)
+            text_pos.y += text_size.y + 2*padding + margin
+		}
 	}
 
 	return hovered, -1

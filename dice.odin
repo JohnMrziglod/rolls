@@ -2,6 +2,7 @@ package game
 
 import "core:fmt"
 import "core:slice"
+import rl "vendor:raylib"
 
 dice_kills :: proc(killer: ^Die, victim: ^Die) {
 	for &upgrade in killer.upgrades{
@@ -20,7 +21,8 @@ dice_killed :: proc(victim: ^Die, killer: ^Die=nil){
 
 	add_particles(victim.position, victim.color1)
 	add_text(victim.position, app.gui.ghost_positions[victim.player],
-			"", victim.color1, 2.0, icon_id=Vector2{0, 14}, icon_size=app.gui.font_size2)
+			"", rl.ColorAlpha(victim.color1, .5), 2.0, icon_id=Vector2{0, 7+f32(victim.current_number)},
+		    icon_size=app.gui.font_size1)
 
 	victim.state = .DEAD
 	victim.position.y = 1000.
