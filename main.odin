@@ -1068,22 +1068,31 @@ dice_scoring :: proc(dt: real) {
 				    if on_top {
 						bonus := 0.
 						for o in player.dice_sorted {
-							other_die := &app.dice[o]
-                            if d == o || other_die.state != .ALIVE || other_die.current_number < 4 do continue
-                            bonus += sco(other_die.current_number)
+							die2 := &app.dice[o]
+                            if d == o || die2.state != .ALIVE || die2.current_number < 4 do continue
+                            bonus += sco(die2.current_number)
+                            add_text(die2.position, fmt.aprintf("+%v", die2.current_number), die2.color1,
+                            	delay=delay, lifetime=duration, icon_id=icon_index_from_id("CardDice_Optimist"), icon_size=50)
+                            delay += duration/3.
                         }
 						text = fmt.aprintf("+%.f", bonus)
 						die.current_score += bonus
 					}
 				case .CardDice_Pirate:
 					highest_score: sco
+					highest_die: i32
 					for d2 in other_player.dice_sorted {
 						die2 := &app.dice[d2]
                         if die2.state != .ALIVE || sco(die2.current_number) <= highest_score do continue
                         highest_score = sco(die2.current_number)
+                        highest_die = d2
                     }
 					text = fmt.aprintf("+%.f", highest_score)
 					die.current_score += highest_score
+					die2 := &app.dice[highest_die]
+					add_text(die2.position, fmt.aprintf("+%v", die2.current_number), die2.color1,
+                        	delay=delay, lifetime=duration, icon_id=icon_index_from_id("CardDice_Pirate"), icon_size=50)
+					delay += duration/3.
 				case .CardDice_PlusOne:
 				    plus_score := 1
 					if on_top do plus_score += n_alive-1
@@ -1093,9 +1102,12 @@ dice_scoring :: proc(dt: real) {
 				    if on_top {
 						multiplier := 0.
 						for o in player.dice_sorted {
-							other_die := &app.dice[o]
-                            if d == o || other_die.state != .ALIVE || other_die.current_number > 3 do continue
-                            multiplier += sco(other_die.current_number)
+							die2 := &app.dice[o]
+                            if d == o || die2.state != .ALIVE || die2.current_number > 3 do continue
+                            multiplier += sco(die2.current_number)
+                            add_text(die2.position, fmt.aprintf("+%v", die2.current_number), die2.color1,
+                            	delay=delay, lifetime=duration, icon_id=icon_index_from_id("CardDice_Pessimist"), icon_size=50)
+                            delay += duration/3.
                         }
                         if multiplier > 0. {
     						text = fmt.aprintf("x%.f", multiplier)
@@ -1110,7 +1122,7 @@ dice_scoring :: proc(dt: real) {
                         if d == d2 || die2.state != .ALIVE || die2.current_number <= die.current_number do continue
                         bonus += sco(die2.current_number)
                         add_text(die2.position, fmt.aprintf("+%v", die2.current_number), die2.color1,
-                        	delay=delay, lifetime=duration, icon_id=icon_index_from_id("CardDice_Train"))
+                        	delay=delay, lifetime=duration, icon_id=icon_index_from_id("CardDice_Train"), icon_size=50)
                         delay += duration/3.
                     }
                     if bonus > 0. {
