@@ -180,6 +180,12 @@ card_activate :: proc(player: ^Player, card: ^Card){
 			}
 		}
 	}
+
+	texture_ids := []Vector2{
+		{0, 8}, {0, 9}, {0, 10}, {0, 11}, {0, 12}, {0, 13},
+	}
+	add_icon_particles(
+		rl.GetMousePosition()-CARD_SIZE/2., CARD_SIZE, texture_ids, COLOR_CARDS[card.category])
 }
 
 card_assign :: proc(die: ^Die, card: Card, index:i32=-1) -> bool{

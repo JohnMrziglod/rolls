@@ -65,6 +65,13 @@ quaternion_add_vector :: proc(q: ^Quaternion, vector: Vector3) {
 	q.z += nq.z * 0.5
 }
 
+random_vector2 :: proc(min, max: f32) -> Vector2 {
+	return {
+		rand.float32_range(min, max),
+		rand.float32_range(min, max),
+	}
+}
+
 random_vector :: proc(min, max: f32, y_min:f32=99999.) -> Vector3 {
 	y_min := y_min
 	if y_min == 99999. {

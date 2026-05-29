@@ -27,6 +27,14 @@ Particles :: struct{
 	lifetime: f32
 }
 
+IconParticle :: struct{
+	position: Vector2,
+	velocity: Vector2,
+	texture_id: Vector2,
+	color: rl.Color,
+	lifetime: f32,
+}
+
 Vector :: union{Vector2, Vector3}
 Animation :: struct{
 	start: Vector,
@@ -237,6 +245,30 @@ add_particles :: proc(position: Vector3, color: rl.Color){
 		particles.lifetime = 1.0
 
 		return
+	}
+}
+
+add_icon_particles :: proc(position, area: Vector2, texture_ids: []Vector2, color: rl.Color, lifetime:f32=2.){
+	for &particle in app.icon_particles[:200]{
+		particle.position = position+{rand.float32_range(0, area.x), rand.float32_range(0, area.y)}
+		// particle.velocity = random_vector2(-200., 200.)
+		particle.velocity.y = rand.float32_range(50, 1000)
+		particle.texture_id = rand.choice(texture_ids[:])
+		particle.color = color
+		particle.lifetime = lifetime
+	}
+}
+
+draw_icon_particles :: proc(dt: real){
+	for &particle, i in app.icon_particles{
+		if particle.lifetime <= 0. do return
+
+		draw_texture_by_index(particle.texture_id, particle.position, 30.,
+			rl.ColorAlpha(particle.color, min(particle.lifetime, 1.)),
+			rotation=math.sin((f32(rl.GetTime())+f32(i))*10)*20
+		)
+		particle.position += particle.velocity * dt
+		particle.lifetime -= dt * config.game_speed
 	}
 }
 
@@ -560,7 +592,7 @@ draw_die_info :: proc(die: Die) -> i32{
 	icon_size := f32(50.)
     padding := f32(4.)
 
-    draw_box(position, size={6*(icon_size+2*padding)-padding, icon_size+3*padding+app.gui.font_size2}, fill=die.color1)
+    draw_box(position, size={6*(icon_size+2*padding)-padding, icon_size+3*padding+app.gui.font_size2}, fill=rl.ColorAlpha(die.color1, 0.5))
 
 	#reverse for upgrade, u in die.upgrades{
 		// upgrade_pos, anchor := ring_position_2d(u+1, icon_size+4*padding)

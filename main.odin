@@ -166,6 +166,7 @@ Application :: struct {
 	camera3d: Camera3D,
 	camera2d: rl.Camera2D,
 	particles: [1000]Particles,
+	icon_particles: [1000]IconParticle,
 	animations: [200]Animation,
 
 	// game world
@@ -1231,6 +1232,11 @@ scoring_summary :: proc(dt: real) {
 			    append(&player.cards, card)
 			} else {
 				play_sound(11)
+				texture_ids := []Vector2{
+					{0, 8}, {0, 9}, {0, 10}, {0, 11}, {0, 12}, {0, 13},
+				}
+				add_icon_particles(
+					app.gui.hand_positions[p], CARD_SIZE, texture_ids, COLOR_CARDS[card.category])
 			}
 		}
 	}
@@ -1486,6 +1492,7 @@ draw :: proc(dt: real) {
 
 	for &player, p in app.players{
 		discard_card := -1
+		discard_position: Vector2
 		discard_silent := false
 
 		// We draw them in reverse, so we don't get a z-order problem with the cards (the hovered one should be on top)
@@ -1511,6 +1518,7 @@ draw :: proc(dt: real) {
 					app.card_selected = card
 					discard_card = c
 					discard_silent = true
+					discard_position = position
 					state_change(.UPGRADE_DIE)
 				}
 			} else if action == 0{
@@ -1960,6 +1968,8 @@ draw :: proc(dt: real) {
 		}
 		draw_text(animation.text, {x, y}, font_size, text_color, outline=text_outline)
 	}
+
+	draw_icon_particles(dt)
 }
 
 wait :: proc(duration: real){
