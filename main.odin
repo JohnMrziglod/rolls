@@ -1075,6 +1075,15 @@ dice_scoring :: proc(dt: real) {
 						text = fmt.aprintf("+%.f", bonus)
 						die.current_score += bonus
 					}
+				case .CardDice_Pirate:
+					highest_score: sco
+					for d2 in other_player.dice_sorted {
+						die2 := &app.dice[d2]
+                        if die2.state != .ALIVE || sco(die2.current_number) <= highest_score do continue
+                        highest_score = sco(die2.current_number)
+                    }
+					text = fmt.aprintf("+%.f", highest_score)
+					die.current_score += highest_score
 				case .CardDice_PlusOne:
 				    plus_score := 1
 					if on_top do plus_score += n_alive-1
