@@ -317,7 +317,8 @@ measure_text :: proc(text: string, font_size: f32, spacing:f32=1.0, max_width:f3
 
 draw_text :: proc(text: string, position: rl.Vector2, font_size: f32=-1.,
 		color: rl.Color=rl.RAYWHITE, spacing:f32=1.0, line_spacing:f32=1.2, max_width:f32=9999,
-		strikethrough:bool=false, overline:bool=false, boxed:rl.Color=rl.BLANK, box_width:f32=-1, padding:f32=10,
+		strikethrough:bool=false, overline:bool=false, boxed:rl.Color=rl.BLANK, box_width:f32=-1, box_offset:f32=0.,
+		padding:f32=10,
 		anchor:TextAnchor=.LEFT, draw:bool=true, highlight_color:rl.Color=rl.RAYWHITE,
 		outline:rl.Color=rl.BLANK) -> rl.Vector2{
 
@@ -329,7 +330,7 @@ draw_text :: proc(text: string, position: rl.Vector2, font_size: f32=-1.,
 	if boxed != rl.BLANK {
 	    box_size := measure_text(text, font_size, spacing, max_width)+2*padding
 		if box_width > 0 do box_size.x = box_width
-	    draw_box(position - padding, box_size, boxed)
+	    draw_box(position - padding, box_size, boxed, offset=box_offset)
         // position += {padding, padding}
 	}
 
@@ -343,7 +344,11 @@ draw_text :: proc(text: string, position: rl.Vector2, font_size: f32=-1.,
 
 	scale_factor := font_size / f32(font.baseSize)
 	in_tag: bool
+	// TokenType :: union{Text, Highlighted, Icon}
 	highlighted: bool
+	in_icon: bool
+	icon_id: string
+	draw_icon: bool
 
 	for r, i in text{
 	    if r == '[' {
@@ -353,9 +358,20 @@ draw_text :: proc(text: string, position: rl.Vector2, font_size: f32=-1.,
 	    if in_tag {
 			if r == ']' {
     			in_tag = false
+       			if in_icon{
+					draw_texture_by_string(icon_id, position + rl.Vector2{text_offset_x, text_offset_y}, font_size*scale_factor, color)
+				}
+       			in_icon = false
     			continue
-			} else if r == 'h' {
+			} else if !in_icon && r == 'i' {
+				in_icon = true
+			    icon_id = ""
+				continue
+			} else if !in_icon && r == 'h' {
 			    highlighted = !highlighted
+				continue
+			} else if in_icon {
+			    icon_id = fmt.join(icon_id, r, context.temp_allocator)
 				continue
 			}
 		}
@@ -396,17 +412,8 @@ draw_text :: proc(text: string, position: rl.Vector2, font_size: f32=-1.,
 		}
 
 		if draw {
-		    if highlighted{
-          		// rl.DrawTextCodepoint(
-         			// font, r,
-         			// position + rl.Vector2{text_offset_x, text_offset_y} - 2.,
-         			// font_size+4, color/2)
-                rl.DrawRectangleV(
-                    position + rl.Vector2{text_offset_x, text_offset_y},
-                    {glyph_width, font_size}, rl.BLACK)
-			}
 			if !strings.is_space(r) {
-				if outline != rl.BLANK{
+				if outline != rl.BLANK || highlighted{
 					rl.DrawTextCodepoint(
 						font, r,
 						position + rl.Vector2{text_offset_x, text_offset_y}-2.,
@@ -415,7 +422,7 @@ draw_text :: proc(text: string, position: rl.Vector2, font_size: f32=-1.,
 			    rl.DrawTextCodepoint(
 					font, r,
 					position + rl.Vector2{text_offset_x, text_offset_y},
-					font_size, highlighted ? rl.RAYWHITE : color)
+					font_size, highlighted ? rl.GRAY : color)
 			}
 		}
 
@@ -447,12 +454,16 @@ draw_text :: proc(text: string, position: rl.Vector2, font_size: f32=-1.,
 	return text_size
 }
 
-draw_box :: proc(position, size: rl.Vector2, fill:rl.Color=rl.BLANK, outline:rl.Color=rl.BLACK, thickness:f32=4.) {
+draw_box :: proc(position, size: rl.Vector2, fill:rl.Color=rl.BLANK, outline:rl.Color=rl.BLACK, thickness:f32=4., offset:f32=0.) {
+	// offset := f32(20)
+	box := rl.Rectangle{x=position.x-offset, y=position.y-offset, width=size.x+2*offset, height=size.y+2*offset}
+	roundness :f32= 0.1
+	segments :i32= 12
 	if fill != rl.BLANK {
-		rl.DrawRectangleV(position, size, fill)
+		rl.DrawRectangleRounded(box, roundness, segments, fill)
 	}
-	rl.DrawRectangleLinesEx(
-		{position.x-thickness, position.y-thickness, size.x+2*thickness, size.y+2*thickness}, thickness, outline)
+	box = {position.x-thickness, position.y-thickness, size.x+2*thickness, size.y+2*thickness}
+	rl.DrawRectangleRoundedLinesEx(box, roundness/2., segments, thickness, outline)
 }
 
 color_brighten :: proc(color: rl.Color, factor: f32) -> rl.Color {
@@ -500,22 +511,29 @@ fade_out :: proc(){
 	draw_box({-10, -10}, {app.gui.width+100, app.gui.height+100}, fill=rl.ColorAlpha(rl.BLACK, 0.8), thickness=0)
 }
 
-draw_card :: proc(card: Card, position: rl.Vector2, color:rl.Color=rl.BLANK, actions:[]string={}, static:bool=false, with_icon:bool=true) -> (bool, i32){
+card_is_hovered :: proc(position: rl.Vector2, ) -> bool{
+	return rl.CheckCollisionPointRec(rl.GetMousePosition(), {x=position.x, y=position.y, width=f32(CARD_SIZE.x), height=f32(CARD_SIZE.y)})
+}
+
+draw_card :: proc(
+		card: Card, position: rl.Vector2, color:rl.Color=rl.BLANK, actions:[]string={},
+		with_title:bool=true, with_icon:bool=true, with_info:bool=true,
+) -> (bool, i32){
     size := CARD_SIZE
-   	font_size :f32= app.gui.font_size2
+   	font_size :f32= app.gui.font_size2-2
 	padding :f32= 10
 	margin: f32 = 10
 	header_height := font_size+2*padding
 
     if !with_icon do size.y = header_height
-	hovered := with_icon && rl.CheckCollisionPointRec(rl.GetMousePosition(), {x=position.x, y=position.y, width=f32(size.x), height=f32(size.y)})
+	hovered := with_icon && card_is_hovered(position)
 
 	color := color
 	if color == rl.BLANK do color = COLOR_CARDS[card.category]
 
 	position := position
 
-	if hovered && !static{
+	if hovered{
 		color = rl.ColorBrightness(color, 0.1)
 		position.y += -10. //math.sin(f32(rl.GetTime())*10)*5
 	}
@@ -526,33 +544,35 @@ draw_card :: proc(card: Card, position: rl.Vector2, color:rl.Color=rl.BLANK, act
 		color = rl.ColorBrightness(color, -0.3)
 	}
 
-	if card.triggered > 0. && !static{
+	if card.triggered > 0.{
 		position.y += math.sin(f32(rl.GetTime())*20)*10
 	}
 
 	lt :f32= 4. // line_thickness
-
 	if with_icon{
-		rl.DrawRectangleV(position, size, color)
-		lc := rl.Color{0, 0, 0, color.a} // color
-		rl.DrawRectangleLinesEx({position.x-lt, position.y-lt, size.x+2*lt, size.y+2*lt}, lt, lc)
+		draw_box(position, size, fill=color, outline=rl.Color{0, 0, 0, color.a}, offset=16)
+		// rl.DrawRectangleV(position, size, color)
+		// lc := rl.Color{0, 0, 0, color.a} // color
+		// rl.DrawRectangleLinesEx({position.x-lt, position.y-lt, size.x+2*lt, size.y+2*lt}, lt, lc)
 	}
 
 	// Title
-	rl.DrawRectangleV(position-lt, {size.x, header_height}+2*lt, rl.BLACK)
-	draw_text(get_text(card.type, "title"), position + padding, font_size, rl.RAYWHITE, max_width=size.x-2*padding)
-	icon_size := header_height - 2*padding
-	icon_position := position+{size.x-icon_size-padding, padding}
-	draw_texture(Vector2{0., 16.+f32(card.category)}, icon_position, icon_size, color)
-	if card.category == .ROLL && card.lifetime > 0 {
-		draw_text(fmt.tprintf("%v", card.lifetime),
-			position+{size.x-padding-icon_size-2, padding}, font_size, rl.RAYWHITE, anchor=.RIGHT)
+	if with_title{
+		// rl.DrawRectangleV(position-lt, {size.x, header_height}+2*lt, rl.BLACK)
+		draw_text(get_text(card.type, "title"), position + padding, font_size, rl.BLACK, max_width=size.x-2*padding)
+		icon_size := header_height - 2*padding
+		icon_position := position+{size.x-icon_size-padding, padding}
+		draw_texture(Vector2{0., 16.+f32(card.category)}, icon_position, icon_size, color)
+		if card.category == .ROLL && card.lifetime > 0 {
+			draw_text(fmt.tprintf("%v", card.lifetime),
+				position+{size.x-padding-icon_size-2, padding}, font_size, rl.BLACK, anchor=.RIGHT)
+		}
 	}
 
 	// main card icon
 	if with_icon{
-		icon_position = position+padding + {0., header_height}
-		icon_size = min(size.x, size.y)-2*padding
+		icon_position := position+padding + {0., header_height}
+		icon_size := min(size.x, size.y)-2*padding
 		icon_color := hovered ? rl.ColorAlpha(color, 0.5) : color
 		rl.DrawRectangleV(icon_position+40, {}+icon_size-2*40, rl.ColorBrightness(icon_color, -0.2))
 		draw_texture(reflect.enum_string(card.type), icon_position, icon_size+math.sin(f32(rl.GetTime())+30*f32(card.type))*3, icon_color, rotation=math.sin(f32(rl.GetTime())+10*f32(card.type))*3)
@@ -569,9 +589,12 @@ draw_card :: proc(card: Card, position: rl.Vector2, color:rl.Color=rl.BLANK, act
 		}
 	}
 
-	// Description
+	// Info
+	if !with_info do return hovered, -1
+
 	show_description := hovered || !with_icon
-	text_pos := position + {0., size.y+margin}+padding
+	text_pos := position
+	if with_title || with_icon do text_pos += {0, size.y+margin+32.}+padding
 	if show_description {
 	    ids := []string{"description", "description2"}
 		for id in ids{
@@ -580,7 +603,8 @@ draw_card :: proc(card: Card, position: rl.Vector2, color:rl.Color=rl.BLANK, act
 			text := card_fill_vars(card, get_text(card.type, id))
             text_size := draw_text(
                     text, text_pos, font_size, rl.BLACK,
-                    max_width=size.x-(text_pos.x-position.x), highlight_color=color, boxed=color, box_width=size.x)
+                    max_width=size.x-(text_pos.x-position.x), highlight_color=color,
+                    boxed=color, box_width=size.x, box_offset=16.)
             text_pos.y += text_size.y + 2*padding + margin
 		}
 	}
@@ -588,7 +612,7 @@ draw_card :: proc(card: Card, position: rl.Vector2, color:rl.Color=rl.BLANK, act
 	return hovered, -1
 }
 
-draw_die_info :: proc(die: Die) -> i32{
+draw_die_info :: proc(die: Die, extended:bool=false) -> i32{
 	hovered_upgrade_index :i32= -1
 	position := rl.GetWorldToScreen(die.position, app.camera3d)
 	icon_size := f32(50.)
@@ -632,10 +656,12 @@ draw_die_info :: proc(die: Die) -> i32{
     	draw_card(card, position+{-margin+4., box_size.y+margin}, with_icon=false)
     }
 
-    text := fmt.tprintf("Attack: %v, Health: %v", die.attack, die.health)
-    text_position := position + padding
-    text_position.y += icon_size + padding
-    draw_text(text, text_position, color=rl.BLACK)
+    if extended {
+	    text := fmt.tprintf("Attack: %v, Health: %v", die.attack, die.health)
+	    text_position := position + padding
+	    text_position.y += icon_size + padding + 10.
+	    draw_text(text, text_position, color=rl.BLACK)
+    }
 
     return hovered_upgrade_index
 }

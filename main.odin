@@ -1498,44 +1498,6 @@ draw :: proc(dt: real) {
 	mouse_pos := rl.GetMousePosition()
 
 	for &player, p in app.players{
-		discard_card := -1
-		discard_position: Vector2
-		discard_silent := false
-
-		// We draw them in reverse, so we don't get a z-order problem with the cards (the hovered one should be on top)
-		#reverse for &card, c in player.cards{
-			position := app.gui.hand_positions[p]
-			if f32(len(player.cards))*(CARD_SIZE.y+30) > app.gui.hand_area_height {
-				position += {0, app.gui.hand_area_height/f32(len(player.cards))*f32(c)}
-			} else {
-				position += {0, f32(c)*(30+CARD_SIZE.y)}
-			}
-			actions := []string{}
-			if app.state == .WAIT_FOR_ROLL && p == 0 {
-				if card.category == .ROLL do actions = card.active ? {"DISCARD"} : {"DISCARD", "ACTIVATE"}
-				else if card.category == .DICE do actions = {"DISCARD", "ASSIGN"}
-				else if card.category == .CYCLE do actions = {"DISCARD", "ACTIVATE"}
-			}
-
-			hovered, action := draw_card(card, position, actions=actions)
-			if app.state == .WAIT_FOR_ROLL && action == 1 {
-				if card.category == .ROLL{
-					card_activate(&player, &card)
-				} else if card.category == .DICE {
-					app.card_selected = card
-					discard_card = c
-					discard_silent = true
-					discard_position = position
-					state_change(.UPGRADE_DIE)
-				}
-			} else if action == 0{
-				discard_card = c
-			}
-		}
-		if discard_card != -1 {
-			card_discard(&player, i32(discard_card), silent=discard_silent)
-		}
-
 		// Draw ghost dice on the side:
 		ghost_cols :i32= 5 // @TODO: make this dynamic based on the max number of ghosts a player can have
 		ghost_size :f32= app.gui.font_size1
@@ -1607,6 +1569,52 @@ draw :: proc(dt: real) {
 
 			draw_text(text, position, font_size, player.color,)
 		}
+
+		hovered_card: ^Card
+		hovered_card_index: i32
+		hovered_position: Vector2
+
+		// We draw them in reverse, so we don't get a z-order problem with the cards (the hovered one should be on top)
+		lowest_y := app.gui.ghost_positions[p].y - 10.
+		area_y := lowest_y - app.gui.hand_positions[p].y
+		for &card, c in player.cards{
+			position := app.gui.hand_positions[p]
+			if f32(len(player.cards))*(CARD_SIZE.y+30) > lowest_y {
+				position.y += area_y/f32(len(player.cards))*f32(c)
+			} else {
+				position.y += f32(c)*(30+CARD_SIZE.y)
+			}
+			hovered := card_is_hovered(position)
+			if hovered_card == nil && hovered {
+				hovered_card = &card
+				hovered_card_index = i32(c)
+				hovered_position = position
+			} else {
+				draw_card(card, position, with_info=false)
+			}
+		}
+
+		if hovered_card != nil {
+			actions := []string{}
+			if app.state == .WAIT_FOR_ROLL && p == 0 {
+				if hovered_card.category == .ROLL do actions = hovered_card.active ? {"DISCARD"} : {"DISCARD", "ACTIVATE"}
+				else if hovered_card.category == .DICE do actions = {"DISCARD", "ASSIGN"}
+				else if hovered_card.category == .CYCLE do actions = {"DISCARD", "ACTIVATE"}
+			}
+			_, action := draw_card(hovered_card^, hovered_position, actions=actions)
+
+			if app.state == .WAIT_FOR_ROLL && action == 1 {
+				if hovered_card.category == .ROLL{
+					// card_activate(&player, hovered_card)
+				} else if hovered_card.category == .DICE {
+					app.card_selected = hovered_card^
+					card_discard(&player, hovered_card_index, silent=true)
+					state_change(.UPGRADE_DIE)
+				}
+			} else if action == 0{
+				card_discard(&player, hovered_card_index)
+			}
+		}
 	}
 
 	info := app.state == .WAIT_FOR_ROLL// || app.state == .UPGRADE_DIE
@@ -1648,7 +1656,7 @@ draw :: proc(dt: real) {
 	}
 
 	if app.state == .CHARGING{
-		fade_out()
+		// fade_out()
 		// Draw a power bar at the center of the screen
 		width: f32 = 800.
 		height: f32 = 80.
@@ -1730,7 +1738,7 @@ draw :: proc(dt: real) {
 								active=highlighted[g], clickable=false)
 				}
 
-				if button("Score", position+{700, 0}) {
+				if button("Score", position+{700, -4.}) {
 					human.cycle.scored_combinations += {combo_type}
 					human.roll.score += score // @TODO: Add it to roll score
 					ghosts_copy := make([dynamic]i32, len(human.ghosts), cap(human.ghosts))
@@ -1824,16 +1832,24 @@ draw :: proc(dt: real) {
 		text := "Choose one of these cards"
 		draw_text(text, {app.gui.width/2., app.gui.height-150}, app.gui.font_size1, rl.RAYWHITE, anchor=.CENTER)
 
-		n_cards: f32
+		n_cards: i32
 		for card in app.cards_offer do if card.type != .CardNone do n_cards += 1
 
-		margin :f32= 10
+		margin :f32= 50.
+		mid_i32 := int(n_cards/2)
+		mid_f32 := f32(n_cards)/2.
 		for &card, c in app.cards_offer{
 			if card.type == .CardNone do continue
 
-			position := Vector2{
-			    margin+(f32(c)+1)*(app.gui.width-2.*margin)/(n_cards+1)-CARD_SIZE.x/2.,
-				(app.gui.height-CARD_SIZE.y)/2.
+			position: Vector2 = {app.gui.width/2. - CARD_SIZE.x/2., (app.gui.height-CARD_SIZE.y)/2.}
+			if n_cards % 2 == 1 {
+				if c == mid_i32 {
+					// nothing ...
+				} else if c < mid_i32 {
+					position.x -= f32(mid_i32-c)*(CARD_SIZE.x+margin)
+				} else {
+					position.x += f32(c-mid_i32)*(CARD_SIZE.x+margin)
+				}
 			}
 			position.y += math.sin(f32(rl.GetTime())+position.x)*15
 
