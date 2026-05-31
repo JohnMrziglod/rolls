@@ -496,6 +496,10 @@ draw_texture_by_string :: proc(texture_id: string, position: Vector2, size: f32,
 	rl.DrawTexturePro(texture, {x=tp.x, y=tp.y, width=ts.x, height=ts.y}, dest, {}+size/2., rotation, tint)
 }
 
+fade_out :: proc(){
+	draw_box({-10, -10}, {app.gui.width+100, app.gui.height+100}, fill=rl.ColorAlpha(rl.BLACK, 0.8), thickness=0)
+}
+
 draw_card :: proc(card: Card, position: rl.Vector2, color:rl.Color=rl.BLANK, actions:[]string={}, static:bool=false, with_icon:bool=true) -> (bool, i32){
     size := CARD_SIZE
    	font_size :f32= app.gui.font_size2
@@ -510,7 +514,6 @@ draw_card :: proc(card: Card, position: rl.Vector2, color:rl.Color=rl.BLANK, act
 	if color == rl.BLANK do color = COLOR_CARDS[card.category]
 
 	position := position
-	// if position.y+size.y+300 > app.gui.height do position.y -= size.y + 20
 
 	if hovered && !static{
 		color = rl.ColorBrightness(color, 0.1)
@@ -528,11 +531,10 @@ draw_card :: proc(card: Card, position: rl.Vector2, color:rl.Color=rl.BLANK, act
 	}
 
 	lt :f32= 4. // line_thickness
-	lc := rl.BLACK // color / 2 // line color
-	lc.a = color.a
 
 	if with_icon{
 		rl.DrawRectangleV(position, size, color)
+		lc := rl.Color{0, 0, 0, color.a} // color
 		rl.DrawRectangleLinesEx({position.x-lt, position.y-lt, size.x+2*lt, size.y+2*lt}, lt, lc)
 	}
 
@@ -590,12 +592,15 @@ draw_die_info :: proc(die: Die) -> i32{
 	hovered_upgrade_index :i32= -1
 	position := rl.GetWorldToScreen(die.position, app.camera3d)
 	icon_size := f32(50.)
+	margin := f32(10.)
     padding := f32(4.)
 
-    draw_box(position, size={6*(icon_size+2*padding)-padding, icon_size+3*padding+app.gui.font_size2}, fill=rl.ColorAlpha(die.color1, 0.5))
+    box_size := Vector2{6*icon_size+10*padding, icon_size+3*padding+app.gui.font_size2}+2.*margin
+    draw_box(position-margin, box_size, fill=rl.ColorAlpha(die.color1, 0.8), thickness=0.)
 
+    card: Card
+    card_position: Vector2
 	#reverse for upgrade, u in die.upgrades{
-		// upgrade_pos, anchor := ring_position_2d(u+1, icon_size+4*padding)
 		upgrade_pos := position + f32(u)*Vector2{icon_size+2*padding, 0.}
 		upgraded := upgrade.type != .CardNone
 
@@ -612,17 +617,21 @@ draw_die_info :: proc(die: Die) -> i32{
         hovered := rl.CheckCollisionPointRec(rl.GetMousePosition(), dest)
         if hovered {
 			if upgraded {
-			  		card_position := upgrade_pos + {-CARD_SIZE.x/2.+icon_size/2., icon_size+10}
-			    draw_card(upgrade, card_position, with_icon=false)
+			  	card_position = upgrade_pos + {-CARD_SIZE.x/2.+icon_size/2., icon_size+10}
+				card = upgrade
 			} else if app.card_selected.category == .DICE{
 				tp = icon_index_from_card(app.card_selected.type)
    				color = COLOR_CARDS[.DICE]
 			}
 			hovered_upgrade_index = i32(u)
         }
-        draw_box({dest.x, dest.y}-padding/2, {}+icon_size+2*padding/2, fill=upgraded ? color : color/2, thickness=2)
+        draw_box({dest.x, dest.y}-padding, {}+icon_size+2*padding, fill=upgraded ? color : rl.ColorAlpha(color, 0.8), thickness=1)
         draw_texture(tp, upgrade_pos, icon_size, tint=upgraded ? rl.BLACK : rl.RAYWHITE/2)
     }
+    if card.type != .CardNone {
+    	draw_card(card, position+{-margin+4., box_size.y+margin}, with_icon=false)
+    }
+
     text := fmt.tprintf("Attack: %v, Health: %v", die.attack, die.health)
     text_position := position + padding
     text_position.y += icon_size + padding

@@ -71,6 +71,7 @@ GameState :: enum {
 	DICE_UPGRADES,
 	CARDS_BATTLE,
 	DICES_BATTLE,
+	DICE_DEATHS,
 	DICE_SCORING,
 	CARDS_SCORING,
 	SCORING_SUMMARY,	// only for the animations (all points are flying in)
@@ -503,6 +504,8 @@ main :: proc() {
 				cards_battle(dt)
 			case .DICES_BATTLE:
 				dice_battle(dt)
+			case .DICE_DEATHS:
+				dice_deaths(dt)
 			case .DICE_SCORING:
 				dice_scoring(dt)
 			case .CARDS_SCORING:
@@ -962,17 +965,20 @@ dice_battle :: proc(dt: real) {
 		}
 	}
 
-	// Clean up all the dead dice:
+	app.battle.seen = {}
+
+	state_change(.DICE_DEATHS, 0.1)
+}
+
+dice_deaths :: proc(dt: real) {
 	for &die, d in app.dice{
 		if die.health > 0 || die.state != .ALIVE do continue
 
 		dice_killed(&die)
+		wait(1.)
+		return
 	}
-
-	app.battle.seen = {}
-
-	// We move to the next app.state
-	state_change(.DICE_SCORING, 0.5)
+	state_change(.DICE_SCORING, 0.4)
 }
 
 dice_scoring :: proc(dt: real) {
@@ -1235,8 +1241,8 @@ scoring_summary :: proc(dt: real) {
 				texture_ids := []Vector2{
 					{0, 8}, {0, 9}, {0, 10}, {0, 11}, {0, 12}, {0, 13},
 				}
-				add_icon_particles(
-					app.gui.hand_positions[p], CARD_SIZE, texture_ids, COLOR_CARDS[card.category])
+				// add_icon_particles(
+				// 	app.gui.hand_positions[p], CARD_SIZE, texture_ids, COLOR_CARDS[card.category])
 			}
 		}
 	}
@@ -1431,6 +1437,7 @@ draw :: proc(dt: real) {
 
 	// Draw a big cube to represent the area where the app.dice can move
 	rl.DrawCube(rl.Vector3{0.0, -.6, .0}, AREA_SIZE, 1.0, AREA_SIZE, COLOR_TABLE)
+	rl.DrawCube(rl.Vector3{0.0, -.6, .0}, AREA_SIZE+1., 0.9, AREA_SIZE+1., rl.ColorBrightness(COLOR_TABLE, -0.2))
 	rl.DrawCubeWires(rl.Vector3{0.0, -.6, .0}, AREA_SIZE, 1.0, AREA_SIZE, rl.BLACK)
 
 	if app.state == .WAIT_FOR_ROLL && (rl.IsMouseButtonPressed(.LEFT) || rl.IsMouseButtonPressed(.RIGHT)){
@@ -1440,7 +1447,7 @@ draw :: proc(dt: real) {
 	dice_hovered := -1
 	for &dice, d in app.dice{
 		if dice.state != .ALIVE do continue
-		hoverable := app.state == .WAIT_FOR_ROLL || (app.state == .UPGRADE_DIE && dice.player == 0)
+		hoverable := app.state == .WAIT_FOR_ROLL
 		if draw_die(dice, hoverable=hoverable) {
 			dice_hovered = d
 			if rl.IsMouseButtonPressed(.LEFT) {
@@ -1555,7 +1562,7 @@ draw :: proc(dt: real) {
 				app.ghosts_selected[0] = i32(i)
 			}
 		}
-		if p == 0{
+		if p == 0 && app.state == .WAIT_FOR_ROLL{
 			combos := possible_combinations(player.ghosts[:])
 			combos_counter := 0
 			for combo in combos{
@@ -1568,7 +1575,8 @@ draw :: proc(dt: real) {
 				position := app.gui.ghost_positions[p]
 				position.x += (ghost_dx*f32(ghost_cols))/2.
 				position.y += ghost_size// + app.gui.font_size2/.2
-				draw_text(text, position, color=player.color, anchor=.CENTER, outline=rl.BLACK)
+				font_size := app.gui.font_size2 * (1.+0.5*splash(app.state_clock))
+				draw_text(text, position, color=player.color, font_size=font_size, anchor=.CENTER, outline=rl.BLACK)
 			}
 		}
 
@@ -1640,6 +1648,7 @@ draw :: proc(dt: real) {
 	}
 
 	if app.state == .CHARGING{
+		fade_out()
 		// Draw a power bar at the center of the screen
 		width: f32 = 800.
 		height: f32 = 80.
@@ -1647,9 +1656,8 @@ draw :: proc(dt: real) {
 		y := (f32(screen_height) - height) / 2.
 		rl.DrawRectangleV({x, y}, {app.power * width, height}, app.players[app.current_player].color)
 		rl.DrawRectangleLinesEx({x, y, width, height}, 2., rl.BLACK)
-	}
-
-	if app.state == .GHOST_BOARD {
+	} else if app.state == .GHOST_BOARD {
+		fade_out()
 		board_size := rl.Vector2{920, app.gui.height-150}
 		board_position := rl.Vector2{(app.gui.width-board_size.x)/2., 50}
 		board_color := COLOR_PLAYERS[0]/2
@@ -1802,24 +1810,19 @@ draw :: proc(dt: real) {
 		}
 	}
 
-	// if app.state == .WAIT_FOR_AI {
-	// 	text := "The antagonist is thinking..."
-	// 	draw_text(text, {screen_width/2. - measure_text(text, app.gui.font_size1).x/2., screen_height/2.}, app.gui.font_size1, rl.RAYWHITE)
-	// }
 	if app.state == .WAIT_FOR_ROLL {
 		// A button named "ROLL!" in the bottom, lower part of the screen
-		text := "Press <SPACE> to continue" //app.current_player == 0 ? "ROLL!" : "ANTAGONIST ROLLS"
-		if button(text, {screen_width/2., screen_height - 150}, size={300, 80}, font_size=app.gui.font_size1,
-				color=app.gui.bg_color, anchor=.CENTER) {
+		text := "Press <SPACE> to continue"
+		if button(text, {app.gui.width/2., app.gui.height-150}, size={300, 80}, font_size=app.gui.font_size1,
+				color=rl.BLANK, anchor=.CENTER) {
 			state_change(.CHARGING)
 		}
-	}
-
-	if app.state == .CARDS_OFFER {
+	} else if app.state == .CARDS_OFFER {
+		fade_out()
 		app.die_selected = -1
 
 		text := "Choose one of these cards"
-		draw_text(text, {screen_width/2., screen_height - 150}, app.gui.font_size1, rl.RAYWHITE, anchor=.CENTER)
+		draw_text(text, {app.gui.width/2., app.gui.height-150}, app.gui.font_size1, rl.RAYWHITE, anchor=.CENTER)
 
 		n_cards: f32
 		for card in app.cards_offer do if card.type != .CardNone do n_cards += 1
@@ -1832,6 +1835,7 @@ draw :: proc(dt: real) {
 			    margin+(f32(c)+1)*(app.gui.width-2.*margin)/(n_cards+1)-CARD_SIZE.x/2.,
 				(app.gui.height-CARD_SIZE.y)/2.
 			}
+			position.y += math.sin(f32(rl.GetTime())+position.x)*15
 
 			actions := []string{"KEEP", "ACTIVATE"}
 			if card.category == .DICE do actions = {"KEEP", "ASSIGN"}
