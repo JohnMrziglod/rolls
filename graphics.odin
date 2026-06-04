@@ -465,7 +465,7 @@ draw_text :: proc(text: string, position: rl.Vector2, font_size: f32=-1.,
 	return text_size
 }
 
-draw_rounded_box :: proc(position, size: rl.Vector2, fill:rl.Color=rl.BLANK, radius:f32=8.) {
+draw_rounded_box :: proc(position, size: rl.Vector2, fill:rl.Color=rl.BLANK, radius:f32=6.) {
 	w := size.x;
 	h := size.y;
 	roundness := 2.*radius / min(w, h)
@@ -546,7 +546,7 @@ draw_card :: proc(
     size := CARD_SIZE
    	font_size :f32= app.gui.font_size2-2
 	padding :f32= 10
-	margin: f32 = 10
+	margin: f32 = 12
 	header_height := font_size+2*padding
 
 	color := color
@@ -618,7 +618,7 @@ draw_card :: proc(
 
 	show_description := hovered || !with_icon
 	text_pos := position
-	if with_title || with_icon do text_pos += {0, size.y+margin+2*BOX_PADDING}+padding
+	if with_title || with_icon do text_pos += {0, size.y+margin}+padding
 	if show_description {
 	    ids := []string{"description", "description2"}
 		for id in ids{
@@ -628,8 +628,8 @@ draw_card :: proc(
             text_size := draw_text(
                     text, text_pos, font_size, rl.BLACK,
                     max_width=size.x-(text_pos.x-position.x), highlight_color=color,
-                    boxed=color, box_width=size.x, box_offset=BOX_PADDING)
-            text_pos.y += text_size.y + 2*padding + margin + 2.*BOX_PADDING
+                    boxed=color, box_width=size.x, box_offset=padding)
+            text_pos.y += text_size.y + 2*padding + margin
 		}
 	}
 

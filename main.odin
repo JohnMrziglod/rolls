@@ -1571,13 +1571,13 @@ draw :: proc(dt: real) {
 		hovered_position: Vector2
 
 		lowest_y := app.gui.ghost_positions[p].y - 10.
-		area_y := lowest_y - app.gui.hand_positions[p].y
+		area_y := lowest_y - app.gui.hand_positions[p].y - CARD_SIZE.y
 		for &card, c in player.cards{
 			position := app.gui.hand_positions[p]
 			if f32(len(player.cards))*(CARD_SIZE.y+40) > lowest_y {
 				position.y += area_y/f32(len(player.cards))*f32(c)
 			} else {
-				position.y += f32(c)*(40+CARD_SIZE.y)
+				position.y += f32(c)*(CARD_SIZE.y+40)
 			}
 			position.x += f32(c%2)
 			hovered := card_is_hovered(position)
