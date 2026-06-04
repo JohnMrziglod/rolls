@@ -20,6 +20,7 @@ COLOR_BACKGROUND := rl.Color{203, 161, 53, 255}
 COLOR_CARDS := [CardCategory]rl.Color{
 	.NONE=rl.BLACK,
 	.ROLL=rl.Color{200, 224, 193, 255},
+	.FLASH=rl.Color{152, 95, 153, 255},
 	.DICE=rl.Color{245, 105, 96, 255},
 	.CYCLE=rl.Color{106, 168, 168, 255},
 }
@@ -87,7 +88,7 @@ RollState :: struct{
 	score: sco,
 	score_counter: i32,
 	score_timer: f32,
-	multiplier: sco,
+	factor: sco,
 	kills: i32,
 	effects: map[CardType]void,
 }
@@ -426,7 +427,7 @@ main :: proc() {
 				state_change(.WAIT_FOR_ROLL)
 				app.ghosts_selected = {-1, -1, -1, -1, -1}
 			} else if app.state == .UPGRADE_DIE || app.state == .CARDS_OFFER {
-				// @FIXME: we have to solve this better..
+				state_change(.WAIT_FOR_ROLL)
 			} else {
 				state_change(.MENU)
 			}
@@ -440,7 +441,7 @@ main :: proc() {
 		}
 		if rl.IsKeyPressed(rl.KeyboardKey.G){
 			app.cards_offer = {}
-			cards_generate(app.cards_offer[:5], .RollAndDiceCards)
+			cards_generate(app.cards_offer[:5], .FlashRollAndDiceCards)
 			state_change(.CARDS_OFFER)
 		}
 		if rl.IsKeyPressed(rl.KeyboardKey.H){
@@ -798,23 +799,13 @@ cards_battle :: proc (dt: real) {
 					append(&player.ghosts, ghost)
 				}
 				slice.sort(player.ghosts[:])
-			case .CardRoll_GraveRoll:
-				if len(player.ghosts) > 0{
-					for &ghost in player.ghosts{
-						ghost = rand.int32_range(1, 7)
-					}
-					slice.sort(player.ghosts[:])
-					add_text(position, fmt.aprint("REROLLED GHOSTS!"), player.color, lifetime=1.)
-				} else {
-					add_text(position, fmt.aprint("NO GHOSTS TO REROLL!"), player.color, lifetime=1.)
-				}
 			case .CardRoll_GhostHour:
 				ghost_score: sco
 				for ghost in player.ghosts do ghost_score += sco(ghost)
 				player.roll.score += ghost_score
 				add_text(position, fmt.aprintf("+%.f FROM GHOSTS!", ghost_score), COLOR_CARDS[card.category], lifetime=1.)
 			case .CardRoll_HappyHour:
-				player.roll.multiplier += 2
+				player.roll.factor += 2
 				add_text(position, fmt.aprint("ROLL SCORE X2"), player.color, lifetime=1.)
 			case .CardRoll_MarketCrash:
 				for &dice, d in app.dice{
@@ -1007,27 +998,27 @@ dice_scoring :: proc(dt: real) {
 
 				#partial switch upgrade.type {
 				case .CardDice_Antenna:
-					multiplier := 0.
+					factor := 0.
 					for d2 in player.dice_sorted {
 						die2 := &app.dice[d2]
                         if d == d2 || die2.state != .ALIVE do continue
 
                         if die_has_upgrade(die2^, .CardDice_Antenna) {
 							// add_text(die2.position, fmt.aprint("ANTENNA BOOST!"), COLOR_UPGRADES[.CardDice_Antenna], lifetime=0.6)
-							multiplier += sco(die2.current_number)
+							factor += sco(die2.current_number)
 						}
                     }
-                    if multiplier > 0. {
-  						text = fmt.aprintf("x%.f!", multiplier)
-  						die.current_score *= multiplier
+                    if factor > 0. {
+  						text = fmt.aprintf("x%.f!", factor)
+  						die.current_score *= factor
                     }
 
 				case .CardDice_Journalist:
 					if .CardRoll_FakeNews in player.roll.effects || .CardRoll_FakeNews in other_player.roll.effects{
-						player.roll.multiplier += 0.5
+						player.roll.factor += 0.5
 						text = fmt.aprint("x0.5 ROLL SCORE")
 					} else {
-						player.roll.multiplier += 2
+						player.roll.factor += 2
 						text = fmt.aprint("x2 ROLL SCORE")
 					}
 				case .CardDice_Influencer:
@@ -1066,7 +1057,7 @@ dice_scoring :: proc(dt: real) {
 				case .CardDice_Researcher:
 				    if upgrade.var1 != 0. {
     					text = fmt.aprintf("X%.f", upgrade.var1)
-    					player.roll.multiplier += upgrade.var1
+    					player.roll.factor += upgrade.var1
 					}
 				case .CardDice_Medium:
 					text = fmt.aprintf("+%v", len(player.ghosts))
@@ -1107,20 +1098,24 @@ dice_scoring :: proc(dt: real) {
 					die.current_score += sco(plus_score)
 				case .CardDice_Pessimist:
 				    if on_top {
-						multiplier := 0.
+						factor := 0.
 						for o in player.dice_sorted {
 							die2 := &app.dice[o]
                             if d == o || die2.state != .ALIVE || die2.current_number > 3 do continue
-                            multiplier += sco(die2.current_number)
+                            factor += sco(die2.current_number)
                             add_text(die2.position, fmt.aprintf("+%v", die2.current_number), die2.color1,
                             	delay=delay, lifetime=duration, icon_id=icon_index_from_id("CardDice_Pessimist"), icon_size=50)
                             delay += duration/3.
                         }
-                        if multiplier > 0. {
-    						text = fmt.aprintf("x%.f", multiplier)
-    						die.current_score *= multiplier
+                        if factor > 0. {
+    						text = fmt.aprintf("x%.f", factor)
+    						die.current_score *= factor
                         }
 					}
+				case .CardDice_Randomizer:
+					random_bonus := rand.int32_range(1, 7)
+					text = fmt.aprintf("+%v", random_bonus)
+					die.current_score += sco(random_bonus)
 				case .CardDice_Train:
 					bonus := 0.
 					n_dice := 0
@@ -1141,7 +1136,7 @@ dice_scoring :: proc(dt: real) {
        					text = fmt.aprintf("+%.f", upgrade.var1)
                         die.current_score += upgrade.var1
        	            }
-				case .CardDice_PowerDice:
+				case .CardDice_PowerUp:
 					if on_top{
 						upgrade.var1 += 1.
 					}
@@ -1204,8 +1199,8 @@ play_sound :: proc(sound_id: i32, volume: f32=1., pitch: f32=1.) {
 scoring_summary :: proc(dt: real) {
 	roll_scores := [2]sco{}
 	for &player, p in app.players {
-		if player.roll.multiplier > 0. {
-			player.roll.score *= player.roll.multiplier
+		if player.roll.factor > 0. {
+			player.roll.score *= player.roll.factor
 		}
 
 		// We delay it due to the Revenge Roll Card
@@ -1337,15 +1332,16 @@ wait_for_ai :: proc(){
 	    best_numbers := [5]i32{}
 	    for index, i in best_indices[:5] do best_numbers[i] = ai.ghosts[index]
 
-	    best_score := 0.
+	    best_score, best_factor: sco
 	    best_combo :CombinationType= .None
 	    highlighted := [5]bool{}
 
 		for combo_type, c in CombinationType{
 			if combo_type == .None do continue
 
-			match, score := test_combination(combo_type, best_numbers[:], &highlighted)
-			if match && score > best_score {
+			match, score, factor := test_combination(combo_type, best_numbers[:], &highlighted)
+			if match && (factor > best_factor || score > best_score) {
+				best_factor = factor
 				best_score = score
 				best_combo = combo_type
 			}
@@ -1360,15 +1356,16 @@ wait_for_ai :: proc(){
 			// + the number of alive dice of the defensive player (roll cards not included)
 			if die.state == .ALIVE && die.player != app.current_player do n_alive += 1
 		}
-		if best_score > 0 && (best_score > 20 || i32(len(ai.ghosts))+n_alive > ai.ghosts_max) {
+		if best_score > 0 && (best_score > 20 || best_factor > 0 || i32(len(ai.ghosts))+n_alive > ai.ghosts_max) {
 			ai.roll.score += best_score
+			ai.roll.factor += best_factor
 
 			not_wanted_cards := bit_set[CardType]{
 				.CardRoll_Exorcism, .CardRoll_FakeNews,
 				.CardRoll_MarketCrash, .CardRoll_WhiteElephant
 			}
 			cards := [3]Card{}
-			cards_generate(cards[:], .RollAndDiceCards)
+			cards_generate(cards[:], .FlashRollAndDiceCards)
 			for card in cards{
 				if card.type in not_wanted_cards do continue
 				append(&ai.cards, card)
@@ -1512,8 +1509,7 @@ draw :: proc(dt: real) {
 			if p == 1 do position.x -= ghost_size+ghost_padding	// shift the right player's ghosts to the left
 
 			if ghost_index >= i32(len(player.ghosts)) {
-				thickness :f32= 2
-				draw_box(position+{2, 2}, {ghost_size-2, ghost_size-2}-thickness, fill={100, 100, 100, 120}, thickness=thickness)
+				draw_box(position+{2, 2}, {ghost_size-2, ghost_size-2}-2., fill={100, 100, 100, 120}, thickness=2.)
 				continue
 			}
 			ghost_number := player.ghosts[ghost_index]
@@ -1556,8 +1552,8 @@ draw :: proc(dt: real) {
 			if player.is_scoring && player.roll.score > 0. {
 				font_size += math.max((0.3-app.state_clock), 0.1) * 100
 			}
-			if player.roll.multiplier > 0 {
-				text = fmt.tprintf("+ %.f X %.f", player.roll.score, player.roll.multiplier)
+			if player.roll.factor > 0 {
+				text = fmt.tprintf("+ %.f X %.f", player.roll.score, player.roll.factor)
 			} else {
 				text = fmt.tprintf("+ %.f", player.roll.score)
 			}
@@ -1574,38 +1570,41 @@ draw :: proc(dt: real) {
 		hovered_card_index: i32
 		hovered_position: Vector2
 
-		// We draw them in reverse, so we don't get a z-order problem with the cards (the hovered one should be on top)
 		lowest_y := app.gui.ghost_positions[p].y - 10.
 		area_y := lowest_y - app.gui.hand_positions[p].y
 		for &card, c in player.cards{
 			position := app.gui.hand_positions[p]
-			if f32(len(player.cards))*(CARD_SIZE.y+30) > lowest_y {
+			if f32(len(player.cards))*(CARD_SIZE.y+40) > lowest_y {
 				position.y += area_y/f32(len(player.cards))*f32(c)
 			} else {
-				position.y += f32(c)*(30+CARD_SIZE.y)
+				position.y += f32(c)*(40+CARD_SIZE.y)
 			}
+			position.x += f32(c%2)
 			hovered := card_is_hovered(position)
 			if hovered_card == nil && hovered {
 				hovered_card = &card
 				hovered_card_index = i32(c)
 				hovered_position = position
 			} else {
-				draw_card(card, position, with_info=false)
+				draw_card(card, position, with_info=false, hoverable=false)
 			}
 		}
 
 		if hovered_card != nil {
 			actions := []string{}
 			if app.state == .WAIT_FOR_ROLL && p == 0 {
-				if hovered_card.category == .ROLL do actions = hovered_card.active ? {"DISCARD"} : {"DISCARD", "ACTIVATE"}
+				if hovered_card.category < .DICE do actions = hovered_card.active ? {"DISCARD"} : {"DISCARD", "ACTIVATE"}
 				else if hovered_card.category == .DICE do actions = {"DISCARD", "ASSIGN"}
 				else if hovered_card.category == .CYCLE do actions = {"DISCARD", "ACTIVATE"}
 			}
 			_, action := draw_card(hovered_card^, hovered_position, actions=actions)
 
 			if app.state == .WAIT_FOR_ROLL && action == 1 {
-				if hovered_card.category == .ROLL{
-					// card_activate(&player, hovered_card)
+				if hovered_card.category == .FLASH{
+					card_activate(&player, hovered_card)
+					card_discard(&player, hovered_card_index, silent=true)
+				} else if hovered_card.category == .ROLL{
+					card_activate(&player, hovered_card)
 				} else if hovered_card.category == .DICE {
 					app.card_selected = hovered_card^
 					card_discard(&player, hovered_card_index, silent=true)
@@ -1725,12 +1724,16 @@ draw :: proc(dt: real) {
 			if combo_type == .None do continue
 
 			position := board_position + rl.Vector2{20, 150 + f32(c)*app.gui.font_size2*1.6}
-			match, score := test_combination(combo_type, ghost_selected_numbers[:], &highlighted)
+			match, score, factor := test_combination(combo_type, ghost_selected_numbers[:], &highlighted)
 			already_scored := combo_type in human.cycle.scored_combinations
 			if already_scored do n_scored_combos += 1
 			draw_text(fmt.tprintf("%v", combo_type), position, app.gui.font_size2, (match && !already_scored) ? rl.RAYWHITE : rl.GRAY, strikethrough=already_scored)
 			if !already_scored && match && enough_ghosts {
-				draw_text(fmt.tprintf("+%.f", score), position+{600, 0}, app.gui.font_size2, rl.RAYWHITE)
+				if factor > 0 {
+					draw_text(fmt.tprintf("+%.f, x%.f", score, factor), position+{600, 0}, color=rl.RAYWHITE)
+				} else {
+					draw_text(fmt.tprintf("+%.f", score), position+{600, 0}, color=rl.RAYWHITE)
+				}
 
 				for ghost_number, g in ghost_selected_numbers{
 					dice_button(ghost_number, position+{300+f32(g)*(ghost_size2+5), -7},
@@ -1758,7 +1761,7 @@ draw :: proc(dt: real) {
 					}
 					app.ghosts_selected = {}-1 // deselect everything
 					app.cards_offer = {}
-					cards_generate(app.cards_offer[:3], .RollAndDiceCards)
+					cards_generate(app.cards_offer[:3], .FlashRollAndDiceCards)
 					state_change(.CARDS_OFFER)
 				}
 				if match && score > highest_score {
@@ -1858,14 +1861,19 @@ draw :: proc(dt: real) {
 			else if card.category == .CYCLE do actions = {"ACTIVATE"}
 			_, action := draw_card(card, position, actions=actions)
 			if action == 1 {
-				if card.category == .ROLL{
+				if card.category == .FLASH {
+					card_activate(human, &card)
+					state_change(.WAIT_FOR_ROLL)
+					app.cards_offer = {}
+				} else if card.category == .ROLL{
 					card_activate(human, &card)
 					append(&human.cards, card)
-					card = {}
 					state_change(.WAIT_FOR_ROLL)
+					app.cards_offer = {}
 				} else if card.category == .DICE {
 					app.card_selected = card
 					state_change(.UPGRADE_DIE)
+					app.cards_offer = {}
 				}
 			} else if action == 0{
 				if card.category == .CYCLE {
@@ -1873,8 +1881,8 @@ draw :: proc(dt: real) {
 				} else {
 					append(&human.cards, card)
 				}
-				card = {}
 				state_change(.WAIT_FOR_ROLL)
+				app.cards_offer = {}
 			}
 		}
 
@@ -1882,9 +1890,7 @@ draw :: proc(dt: real) {
 			app.antagonist.tutorial_cards = true
 			antagonist_story("antagonist_tutorial_cards")
 		}
-	}
-
-	if app.state == .UPGRADE_DIE {
+	} else if app.state == .UPGRADE_DIE {
 		selected_die: ^Die
 		selected_face :i32= -1
 		for &die in app.dice{
@@ -1955,8 +1961,6 @@ draw :: proc(dt: real) {
 		size_factor := splash(life_ratio)
 		font_size *= size_factor
 
-		// end_2d = start_2d// + {0, -20}
-
 		x := math.lerp(start_2d.x, end_2d.x, 1.-life_ratio)
 		y := math.lerp(start_2d.y, end_2d.y, 1.-life_ratio)
 
@@ -1970,23 +1974,22 @@ draw :: proc(dt: real) {
 
 		if len(animation.text) == 0 do continue
 
-		text_size := measure_text(animation.text, font_size)
-		x -= text_size.x/2.
-		y -= text_size.y/2.
+		// text_size := measure_text(animation.text, font_size)
+		// x -= text_size.x/2.
+		// y -= text_size.y/2.
 
-		box_position := Vector2{x-5, y-5}
-		// if animation.anchor == .CENTER do box_position.x -= text_size.x/2.
+		// box_position := Vector2{x-5, y-5}
+		// if animation.anchor == .LEFT do box_position.x += text_size.x/2.
 		// if animation.anchor == .RIGHT do box_position.x -= text_size.x
 		text_color := rl.ColorAlpha(animation.color, alpha)
 		text_outline := rl.BLACK
+		box_fill := rl.BLANK
 		if !has_icon{
-			draw_box(box_position, {text_size.x+10, text_size.y+10},
-				fill=rl.ColorAlpha(animation.color, alpha), thickness=2,
-				outline=rl.ColorAlpha(rl.BLACK, alpha))
+			box_fill = rl.ColorAlpha(animation.color, alpha)
 			text_color = rl.ColorAlpha(rl.BLACK, alpha)
 			text_outline = rl.BLANK
 		}
-		draw_text(animation.text, {x, y}, font_size, text_color, outline=text_outline)
+		draw_text(animation.text, {x, y}, font_size, text_color, outline=text_outline, boxed=box_fill, anchor=animation.anchor)
 	}
 
 	draw_icon_particles(dt)

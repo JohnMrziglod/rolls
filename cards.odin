@@ -4,19 +4,21 @@ import "core:fmt"
 import "core:math"
 import "core:math/rand"
 import "core:reflect"
+import "core:slice"
 import "core:strings"
 import rl "vendor:raylib"
 
 CARD_SIZE :: [2]f32{300, 350}
-CardCategory :: enum {NONE, ROLL, DICE, CYCLE}
+CardCategory :: enum {NONE, FLASH, ROLL, DICE, CYCLE}
 CardType :: enum i32{
 		CardNone,
+	CardFlash_GraveRoll,
+		CardFlashs,
 	CardRoll_Attack,
 	CardRoll_Defense,
 	CardRoll_Doppelgeist,
 	CardRoll_Exorcism,
 	CardRoll_FakeNews,
-	CardRoll_GraveRoll,
 	CardRoll_GhostHour,
 	CardRoll_HappyHour,
 	CardRoll_Immortality,
@@ -38,10 +40,11 @@ CardType :: enum i32{
 	CardDice_Optimist,
 	CardDice_Pessimist,
 	CardDice_PlusOne,
-	CardDice_PowerDice,
+	CardDice_PowerUp,
 	CardDice_Historian,
 	CardDice_Librarian,
 	CardDice_Pirate,
+	CardDice_Randomizer,
 	CardDice_Researcher,
 	CardDice_Tank,
 	CardDice_Train,
@@ -67,34 +70,38 @@ Card :: struct{
 	triggered: f32,		// How long it should be displayed as triggered in seconds
 }
 
-CardGenerateTypes :: enum{AllCards, RollCards, RollAndDiceCards, DiceCards, CycleCards}
+CardGenerateTypes :: enum{AllCards, FlashCards, RollCards, FlashRollAndDiceCards, DiceCards, CycleCards}
 cards_generate :: proc(cards: []Card, types:CardGenerateTypes){
 	lower_bound := i32(CardType.CardNone)+1
 	upper_bound := i32(CardType.CardCycles)
 	switch types {
 	case .AllCards:
 		// do nothing, we want all cards
-	case .DiceCards:
-		lower_bound = i32(CardType.CardRolls)+1
-		upper_bound = i32(CardType.CardDices)
+	case .FlashCards:
+		upper_bound = i32(CardType.CardFlashs)
 	case .RollCards:
+		lower_bound = i32(CardType.CardFlashs)+1
 		upper_bound = i32(CardType.CardRolls)
-	case .RollAndDiceCards:
+	case .DiceCards:
+		lower_bound = i32(CardType.CardFlashs)+1
+		upper_bound = i32(CardType.CardDices)
+	case .FlashRollAndDiceCards:
 		upper_bound = i32(CardType.CardDices)
 	case .CycleCards:
 		lower_bound = i32(CardType.CardDices)+1
-		upper_bound = i32(CardType.CardCycles)
 	}
 
-	generated_types := bit_set[CardType]{}
+	generated_types := bit_set[CardType]{.CardNone, .CardRolls, .CardFlashs}
 	for i in 0..<len(cards) {
 		card_type: CardType
-
-		for (card_type == .CardNone || card_type == .CardRolls || card_type in generated_types) {
+		for (card_type in generated_types) {
 			card_type = CardType(rand.int32_range(lower_bound, upper_bound))
 		}
 
-		cards[i] = Card{type=card_type, category=card_category(card_type)}
+		cards[i] = Card{
+			type=card_type, category=card_category(card_type),
+			var1=card_type==.CardDice_PowerUp?1:0
+		}
 		generated_types += {card_type}
 	}
 }
@@ -114,10 +121,15 @@ card_fill_vars :: proc(card: Card, text: string) -> string{
 }
 
 card_category :: proc(type: CardType) -> CardCategory{
-	if type > .CardNone && type < .CardRolls do return .ROLL
+	if type > .CardNone && type < .CardFlashs do return .FLASH
+	if type > .CardFlashs && type < .CardRolls do return .ROLL
 	if type > .CardRolls && type < .CardDices do return .DICE
 	if type > .CardDices && type < .CardCycles do return .CYCLE
 	return .NONE // Invalid card type, return default category
+}
+
+card_is_hovered :: proc(position: rl.Vector2, ) -> bool{
+	return rl.CheckCollisionPointRec(rl.GetMousePosition(), {x=position.x, y=position.y, width=f32(CARD_SIZE.x), height=f32(CARD_SIZE.y)})
 }
 
 card_discard :: proc(player: ^Player, index: i32, silent:bool=false){
@@ -144,6 +156,16 @@ card_activate :: proc(player: ^Player, card: ^Card){
 	}
 
 	#partial switch card.type {
+	case .CardFlash_GraveRoll:
+		if len(player.ghosts) > 0{
+			for &ghost in player.ghosts{
+				ghost = rand.int32_range(1, 7)
+			}
+			slice.sort(player.ghosts[:])
+			add_text_fixed(app.gui.ghost_positions[player.id], fmt.aprint("REROLLED GHOSTS!"), player.color, anchor=.LEFT)
+		} else {
+			add_text_fixed(app.gui.ghost_positions[player.id], fmt.aprint("NO GHOSTS TO REROLL!"), player.color, anchor=.LEFT)
+		}
 	case .CardCycle_EternalRoll:
 		player.max_lifetime_roll_cards += 1
 	case .CardCycle_ExtraDie:
@@ -175,7 +197,7 @@ card_activate :: proc(player: ^Player, card: ^Card){
 			case .CardDice_Researcher:
 				if card.category == .CYCLE{
 					upgrade.var1 += 1.
-					add_text(dice.position, fmt.aprint("RESEARCHER: +1 ROLL MULTIPLIER!"), dice.color1, 0.5)
+					add_text(dice.position, fmt.aprint("RESEARCHER: +1 ROLL FACTOR!"), dice.color1, 0.5)
 				}
 			}
 		}
@@ -294,7 +316,7 @@ possible_combinations :: proc(dice: []i32) -> CombinationSet{
 	return combinations
 }
 
-test_combination :: proc(combination: CombinationType, dices: []i32, highlight: ^[5]bool) -> (match:bool=false, score:f64=0) {
+test_combination :: proc(combination: CombinationType, dices: []i32, highlight: ^[5]bool) -> (match:bool=false, score:f64=0, factor:f64=0.) {
 	if combination == .None do return
 
 	counter := [6]i32{}
@@ -387,6 +409,7 @@ test_combination :: proc(combination: CombinationType, dices: []i32, highlight: 
 		match = five
 		if !match do return
 		score = 70 // fixed score
+		factor = 2
 		for number, j in dices {
 			highlight[j] = true
 		}

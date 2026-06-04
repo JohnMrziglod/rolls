@@ -11,6 +11,7 @@ import "core:strings"
 import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
 
+BOX_PADDING :f32: 6.
 TextureFaceSize :: [2]f32{128., 128.}
 
 TextAnchor :: enum {
@@ -272,6 +273,12 @@ draw_icon_particles :: proc(dt: real){
 	}
 }
 
+add_text_fixed :: proc (
+		start: Vector2, text: string, color: rl.Color, lifetime:f32=-1.,
+		font_size: f32=-1, anchor:TextAnchor=.CENTER, delay:f32=0.,
+		icon_id:Maybe(Vector2)=nil, icon_size:f32=0.) {
+	add_text_vec_vec(start, start, text, color, lifetime, font_size, anchor, delay, icon_id, icon_size)
+}
 add_text :: proc{add_text_vec3, add_text_vec2, add_text_vec_vec}
 add_text_vec3 :: proc (
 		start: Vector3, text: string, color: rl.Color, lifetime:f32=-1.,
@@ -330,7 +337,7 @@ draw_text :: proc(text: string, position: rl.Vector2, font_size: f32=-1.,
 	if boxed != rl.BLANK {
 	    box_size := measure_text(text, font_size, spacing, max_width)+2*padding
 		if box_width > 0 do box_size.x = box_width
-	    draw_box(position - padding, box_size, boxed, offset=box_offset)
+	    draw_rounded_box(position - padding, box_size, boxed)
         // position += {padding, padding}
 	}
 
@@ -347,7 +354,7 @@ draw_text :: proc(text: string, position: rl.Vector2, font_size: f32=-1.,
 	// TokenType :: union{Text, Highlighted, Icon}
 	highlighted: bool
 	in_icon: bool
-	icon_id: string
+	icon_id := strings.builder_make(context.temp_allocator)
 	draw_icon: bool
 
 	for r, i in text{
@@ -359,19 +366,23 @@ draw_text :: proc(text: string, position: rl.Vector2, font_size: f32=-1.,
 			if r == ']' {
     			in_tag = false
        			if in_icon{
-					draw_texture_by_string(icon_id, position + rl.Vector2{text_offset_x, text_offset_y}, font_size*scale_factor, color)
+          			if draw{
+						draw_texture_by_string(strings.to_string(icon_id),
+							position + rl.Vector2{text_offset_x+2., text_offset_y}, font_size*scale_factor, highlight_color)
+             		}
+					text_offset_x += font_size*scale_factor+4.
 				}
        			in_icon = false
     			continue
 			} else if !in_icon && r == 'i' {
 				in_icon = true
-			    icon_id = ""
+    			strings.builder_reset(&icon_id)
 				continue
 			} else if !in_icon && r == 'h' {
 			    highlighted = !highlighted
 				continue
 			} else if in_icon {
-			    icon_id = fmt.join(icon_id, r, context.temp_allocator)
+			    strings.write_rune(&icon_id, r)
 				continue
 			}
 		}
@@ -454,16 +465,33 @@ draw_text :: proc(text: string, position: rl.Vector2, font_size: f32=-1.,
 	return text_size
 }
 
-draw_box :: proc(position, size: rl.Vector2, fill:rl.Color=rl.BLANK, outline:rl.Color=rl.BLACK, thickness:f32=4., offset:f32=0.) {
-	// offset := f32(20)
-	box := rl.Rectangle{x=position.x-offset, y=position.y-offset, width=size.x+2*offset, height=size.y+2*offset}
-	roundness :f32= 0.1
-	segments :i32= 12
-	if fill != rl.BLANK {
-		rl.DrawRectangleRounded(box, roundness, segments, fill)
+draw_rounded_box :: proc(position, size: rl.Vector2, fill:rl.Color=rl.BLANK, radius:f32=8.) {
+	w := size.x;
+	h := size.y;
+	roundness := 2.*radius / min(w, h)
+	if (roundness < 0) do roundness = 0
+	if (roundness > 1) do roundness = 1
+
+	draw_box(position, size, fill, outline={0, 0, 0, fill.a}, roundness=roundness)
+}
+draw_box :: proc(position, size: rl.Vector2, fill:rl.Color=rl.BLANK, outline:rl.Color=rl.BLACK, thickness:f32=5., roundness:f32=0.) {
+	box := rl.Rectangle{x=position.x, y=position.y, width=size.x, height=size.y}
+	if roundness > 0.{
+		segments :i32= 0
+		if fill != rl.BLANK {
+			rl.DrawRectangleRounded(box, roundness, segments, fill)
+		}
+		box = {position.x, position.y, size.x, size.y}
+		rl.DrawRectangleRoundedLinesEx(box, roundness, segments, thickness, outline)
+	} else {
+		if fill != rl.BLANK {
+			rl.DrawRectangleV(position, size, fill)
+		}
+		if thickness > 0. {
+			box = {position.x, position.y, size.x, size.y}
+			rl.DrawRectangleLinesEx(box, thickness, outline)
+		}
 	}
-	box = {position.x-thickness, position.y-thickness, size.x+2*thickness, size.y+2*thickness}
-	rl.DrawRectangleRoundedLinesEx(box, roundness/2., segments, thickness, outline)
 }
 
 color_brighten :: proc(color: rl.Color, factor: f32) -> rl.Color {
@@ -508,16 +536,12 @@ draw_texture_by_string :: proc(texture_id: string, position: Vector2, size: f32,
 }
 
 fade_out :: proc(){
-	draw_box({-10, -10}, {app.gui.width+100, app.gui.height+100}, fill=rl.ColorAlpha(rl.BLACK, 0.8), thickness=0)
-}
-
-card_is_hovered :: proc(position: rl.Vector2, ) -> bool{
-	return rl.CheckCollisionPointRec(rl.GetMousePosition(), {x=position.x, y=position.y, width=f32(CARD_SIZE.x), height=f32(CARD_SIZE.y)})
+	draw_box({-200, -200}, {app.gui.width+400, app.gui.height+400}, fill=rl.ColorAlpha(rl.BLACK, 0.6), thickness=0)
 }
 
 draw_card :: proc(
 		card: Card, position: rl.Vector2, color:rl.Color=rl.BLANK, actions:[]string={},
-		with_title:bool=true, with_icon:bool=true, with_info:bool=true,
+		with_title:bool=true, with_icon:bool=true, with_info:bool=true, hoverable:bool=true,
 ) -> (bool, i32){
     size := CARD_SIZE
    	font_size :f32= app.gui.font_size2-2
@@ -525,44 +549,44 @@ draw_card :: proc(
 	margin: f32 = 10
 	header_height := font_size+2*padding
 
-    if !with_icon do size.y = header_height
-	hovered := with_icon && card_is_hovered(position)
-
 	color := color
 	if color == rl.BLANK do color = COLOR_CARDS[card.category]
 
-	position := position
+	if !hoverable do color = rl.ColorBrightness(color, -0.3)
+    if !with_icon do size.y = header_height
+	hovered := hoverable && with_icon && card_is_hovered(position)
 
+	position := position
 	if hovered{
 		color = rl.ColorBrightness(color, 0.1)
-		position.y += -10. //math.sin(f32(rl.GetTime())*10)*5
+		position.y += -10.
 	}
 
 	if card.active {
 		color = rl.ColorBrightness(color, 0.15)
 	} else if !hovered && card.triggered == 0.{
-		color = rl.ColorBrightness(color, -0.3)
+		color = rl.ColorBrightness(color, -0.1)
 	}
 
 	if card.triggered > 0.{
 		position.y += math.sin(f32(rl.GetTime())*20)*10
 	}
 
-	lt :f32= 4. // line_thickness
 	if with_icon{
-		draw_box(position, size, fill=color, outline=rl.Color{0, 0, 0, color.a}, offset=16)
-		// rl.DrawRectangleV(position, size, color)
-		// lc := rl.Color{0, 0, 0, color.a} // color
-		// rl.DrawRectangleLinesEx({position.x-lt, position.y-lt, size.x+2*lt, size.y+2*lt}, lt, lc)
+		draw_rounded_box(position, size, fill=color)
 	}
 
 	// Title
 	if with_title{
-		// rl.DrawRectangleV(position-lt, {size.x, header_height}+2*lt, rl.BLACK)
+		if !with_icon {
+			draw_rounded_box(position, {size.x, header_height}, fill=rl.ColorContrast(color, 0.1))
+		} else {
+			rl.DrawLineEx(position+{0., header_height}, position+{size.x, header_height}, 4., rl.BLACK)
+		}
 		draw_text(get_text(card.type, "title"), position + padding, font_size, rl.BLACK, max_width=size.x-2*padding)
 		icon_size := header_height - 2*padding
 		icon_position := position+{size.x-icon_size-padding, padding}
-		draw_texture(Vector2{0., 16.+f32(card.category)}, icon_position, icon_size, color)
+		draw_texture(Vector2{0., 15.+f32(card.category)}, icon_position, icon_size, color)
 		if card.category == .ROLL && card.lifetime > 0 {
 			draw_text(fmt.tprintf("%v", card.lifetime),
 				position+{size.x-padding-icon_size-2, padding}, font_size, rl.BLACK, anchor=.RIGHT)
@@ -571,7 +595,7 @@ draw_card :: proc(
 
 	// main card icon
 	if with_icon{
-		icon_position := position+padding + {0., header_height}
+		icon_position := position+padding + {0., header_height+6.}
 		icon_size := min(size.x, size.y)-2*padding
 		icon_color := hovered ? rl.ColorAlpha(color, 0.5) : color
 		rl.DrawRectangleV(icon_position+40, {}+icon_size-2*40, rl.ColorBrightness(icon_color, -0.2))
@@ -594,7 +618,7 @@ draw_card :: proc(
 
 	show_description := hovered || !with_icon
 	text_pos := position
-	if with_title || with_icon do text_pos += {0, size.y+margin+32.}+padding
+	if with_title || with_icon do text_pos += {0, size.y+margin+2*BOX_PADDING}+padding
 	if show_description {
 	    ids := []string{"description", "description2"}
 		for id in ids{
@@ -604,8 +628,8 @@ draw_card :: proc(
             text_size := draw_text(
                     text, text_pos, font_size, rl.BLACK,
                     max_width=size.x-(text_pos.x-position.x), highlight_color=color,
-                    boxed=color, box_width=size.x, box_offset=16.)
-            text_pos.y += text_size.y + 2*padding + margin
+                    boxed=color, box_width=size.x, box_offset=BOX_PADDING)
+            text_pos.y += text_size.y + 2*padding + margin + 2.*BOX_PADDING
 		}
 	}
 

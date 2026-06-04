@@ -1,5 +1,21 @@
-Die4
-/texture_id=[0,0]
+DieFace1
+/texture_id=[0,8]
+DieFace2
+/texture_id=[0,9]
+DieFace3
+/texture_id=[0,10]
+DieFace4
+/texture_id=[0,11]
+DieFace5
+/texture_id=[0,12]
+DieFace6
+/texture_id=[0,13]
+# FLASH CARDS
+CardFlash_GraveRoll
+/title="GRAVE ROLL"
+/description="Reroll your GHOST DICE."
+/texture_id=[4,8]
+# ROLL CARDS
 CardRoll_Attack
 /title="FULL ATTACK!"
 /description="All your DICE get +1 ATTACK."
@@ -18,19 +34,15 @@ CardRoll_Exorcism
 /texture_id=[4,5]
 CardRoll_FakeNews
 /title="FAKE NEWS"
-/description="All JOURNALIST DICE will only add 0.5 to the ROLL MULTIPLIER."
+/description="All JOURNALIST DICE will only add 0.5 to the ROLL FACTOR."
 /texture_id=[4,7]
 CardRoll_GhostHour
 /title="GHOST HOUR"
 /description="Your GHOST DICE' numbers add to your ROLL SCORE."
 /texture_id=[4,6]
-CardRoll_GraveRoll
-/title="GRAVE ROLL"
-/description="Your GHOST DICE will be rerolled after each roll."
-/texture_id=[4,8]
 CardRoll_HappyHour
 /title="HAPPY HOUR"
-/description="+2 to your ROLL MULTIPLIER."
+/description="+2 to your ROLL FACTOR."
 /texture_id=[4,0]
 CardRoll_Immortality
 /title="IMMORTALITY"
@@ -57,6 +69,9 @@ CardRoll_TombRaider
 /description="Steal one of your antagonist's GHOST DICE after the next roll."
 /texture_id=[4,13]
 # DICE CARDS
+CardDice_Anarchist
+/title="ANARCHIST"
+/description="This die adds the number of eliminated dice in this roll to its score."
 CardDice_Assassin
 /title="ASSASSIN"
 /description="+2 ATTACK for this die."
@@ -64,7 +79,7 @@ CardDice_Assassin
 /texture_id=[1,1]
 CardDice_Drunk
 /title="DRUNK"
-/description="This die attacks antagonist's dice regardless of their numbers."
+/description="This die attacks another antagonist's dice regardless of matching their pips."
 /texture_id=[1,18]
 CardDice_Tank
 /title="TANK"
@@ -73,25 +88,25 @@ CardDice_Tank
 /texture_id=[1,2]
 CardDice_Antenna
 /title="ANTENNA"
-/description="Multiplies die's SCORE by the product of your other surviving dice with ANTENNA."
+/description="This die multiplies its score by the pips of your other surviving dice with ANTENNA."
 /texture_id=[1,4]
 CardDice_Optimist
 /title="OPTIMIST"
-/description="This die only shows the numbers [iDie4], [iDie5], and [iDie6]."
-/description2="When on [h]TOP FACE[h], add the sum of your surviving dice greater or equal [h]4[h] to die's score."
+/description="This die only shows the numbers [iDieFace4], [iDieFace5], and [iDieFace6]."
+/description2="When on [h]TOP FACE[h], this die adds the pips of your surviving dice greater or equal [iDieFace4] to its score."
 /texture_id=[1,9]
 CardDice_Pessimist
 /title="PESSIMIST"
-/description="This die only shows the numbers [h]1[h], [h]2[h], and [h]3[h]."
-/description2="When on [h]TOP FACE[h], multiplies die's SCORE by the product of your surviving dice lower or equal [h]3[h]."
+/description="This die only shows the numbers [iDieFace1], [iDieFace2], and [iDieFace3]."
+/description2="When on [h]TOP FACE[h], this die multiplies its score by the pips of your surviving dice lower or equal [iDieFace3]."
 /texture_id=[1,8]
 CardDice_General
 /title="GENERAL"
-/description="Multiplies die's SCORE by the number your surviving DICE."
+/description="This die multiplies its score by the number your surviving dice."
 /texture_id=[1,17]
 CardDice_Journalist
 /title="JOURNALIST"
-/description="+2 ROLL MULTIPLIER."
+/description="+2 to your ROLL FACTOR."
 /texture_id=[1,6]
 CardDice_Influencer
 /title="INFLUENCER"
@@ -114,10 +129,10 @@ CardDice_PlusOne
 /texture_id=[1,5]
 CardDice_Investor
 /title="INVESTOR"
-/description="Adds die's SCORE with 10% interest to SAVINGS (currently [h]+%VAR1_F[h])."
+/description="Adds die's SCORE with 10% interest to SAVINGS.[n]Currently: [h]+%VAR1_F[h]"
 /description2="When on [h]TOP FACE[h], adds die's SAVINGS to the ROLL SCORE and reset SAVINGS to 0."
 /texture_id=[1,3]
-CardDice_PowerDice
+CardDice_PowerUp
 /title="POWER UP"
 /description="This die multiplies its score by [h]%VAR1[h]."
 /description2="When on [h]TOP FACE[h], increase the factor by 1."
@@ -128,28 +143,32 @@ CardDice_Train
 /texture_id=[1,11]
 CardDice_Historian
 /title="HISTORIAN"
-/description="Gains permanently +1 SCORE when alive and activating a ROLL CARD (currently [h]+%VAR1[h])."
+/description="Gains permanently +1 SCORE when alive and activating a ROLL CARD. [n]Currently: [h]+%VAR1[h]"
 /texture_id=[1,13]
 CardDice_Librarian
 /title="LIBRARIAN"
-/description="Gains permanently +1 SCORE when alive and assigning a DICE CARD to another die (currently [h]+%VAR1[h])."
+/description="Gains permanently +1 SCORE when alive and assigning a DICE CARD to another die. [n]Currently: [h]+%VAR1[h]"
 /texture_id=[1,12]
 CardDice_Pirate
 /title="PIRATE"
 /description="Always scores the same amount like antagonist's highest scoring die."
 /texture_id=[2,1]
+CardDice_Randomizer
+/title="RANDOMIZER"
+/description="This die adds a random number to its score."
+/texture_id=[1,10]
 CardDice_Researcher
 /title="RESEARCHER"
-/description="Gains permanently [h]+1 ROLL MULTIPLIER[h] when alive and activating a CYCLE CARD (currently [h]x%VAR1[h])."
+/description="Gains permanently [h]+1 ROLL FACTOR[h] when alive and activating a CYCLE CARD."
 /texture_id=[1,10]
 CardDice_Veteran
 /title="VETERAN"
-/description="This die gains [h]+2 SCORE[h] each time it survives a roll (currently [h]+%VAR1[h]). Resets to 0 when it dies."
+/description="This die gains [h]+2 SCORE[h] each time it survives a roll. Resets to 0 when it dies.[n]Currently: [h]+%VAR1[h]"
 /description2="When on [h]TOP FACE[h], +1 HEALTH for this die."
 /texture_id=[1,19]
 CardDice_WarHero
 /title="WAR HERO"
-/description="This die gains +1 SCORE each time it kills another die (currently [h]+%VAR1[h])."
+/description="This die gains +1 SCORE each time it kills another die.[n]Currently: [h]+%VAR1[h]"
 /texture_id=[2,0]
 # CYCLE CARDS
 CardCycle_ExtraDie
