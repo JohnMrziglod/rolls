@@ -8,7 +8,6 @@ import "core:slice"
 import "core:strings"
 import rl "vendor:raylib"
 
-CARD_SIZE :: [2]f32{300, 350}
 CardCategory :: enum {NONE, FLASH, ROLL, DICE, CYCLE}
 CardType :: enum i32{
 		CardNone,
@@ -129,7 +128,7 @@ card_category :: proc(type: CardType) -> CardCategory{
 }
 
 card_is_hovered :: proc(position: rl.Vector2, ) -> bool{
-	return rl.CheckCollisionPointRec(rl.GetMousePosition(), {x=position.x, y=position.y, width=f32(CARD_SIZE.x), height=f32(CARD_SIZE.y)})
+	return rl.CheckCollisionPointRec(rl.GetMousePosition(), {x=position.x, y=position.y, width=f32(L.card_size.x), height=f32(L.card_size.y)})
 }
 
 card_discard :: proc(player: ^Player, index: i32, silent:bool=false){
@@ -162,9 +161,9 @@ card_activate :: proc(player: ^Player, card: ^Card){
 				ghost = rand.int32_range(1, 7)
 			}
 			slice.sort(player.ghosts[:])
-			add_text_fixed(app.gui.ghost_positions[player.id], fmt.aprint("REROLLED GHOSTS!"), player.color, anchor=.LEFT)
+			add_text_fixed(L.ghost_positions[player.id], fmt.aprint("REROLLED GHOSTS!"), player.color, anchor=.LEFT)
 		} else {
-			add_text_fixed(app.gui.ghost_positions[player.id], fmt.aprint("NO GHOSTS TO REROLL!"), player.color, anchor=.LEFT)
+			add_text_fixed(L.ghost_positions[player.id], fmt.aprint("NO GHOSTS TO REROLL!"), player.color, anchor=.LEFT)
 		}
 	case .CardCycle_EternalRoll:
 		player.max_lifetime_roll_cards += 1
@@ -207,7 +206,7 @@ card_activate :: proc(player: ^Player, card: ^Card){
 		{0, 8}, {0, 9}, {0, 10}, {0, 11}, {0, 12}, {0, 13},
 	}
 	// add_icon_particles(
-	// 	rl.GetMousePosition()-CARD_SIZE/2., CARD_SIZE, texture_ids, COLOR_CARDS[card.category])
+	// 	rl.GetMousePosition()-L.card_size/2., L.card_size, texture_ids, COLOR_CARDS[card.category])
 }
 
 card_assign :: proc(die: ^Die, card: Card, index:i32=-1) -> bool{

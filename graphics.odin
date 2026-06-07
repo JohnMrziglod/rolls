@@ -310,7 +310,7 @@ add_text_vec_vec :: proc (
 			start_lifetime = lifetime < 0. ? 2. : lifetime,
 			lifetime = lifetime < 0. ? 2. : lifetime,
 			visible = true,
-			font_size=font_size < 0 ? app.gui.font_size2 : font_size,
+			font_size=font_size < 0 ? L.font_size2 : font_size,
 			anchor=anchor,
 			delay=delay
 		}
@@ -329,7 +329,7 @@ draw_text :: proc(text: string, position: rl.Vector2, font_size: f32=-1.,
 		anchor:TextAnchor=.LEFT, draw:bool=true, highlight_color:rl.Color=rl.RAYWHITE,
 		outline:rl.Color=rl.BLANK) -> rl.Vector2{
 
-	font_size := font_size > 0. ? font_size : app.gui.font_size2
+	font_size := font_size > 0. ? font_size : L.font_size2
 
 	position := position
 	if anchor == .RIGHT do position.x -= measure_text(text, font_size, spacing, max_width).x
@@ -468,7 +468,7 @@ draw_text :: proc(text: string, position: rl.Vector2, font_size: f32=-1.,
 draw_rounded_box :: proc(position, size: rl.Vector2, fill:rl.Color=rl.BLANK, radius:f32=6.) {
 	w := size.x;
 	h := size.y;
-	roundness := 2.*radius / min(w, h)
+	roundness := 2.*radius*S / min(w, h)
 	if (roundness < 0) do roundness = 0
 	if (roundness > 1) do roundness = 1
 
@@ -482,14 +482,14 @@ draw_box :: proc(position, size: rl.Vector2, fill:rl.Color=rl.BLANK, outline:rl.
 			rl.DrawRectangleRounded(box, roundness, segments, fill)
 		}
 		box = {position.x, position.y, size.x, size.y}
-		rl.DrawRectangleRoundedLinesEx(box, roundness, segments, thickness, outline)
+		rl.DrawRectangleRoundedLinesEx(box, roundness, segments, thickness*S, outline)
 	} else {
 		if fill != rl.BLANK {
 			rl.DrawRectangleV(position, size, fill)
 		}
 		if thickness > 0. {
 			box = {position.x, position.y, size.x, size.y}
-			rl.DrawRectangleLinesEx(box, thickness, outline)
+			rl.DrawRectangleLinesEx(box, thickness*S, outline)
 		}
 	}
 }
@@ -536,15 +536,15 @@ draw_texture_by_string :: proc(texture_id: string, position: Vector2, size: f32,
 }
 
 fade_out :: proc(){
-	draw_box({-200, -200}, {app.gui.width+400, app.gui.height+400}, fill=rl.ColorAlpha(rl.BLACK, 0.6), thickness=0)
+	draw_box({-200, -200}, {L.width+400, L.height+400}, fill=rl.ColorAlpha(rl.BLACK, 0.6), thickness=0)
 }
 
 draw_card :: proc(
 		card: Card, position: rl.Vector2, color:rl.Color=rl.BLANK, actions:[]string={},
 		with_title:bool=true, with_icon:bool=true, with_info:bool=true, hoverable:bool=true,
 ) -> (bool, i32){
-    size := CARD_SIZE
-   	font_size :f32= app.gui.font_size2-2
+    size := L.card_size
+   	font_size :f32= L.font_size2-2
 	padding :f32= 10
 	margin: f32 = 12
 	header_height := font_size+2*padding
@@ -643,7 +643,7 @@ draw_die_info :: proc(die: Die, extended:bool=false) -> i32{
 	margin := f32(10.)
     padding := f32(4.)
 
-    box_size := Vector2{6*icon_size+10*padding, icon_size+3*padding+app.gui.font_size2}+2.*margin
+    box_size := Vector2{6*icon_size+10*padding, icon_size+3*padding+L.font_size2}+2.*margin
     draw_box(position-margin, box_size, fill=rl.ColorAlpha(die.color1, 0.8), thickness=0.)
 
     card: Card
@@ -665,7 +665,7 @@ draw_die_info :: proc(die: Die, extended:bool=false) -> i32{
         hovered := rl.CheckCollisionPointRec(rl.GetMousePosition(), dest)
         if hovered {
 			if upgraded {
-			  	card_position = upgrade_pos + {-CARD_SIZE.x/2.+icon_size/2., icon_size+10}
+			  	card_position = upgrade_pos + {-L.card_size.x/2.+icon_size/2., icon_size+10}
 				card = upgrade
 			} else if app.card_selected.category == .DICE{
 				tp = icon_index_from_card(app.card_selected.type)

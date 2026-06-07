@@ -20,9 +20,9 @@ dice_killed :: proc(victim: ^Die, killer: ^Die=nil){
 	}
 
 	add_particles(victim.position, victim.color1)
-	add_text(victim.position, app.gui.ghost_positions[victim.player],
+	add_text(victim.position, L.ghost_positions[victim.player],
 			"", rl.ColorAlpha(victim.color1, .5), 1.0, icon_id=Vector2{0, 7+f32(victim.current_number)},
-		    icon_size=app.gui.font_size1)
+		    icon_size=L.font_size1)
 
 	victim.state = .DEAD
 	victim.position.y = 1000.

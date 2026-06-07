@@ -24,6 +24,12 @@ load_data :: proc(texts_buffer: ^string, path: string) {
 	}
 	texts_buffer ^= string(file)
 
+    when ODIN_OS == .Windows{
+	    shift_end := 1 // +1 to remove the \r before \n
+    } else {
+        shift_end := 0
+    }
+
 	Token :: enum{Root, Section, Key, Value, Comment}
 	token: Token
 	expect_section_or_key := true
@@ -44,11 +50,13 @@ load_data :: proc(texts_buffer: ^string, path: string) {
 		    section := texts_buffer[section_start:section_end]
 			local_key := texts_buffer[key_start+1:key_end]
 			global_key := strings.join({section, local_key}, "/")
-			value := texts_buffer[key_end+2:i-2] // +2 for =", -2 to remove " and the \r before \n
+
+            value := texts_buffer[key_end+2:i-1-shift_end] // +2 for =", -2 to remove " and the \r before \n
 			if texts_buffer[key_end+1] == '"' {
 			    app.texts[global_key] = value
 			} else if texts_buffer[key_end+1] == '[' && local_key == "texture_id"{
 			    values := strings.split(value, ",", context.temp_allocator)
+				fmt.println("Parsed texture coordinates for", section, ": ", values)
 				x_coord, x_ok := strconv.parse_int(values[0])
 				y_coord, y_ok := strconv.parse_int(values[1])
 				if x_ok && y_ok {
@@ -57,16 +65,15 @@ load_data :: proc(texts_buffer: ^string, path: string) {
                         f32(y_coord),
                     }
 				} else {
-				    fmt.println("Error parsing texture coordinates for ", section)
+				    fmt.printfln("Error parsing texture coordinates for %v (0: %v, 1: %v)", section, x_ok, y_ok)
 				}
             } else {
                 fmt.printfln("Warning: value for key %s in section %s is neither a string nor a texture id:\n%s", local_key, section, value)
             }
 
-
 			token = .Root
 		} else if token == .Section && r == '\n'{
-			section_end = i-1
+			section_end = i-shift_end
 			token = .Root
 		} else if token == .Root && !strings.is_space(r) {
 			section_start = i
