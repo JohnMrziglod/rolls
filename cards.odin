@@ -45,9 +45,11 @@ CardType :: enum i32{
 	CardDice_Pirate,
 	CardDice_Randomizer,
 	CardDice_Researcher,
+	CardDice_SuperHero,
 	CardDice_Tank,
 	CardDice_Train,
 	CardDice_Veteran,
+	CardDice_VIP,
 	CardDice_WarHero,
 		CardDices,				// <- Until we got upgrade cards
 	CardCycle_ExtraDie,

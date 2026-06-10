@@ -63,7 +63,8 @@ splash :: proc(t: f32) -> f32 {
 }
 
 button :: proc(text: string, position: rl.Vector2, size:rl.Vector2={1, 1}, color:rl.Color=rl.BLACK, active_color:rl.Color=rl.BLANK,
-		font_size:f32=30, clickable:bool=true, padding:f32=10., text_color:=rl.WHITE, anchor:TextAnchor=.LEFT, hover_motion:bool=true) -> bool{
+		font_size:f32=-1., clickable:bool=true, padding:f32=10., text_color:=rl.WHITE, anchor:TextAnchor=.LEFT, hover_motion:bool=true) -> bool{
+	font_size := font_size > 0. ? font_size : L.font_size2
 	text_size := measure_text(text, font_size) + padding
 
 	// highlight it if the mouse is hovering over it
@@ -545,8 +546,8 @@ draw_card :: proc(
 ) -> (bool, i32){
     size := L.card_size
    	font_size :f32= L.font_size2-2
-	padding :f32= 10
-	margin: f32 = 12
+	padding :f32= 10//SCALE(10)
+	margin: f32 = 12//SCALE(12)
 	header_height := font_size+2*padding
 
 	color := color
@@ -559,7 +560,7 @@ draw_card :: proc(
 	position := position
 	if hovered{
 		color = rl.ColorBrightness(color, 0.1)
-		position.y += -10.
+		position.y += -10.*S
 	}
 
 	if card.active {
@@ -569,7 +570,7 @@ draw_card :: proc(
 	}
 
 	if card.triggered > 0.{
-		position.y += math.sin(f32(rl.GetTime())*20)*10
+		position.y += math.sin(f32(rl.GetTime())*20)*10*S
 	}
 
 	if with_icon{
@@ -581,7 +582,7 @@ draw_card :: proc(
 		if !with_icon {
 			draw_rounded_box(position, {size.x, header_height}, fill=rl.ColorContrast(color, 0.1))
 		} else {
-			rl.DrawLineEx(position+{0., header_height}, position+{size.x, header_height}, 4., rl.BLACK)
+			rl.DrawLineEx(position+{0., header_height}, position+{size.x, header_height}, SCALE(4.), rl.BLACK)
 		}
 		draw_text(get_text(card.type, "title"), position + padding, font_size, rl.BLACK, max_width=size.x-2*padding)
 		icon_size := header_height - 2*padding
@@ -595,21 +596,22 @@ draw_card :: proc(
 
 	// main card icon
 	if with_icon{
-		icon_position := position+padding + {0., header_height+6.}
+		icon_position := position+padding + {0., header_height+6.*S}
 		icon_size := min(size.x, size.y)-2*padding
 		icon_color := hovered ? rl.ColorAlpha(color, 0.5) : color
-		rl.DrawRectangleV(icon_position+40, {}+icon_size-2*40, rl.ColorBrightness(icon_color, -0.2))
-		draw_texture(reflect.enum_string(card.type), icon_position, icon_size+math.sin(f32(rl.GetTime())+30*f32(card.type))*3, icon_color, rotation=math.sin(f32(rl.GetTime())+10*f32(card.type))*3)
+		rl.DrawRectangleV(icon_position+40*S, {}+icon_size-2*40*S, rl.ColorBrightness(icon_color, -0.2))
+		draw_texture(reflect.enum_string(card.type), icon_position, icon_size+math.sin(f32(rl.GetTime())+30*f32(card.type))*3*S, icon_color,
+			rotation=math.sin(f32(rl.GetTime())+10*f32(card.type))*3*S)
 	} else {
 		margin = 0.
 	}
 
 	if hovered {
-		button_pos := position + size + {-10, -45}
+		button_pos := position + size + {-10, -45}*S
 
 		for action, i in actions {
 			if button(action, button_pos, font_size=font_size, anchor=.RIGHT) do return hovered, i32(i)
-			button_pos += {-20-measure_text(action, font_size).x, 0}
+			button_pos += {-20*S-measure_text(action, font_size).x, 0}
 		}
 	}
 

@@ -72,6 +72,10 @@ CardRoll_TombRaider
 CardDice_Anarchist
 /title="ANARCHIST"
 /description="This die adds the number of eliminated dice in this roll to its score."
+CardDice_Antenna
+/title="ANTENNA"
+/description="This die multiplies its score by the pips of your other surviving dice with ANTENNA."
+/texture_id=[1,4]
 CardDice_Assassin
 /title="ASSASSIN"
 /description="+2 ATTACK for this die."
@@ -81,15 +85,11 @@ CardDice_Drunk
 /title="DRUNK"
 /description="This die attacks another antagonist's dice regardless of matching their pips."
 /texture_id=[1,18]
-CardDice_Tank
-/title="TANK"
-/description="+2 HEALTH for this die."
-/description2="When on [h]TOP FACE[h], +1 HEALTH for surrounding dice."
-/texture_id=[1,2]
-CardDice_Antenna
-/title="ANTENNA"
-/description="This die multiplies its score by the pips of your other surviving dice with ANTENNA."
-/texture_id=[1,4]
+CardDice_Engineer
+/title="ENGINEER"
+# /description="---"
+/description2="When on [h]TOP FACE[h], creates a DICE CARD."
+/texture_id=[1,14]
 CardDice_Optimist
 /title="OPTIMIST"
 /description="This die only shows the numbers [iDieFace4], [iDieFace5], and [iDieFace6]."
@@ -102,29 +102,24 @@ CardDice_Pessimist
 /texture_id=[1,8]
 CardDice_General
 /title="GENERAL"
-/description="This die multiplies its score by the number your surviving dice."
+/description="This die multiplies its score by the number of your surviving dice."
 /texture_id=[1,17]
-CardDice_Journalist
-/title="JOURNALIST"
-/description="+2 to your ROLL FACTOR."
-/texture_id=[1,6]
 CardDice_Influencer
 /title="INFLUENCER"
 # /description1="---"
 /description2="When on [h]TOP FACE[h], creates a ROLL CARD."
 /texture_id=[1,7]
-CardDice_Engineer
-/title="ENGINEER"
-# /description="---"
-/description2="When on [h]TOP FACE[h], creates a DICE CARD."
-/texture_id=[1,14]
+CardDice_Journalist
+/title="JOURNALIST"
+/description="+2 to your ROLL FACTOR."
+/texture_id=[1,6]
 CardDice_Medium
 /title="MEDIUM"
 /description="Adds the number of GHOST DICE to die's SCORE."
 /texture_id=[1,15]
 CardDice_PlusOne
 /title="PLUS ONE"
-/description="+1 to die's SCORE"
+/description="+1 to die's score."
 /description2="When on [h]TOP FACE[h], +1 to die's SCORE for each of your surviving DICE."
 /texture_id=[1,5]
 CardDice_Investor
@@ -137,6 +132,10 @@ CardDice_PowerUp
 /description="This die multiplies its score by [h]%VAR1[h]."
 /description2="When on [h]TOP FACE[h], increase the factor by 1."
 /texture_id=[1,16]
+CardDice_SuperHero
+/title="SUPER HERO"
+/description="This die protects lower dice by taking hits for them."
+/texture_id=[2,2]
 CardDice_Train
 /title="TRAIN"
 /description="Adds the sum of your other dice higher than this die to its score."
@@ -161,11 +160,20 @@ CardDice_Researcher
 /title="RESEARCHER"
 /description="Gains permanently [h]+1 ROLL FACTOR[h] when alive and activating a CYCLE CARD."
 /texture_id=[1,10]
+CardDice_Tank
+/title="TANK"
+/description="+2 HEALTH for this die."
+/description2="When on [h]TOP FACE[h], +1 HEALTH for surrounding dice."
+/texture_id=[1,2]
 CardDice_Veteran
 /title="VETERAN"
 /description="This die gains [h]+2 SCORE[h] each time it survives a roll. Resets to 0 when it dies.[n]Currently: [h]+%VAR1[h]"
 /description2="When on [h]TOP FACE[h], +1 HEALTH for this die."
 /texture_id=[1,19]
+CardDice_VIP
+/title="VIP"
+/description="This die is protected by your other dice who will get hit instead as long as they are alive."
+/texture_id=[2,3]
 CardDice_WarHero
 /title="WAR HERO"
 /description="This die gains +1 SCORE each time it kills another die.[n]Currently: [h]+%VAR1[h]"

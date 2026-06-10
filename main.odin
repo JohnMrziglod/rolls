@@ -1856,14 +1856,7 @@ draw :: proc(dt: real) {
 			ghost_number := human.ghosts[ghost_index]
 			active := contains(app.ghosts_selected[:], i32(ghost_index))
 
-			if dice_button(
-				ghost_number,
-				position,
-				ghost_size,
-				active_color = human.color,
-				active = active,
-				clickable = true,
-			) {
+			if dice_button(ghost_number, position, ghost_size, active_color = human.color, active = active, clickable = true) {
 				free_index := -1
 				for &slot, slot_index in app.ghosts_selected {
 					if slot == ghost_index {
@@ -1974,23 +1967,13 @@ draw :: proc(dt: real) {
 		} else if highest_score > 0 {
 			text = fmt.tprintf("Your best combination is worth %v points", highest_score)
 		}
-		draw_text(text, board_position + rl.Vector2{20, 20}*S, L.font_size2, rl.RAYWHITE)
-		if button(
-			"ESC",
-			board_position + rl.Vector2{board_size.x - 20, 20}*S,
-			L.font_size2,
-			anchor = .RIGHT,
-		) {
+		draw_text(text, board_position + rl.Vector2{20, 20}*S, color=rl.RAYWHITE)
+		if button("ESC", board_position + rl.Vector2{board_size.x - 20, 20}*S, anchor = .RIGHT,) {
 			state_change(.WAIT_FOR_ROLL)
 			app.ghosts_selected = {-1, -1, -1, -1, -1}
 		}
 		if n_scored_combos == 15 {
-			if button(
-				"FINISH CYCLE",
-				board_position + board_size - {20, 70}*S,
-				L.font_size2,
-				anchor = .RIGHT,
-			) {
+			if button("FINISH CYCLE", board_position + board_size - {20, 70}*S, anchor = .RIGHT,) {
 				add_text(
 					board_position + board_size / 2.,
 					fmt.aprint("CYCLE COMPLETED!"),

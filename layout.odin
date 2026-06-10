@@ -1,14 +1,12 @@
 package game
 
+import "core:math"
 import rl "vendor:raylib"
 
 V2 :: [2]f32
 V3 :: [3]f32
 
 Layout :: struct{
-	// S: f32,
-
-
 	height: f32,
 	width: f32,
 
@@ -22,16 +20,19 @@ Layout :: struct{
 	hand_positions: [2]V2,
 }
 L: Layout
-S: f32					// Scale value to adjust for different window sizes, etc.
 REF_HEIGHT :f32: 1440
+S: f32					// Scale value to adjust for different window sizes, etc.
+SCALE :: proc(v: f32) -> f32{
+	return math.ceil(v * S)
+}
 
 update_layout :: proc() {
 	L.width = f32(rl.GetScreenWidth())
 	L.height = f32(rl.GetScreenHeight())
 	S = L.height / REF_HEIGHT // Scale
 
-	L.font_size1 = 50 * S
-	L.font_size2 = 30 * S
+	L.font_size1 = SCALE(50)
+	L.font_size2 = SCALE(30)
 
 	L.card_size = {300, 350} * S
 
