@@ -3,6 +3,7 @@ package game
 import "core:math"
 import rl "vendor:raylib"
 
+CAMERA_MAX_HEIGHT :f32: 50.
 
 camera_zoom :: proc(position: Vector3){
 	return
@@ -16,7 +17,7 @@ camera_reset :: proc(){
 	app.camera3d.desired_target = {0, 0, 3.0}
 	app.camera3d.desired_position = {
 		0.,//math.cos(app.camera3d.angle)*30.,
-		30,
+		CAMERA_MAX_HEIGHT,
 		3.0,// math.sin(app.camera3d.angle)*30.
 	}
 	app.camera3d.desired_fovy = 40

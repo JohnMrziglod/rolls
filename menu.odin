@@ -15,10 +15,11 @@ menu :: proc(dt:real=0., loading:bool=false){
 	defer rl.EndDrawing()
 
 	rl.ClearBackground(COLOR_TABLE)
-	logo_size := Vector2{200., 200.}*S
+	logo_size := Vector2{1000., 1000.}*S
 	texture := app.textures[1]
-	rl.DrawTextureV(texture,
-		{(L.width-f32(texture.width))/2., (L.height-f32(texture.height))/2.}, rl.WHITE)
+	draw_texture(texture, {(L.width-logo_size.x)/2., (L.height-logo_size.y)/2.}, logo_size, rl.WHITE)
+	// rl.DrawTextureV(texture,
+	// 	{(L.width-f32(texture.width))/2., (L.height-f32(texture.height))/2.}, rl.WHITE)
 
 	text := fmt.tprint("Press SPACE to continue")
 	if loading do text = fmt.tprint("Loading...")

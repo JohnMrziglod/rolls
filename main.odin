@@ -410,10 +410,12 @@ main :: proc() {
 		}
 
 		// Zoom in and out:
-		// mouse_wheel := rl.GetMouseWheelMove()
-		// if mouse_wheel != 0.0 {
-		// 	app.camera3d.desired_position.y += 200. * mouse_wheel * dt
-		// }
+		mouse_wheel := rl.GetMouseWheelMove()
+		if mouse_wheel != 0.0 {
+			app.camera3d.desired_position.y = max(min(app.camera3d.desired_position.y + 200.*mouse_wheel*dt, CAMERA_MAX_HEIGHT), 5.)
+			app.camera3d.desired_position.z = CAMERA_MAX_HEIGHT-min(app.camera3d.desired_position.y, CAMERA_MAX_HEIGHT-3.)
+			// app.camera3d.desired_fovy = linalg.lerp(app.camera3d.desired_fovy, app.camera3d.desired_position.y == 30. ? 40. : 50., dt * 5)
+		}
 
 		if rl.IsMouseButtonDown(.MIDDLE) {
 			// app.camera_rotat
@@ -428,6 +430,11 @@ main :: proc() {
 			app.camera3d.desired_position + app.camera3d.trauma * random_vector(-1, 1)
 		app.camera3d.position = linalg.lerp(app.camera3d.position, camera_position, f32(dt) * 5)
 		app.camera3d.fovy = linalg.lerp(app.camera3d.fovy, app.camera3d.desired_fovy, f32(dt) * 5)
+		if app.camera3d.desired_position.y > CAMERA_MAX_HEIGHT-0.001{
+			app.camera3d.projection = .ORTHOGRAPHIC
+		} else {
+			app.camera3d.projection = .PERSPECTIVE
+		}
 
 		// Update the camera
 		if rl.IsKeyPressed(rl.KeyboardKey.ESCAPE) {

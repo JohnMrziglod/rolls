@@ -516,7 +516,7 @@ icon_index_from_card :: proc(card_type: CardType) -> Vector2 {
 	return app.sub_textures[reflect.enum_string(card_type)] or_else {1, 0}
 }
 
-draw_texture :: proc{draw_texture_by_index, draw_texture_by_string}
+draw_texture :: proc{draw_texture_by_index, draw_texture_by_string, draw_full_texture}
 draw_texture_by_index :: proc(texture_id:Vector2={0,1}, position: Vector2, size: f32, tint:rl.Color=rl.BLACK, rotation:f32=0.){
 	texture := app.textures[0]
 	ts := TextureFaceSize
@@ -534,6 +534,11 @@ draw_texture_by_string :: proc(texture_id: string, position: Vector2, size: f32,
 
 	dest := rl.Rectangle{x=position.x+size/2., y=position.y+size/2., width=size, height=size}
 	rl.DrawTexturePro(texture, {x=tp.x, y=tp.y, width=ts.x, height=ts.y}, dest, {}+size/2., rotation, tint)
+}
+draw_full_texture :: proc(texture: rl.Texture, position, size: Vector2, tint: rl.Color=rl.BLACK){
+	dest := rl.Rectangle{x=position.x+size.x/2., y=position.y+size.y/2., width=size.x, height=size.y}
+	origin := position
+	rl.DrawTexturePro(texture, {x=0., y=0., width=f32(texture.width), height=f32(texture.height)}, dest, {}+size/2., 0., tint)
 }
 
 fade_out :: proc(){
@@ -641,9 +646,9 @@ draw_card :: proc(
 draw_die_info :: proc(die: Die, extended:bool=false) -> i32{
 	hovered_upgrade_index :i32= -1
 	position := rl.GetWorldToScreen(die.position, app.camera3d)
-	icon_size := f32(50.)
-	margin := f32(10.)
-    padding := f32(4.)
+	icon_size := SCALE(50.)
+	margin := SCALE(10.)
+    padding := SCALE(4.)
 
     box_size := Vector2{6*icon_size+10*padding, icon_size+3*padding+L.font_size2}+2.*margin
     draw_box(position-margin, box_size, fill=rl.ColorAlpha(die.color1, 0.8), thickness=0.)
@@ -685,7 +690,7 @@ draw_die_info :: proc(die: Die, extended:bool=false) -> i32{
     if extended {
 	    text := fmt.tprintf("Attack: %v, Health: %v", die.attack, die.health)
 	    text_position := position + padding
-	    text_position.y += icon_size + padding + 10.
+	    text_position.y += icon_size + padding + SCALE(10.)
 	    draw_text(text, text_position, color=rl.BLACK)
     }
 
