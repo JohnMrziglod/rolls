@@ -10,6 +10,8 @@ DieFace5
 /texture_id=[0,12]
 DieFace6
 /texture_id=[0,13]
+Help_TopFace
+/texture_id=[6,0]
 # FLASH CARDS
 CardFlash_GraveRoll
 /title="GRAVE ROLL"
@@ -34,15 +36,15 @@ CardRoll_Exorcism
 /texture_id=[4,5]
 CardRoll_FakeNews
 /title="FAKE NEWS"
-/description="All JOURNALIST DICE will only add 0.5 to the ROLL FACTOR."
+/description="All JOURNALIST DICE will only add 0.5 to the [h]ROLL FACTOR[h]."
 /texture_id=[4,7]
 CardRoll_GhostHour
 /title="GHOST HOUR"
-/description="Your GHOST DICE' numbers add to your ROLL SCORE."
+/description="Your GHOST DICE' numbers add to your [h]ROLL SCORE[h]."
 /texture_id=[4,6]
 CardRoll_HappyHour
 /title="HAPPY HOUR"
-/description="+2 to your ROLL FACTOR."
+/description="+2 to your [h]ROLL FACTOR[h]."
 /texture_id=[4,0]
 CardRoll_Immortality
 /title="IMMORTALITY"
@@ -54,7 +56,7 @@ CardRoll_MarketCrash
 /texture_id=[4,10]
 CardRoll_Revenge
 /title="REVENGE"
-/description="If you have a lower ROLL SCORE than your antagonist, swap them."
+/description="If you have a lower [h]ROLL SCORE[h] than your antagonist, swap them."
 /texture_id=[4,9]
 CardRoll_Suidice
 /title="SUIDICE"
@@ -92,12 +94,12 @@ CardDice_Engineer
 /texture_id=[1,14]
 CardDice_Optimist
 /title="OPTIMIST"
-/description="This die only shows the numbers [iDieFace4], [iDieFace5], and [iDieFace6]."
+/description="This die only shows the numbers [iDieFace4], [iDieFace5] and [iDieFace6]."
 /description2="When on [h]TOP FACE[h], this die adds the pips of your surviving dice greater or equal [iDieFace4] to its score."
 /texture_id=[1,9]
 CardDice_Pessimist
 /title="PESSIMIST"
-/description="This die only shows the numbers [iDieFace1], [iDieFace2], and [iDieFace3]."
+/description="This die only shows the numbers [iDieFace1], [iDieFace2] and [iDieFace3]."
 /description2="When on [h]TOP FACE[h], this die multiplies its score by the pips of your surviving dice lower or equal [iDieFace3]."
 /texture_id=[1,8]
 CardDice_General
@@ -111,7 +113,7 @@ CardDice_Influencer
 /texture_id=[1,7]
 CardDice_Journalist
 /title="JOURNALIST"
-/description="+2 to your ROLL FACTOR."
+/description="+2 to your [h]ROLL FACTOR[h]."
 /texture_id=[1,6]
 CardDice_Medium
 /title="MEDIUM"
@@ -125,17 +127,18 @@ CardDice_PlusOne
 CardDice_Investor
 /title="INVESTOR"
 /description="Adds die's SCORE with 10% interest to SAVINGS.[n]Currently: [h]+%VAR1_F[h]"
-/description2="When on [h]TOP FACE[h], adds die's SAVINGS to the ROLL SCORE and reset SAVINGS to 0."
+/description2="When on [h]TOP FACE[h], adds die's SAVINGS to the [h]ROLL SCORE[h] and reset SAVINGS to 0."
 /texture_id=[1,3]
+CardDice_Introvert
+/title="INTROVERT"
+/description="Multiplies die's SCORE with amount of empty upgrade slots on the same die.[n]Currently: [h]x%VAR1_F[h]"
+/description2="When being on [h]TOP FACE[h] and the only surviving die, multiply this die score by the number of your total dice."
+# /texture_id=[1,3]
 CardDice_PowerUp
 /title="POWER UP"
 /description="This die multiplies its score by [h]%VAR1[h]."
-/description2="When on [h]TOP FACE[h], increase the factor by 1."
+/description2="When on [h]TOP FACE[h], increase that factor permanently by 1."
 /texture_id=[1,16]
-CardDice_SuperHero
-/title="SUPER HERO"
-/description="This die protects lower dice by taking hits for them."
-/texture_id=[2,2]
 CardDice_Train
 /title="TRAIN"
 /description="Adds the sum of your other dice higher than this die to its score."
@@ -153,9 +156,9 @@ CardDice_Pirate
 /description="Always scores the same amount like antagonist's highest scoring die."
 /texture_id=[2,1]
 CardDice_Randomizer
-/title="RANDOMIZER"
+/title="DECISION MAKER"
 /description="This die adds a random number to its score."
-/texture_id=[1,10]
+/texture_id=[2,4]
 CardDice_Researcher
 /title="RESEARCHER"
 /description="Gains permanently [h]+1 ROLL FACTOR[h] when alive and activating a CYCLE CARD."
@@ -170,14 +173,19 @@ CardDice_Veteran
 /description="This die gains [h]+2 SCORE[h] each time it survives a roll. Resets to 0 when it dies.[n]Currently: [h]+%VAR1[h]"
 /description2="When on [h]TOP FACE[h], +1 HEALTH for this die."
 /texture_id=[1,19]
-CardDice_VIP
-/title="VIP"
-/description="This die is protected by your other dice who will get hit instead as long as they are alive."
-/texture_id=[2,3]
 CardDice_WarHero
 /title="WAR HERO"
 /description="This die gains +1 SCORE each time it kills another die.[n]Currently: [h]+%VAR1[h]"
 /texture_id=[2,0]
+# UNIQUE CARDS
+CardDice_Unique_SuperHero
+/title="SUPER HERO"
+/description="This die protects lower dice by taking hits for them."
+/texture_id=[2,2]
+CardDice_Unique_VIP
+/title="VIP"
+/description="This die is protected by your other dice who will get hit instead as long as they are alive."
+/texture_id=[2,3]
 # CYCLE CARDS
 CardCycle_ExtraDie
 /title="EXTRA DIE"

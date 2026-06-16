@@ -12,7 +12,7 @@ CardCategory :: enum {NONE, FLASH, ROLL, DICE, CYCLE}
 CardType :: enum i32{
 		CardNone,
 	CardFlash_GraveRoll,
-		CardFlashs,
+		FlashCards,
 	CardRoll_Attack,
 	CardRoll_Defense,
 	CardRoll_Doppelgeist,
@@ -26,7 +26,7 @@ CardType :: enum i32{
 	CardRoll_Suidice,
 	CardRoll_TombRaider,
 	CardRoll_WhiteElephant,
-		CardRolls,				// <- Until here we got roll cards
+		RollCards,				// <- Until here we got roll cards
 	CardDice_Antenna,
 	CardDice_Assassin,
 	CardDice_Drunk,
@@ -49,16 +49,18 @@ CardType :: enum i32{
 	CardDice_Tank,
 	CardDice_Train,
 	CardDice_Veteran,
-	CardDice_VIP,
 	CardDice_WarHero,
-		CardDices,				// <- Until we got upgrade cards
+		DiceCards,				// <- Until we got dice cards
+	CardDice_Unique_SuperHero,
+	CardDice_Unique_VIP,
+		UniqueDiceCards,		// <- Until here we get unique dice cards
 	CardCycle_ExtraDie,
 	CardCycle_EternalRoll,
 	CardCycle_Graveyard,
 	CardCycle_GhostDiscount,
 	CardCycle_Recycle,
 	CardCycle_Supermarket,
-		CardCycles,				// <- Until we got cycle cards
+		CycleCards,				// <- Until we got cycle cards
 }
 Card :: struct{
 	type: CardType,
@@ -71,28 +73,31 @@ Card :: struct{
 	triggered: f32,		// How long it should be displayed as triggered in seconds
 }
 
-CardGenerateTypes :: enum{AllCards, FlashCards, RollCards, FlashRollAndDiceCards, DiceCards, CycleCards}
+CardGenerateTypes :: enum{AllCards, FlashCards, RollCards, FlashRollAndDiceCards, DiceCards, UniqueDiceCards, CycleCards}
 cards_generate :: proc(cards: []Card, types:CardGenerateTypes){
 	lower_bound := i32(CardType.CardNone)+1
-	upper_bound := i32(CardType.CardCycles)
+	upper_bound := i32(CardType.CycleCards)
 	switch types {
 	case .AllCards:
 		// do nothing, we want all cards
 	case .FlashCards:
-		upper_bound = i32(CardType.CardFlashs)
+		upper_bound = i32(CardType.FlashCards)
 	case .RollCards:
-		lower_bound = i32(CardType.CardFlashs)+1
-		upper_bound = i32(CardType.CardRolls)
+		lower_bound = i32(CardType.FlashCards)+1
+		upper_bound = i32(CardType.RollCards)
 	case .DiceCards:
-		lower_bound = i32(CardType.CardFlashs)+1
-		upper_bound = i32(CardType.CardDices)
+		lower_bound = i32(CardType.FlashCards)+1
+		upper_bound = i32(CardType.DiceCards)
 	case .FlashRollAndDiceCards:
-		upper_bound = i32(CardType.CardDices)
+		upper_bound = i32(CardType.DiceCards)
+	case .UniqueDiceCards:
+		lower_bound = i32(CardType.DiceCards)+1
+		upper_bound = i32(CardType.UniqueDiceCards)
 	case .CycleCards:
-		lower_bound = i32(CardType.CardDices)+1
+		lower_bound = i32(CardType.UniqueDiceCards)+1
 	}
 
-	generated_types := bit_set[CardType]{.CardNone, .CardRolls, .CardFlashs}
+	generated_types := bit_set[CardType]{.CardNone, .RollCards, .FlashCards, .DiceCards, .UniqueDiceCards}
 	for i in 0..<len(cards) {
 		card_type: CardType
 		for (card_type in generated_types) {
@@ -122,11 +127,15 @@ card_fill_vars :: proc(card: Card, text: string) -> string{
 }
 
 card_category :: proc(type: CardType) -> CardCategory{
-	if type > .CardNone && type < .CardFlashs do return .FLASH
-	if type > .CardFlashs && type < .CardRolls do return .ROLL
-	if type > .CardRolls && type < .CardDices do return .DICE
-	if type > .CardDices && type < .CardCycles do return .CYCLE
+	if type > .CardNone && type < .FlashCards do return .FLASH
+	if type > .FlashCards && type < .RollCards do return .ROLL
+	if type > .RollCards && type < .UniqueDiceCards do return .DICE
+	if type > .UniqueDiceCards && type < .CycleCards do return .CYCLE
 	return .NONE // Invalid card type, return default category
+}
+
+card_is_unique :: proc(type: CardType) -> bool{
+	return type > .DiceCards && type < .UniqueDiceCards
 }
 
 card_is_hovered :: proc(position: rl.Vector2, ) -> bool{

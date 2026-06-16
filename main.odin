@@ -352,6 +352,7 @@ main :: proc() {
 	defer {
 		for file in files do defer delete(file)
 	}
+	load_info()
 
 	config.game_speed = 2.
 
@@ -1579,7 +1580,175 @@ draw :: proc(dt: real) {
 		}
 	}
 
-	// update app.particles:
+	show_particles(dt)
+	rl.EndMode3D()
+
+	info := app.state == .WAIT_FOR_ROLL // || app.state == .UPGRADE_DIE
+	if info && app.die_selected != -1 {
+		selected := app.die_selected != -1
+		die := selected ? app.dice[app.die_selected] : app.dice[dice_hovered]
+		draw_die_info(die)
+	}
+
+	if len(app.antagonist.story_id) > 0 {
+		draw_antagonist_story()
+	}
+
+	show_player_stuff(dt)
+	#partial switch app.state {
+	case .CHARGING:
+		// fade_out()
+		// Draw a power bar at the center of the screen
+		width: f32 = 800.*S
+		height: f32 = 80.*S
+		x := (f32(L.width) - width) / 2.
+		y := (f32(L.height) - height) / 2.
+		rl.DrawRectangleV(
+			{x, y},
+			{app.power * width, height},
+			app.players[app.current_player].color,
+		)
+		rl.DrawRectangleLinesEx({x, y, width, height}, 2.*S, rl.BLACK)
+	case .GHOST_BOARD:
+		show_ghost_board()
+	case .WAIT_FOR_ROLL:
+		text := "Press <SPACE> to continue"
+		if button(
+			text, {L.width / 2., L.height - 150*S},
+			size = V2{300, 80}*S,
+			font_size = L.font_size1,
+			color = rl.BLANK, anchor = .CENTER,
+		) {
+			state_change(.CHARGING)
+		}
+	case .CARDS_OFFER:
+		show_cards_offer()
+	case .UPGRADE_DIE:
+		show_upgrade_die()
+	}
+
+	if app.state == .VICTORY || app.state == .DEFEAT {
+		text := "Press <SPACE> to continue"
+		draw_text(
+			text,
+			{L.width / 2., L.height - 150*S},
+			font_size = L.font_size1,
+			color = rl.RAYWHITE,
+			anchor = .CENTER,
+		)
+	}
+
+	show_animations(dt)
+}
+
+wait :: proc(duration: real) {
+	app.state_timer = duration / config.game_speed
+}
+
+state_change :: proc(new_state: GameState, wait: f32 = 0.) {
+	app.state_before = app.state
+	app.state = new_state
+	app.state_clock = 0.
+	app.state_timer = wait / config.game_speed
+
+	if new_state == .CHARGING {
+		camera_reset()
+		app.die_selected = -1
+	}
+}
+
+show_upgrade_die :: proc(){
+	human := &app.players[0]
+	mouse_pos := rl.GetMousePosition()
+
+	selected_die: ^Die
+	selected_face: i32 = -1
+	for &die in app.dice {
+		if die.state != .ALIVE || die.player != 0 do continue
+		hovered_face := draw_die_info(die)
+		if hovered_face != -1 {
+			selected_die = &die
+			selected_face = hovered_face
+		}
+	}
+	// app.card_selected.triggered = app.die_selected >= 0 ? 1. : 0.
+
+	text := "Choose a dice to assign this card to"
+	draw_text(
+		text,
+		{L.width / 2., L.height - 150*S},
+		L.font_size1,
+		rl.RAYWHITE,
+		anchor = .CENTER,
+	)
+	draw_card(app.card_selected, mouse_pos - {L.card_size.x / 2, L.card_size.y + 50*S})
+
+	if rl.IsMouseButtonPressed(.LEFT) && selected_face != -1 {
+		could_upgrade := card_assign(selected_die, app.card_selected, selected_face)
+		app.card_selected = {}
+
+		if !could_upgrade {
+			add_text(
+				selected_die.position,
+				fmt.aprint("Die has no free upgrade slots!"),
+				selected_die.color1,
+				1.5,
+			)
+		}
+		state_change(.WAIT_FOR_ROLL)
+	} else if rl.IsMouseButtonPressed(.RIGHT) || rl.IsKeyPressed(.ESCAPE) {
+		app.card_selected.triggered = 0.
+		append(&human.cards, app.card_selected)
+		app.card_selected = {}
+		add_text(mouse_pos, fmt.aprint("Keep card in hand!"), human.color, 1.5)
+		state_change(.WAIT_FOR_ROLL)
+	}
+}
+
+draw_antagonist_story :: proc(){
+
+	// Let's the bubble get bigger and smaller to make it more dynamic, and also changes the color a bit
+	time_factor := 1. + 0.05 * math.sin(f32(rl.GetTime()) * 5)
+	font_size := L.font_size1 * time_factor
+	thickness: f32 = 4.
+	max_width: f32 = 600*S * time_factor
+	padding: f32 = 20.*S
+	color_fill := rl.BLACK
+	color_text := app.players[1].color
+	message := get_text(app.antagonist.story_id, app.antagonist.index)
+	size := measure_text(message, font_size, max_width = max_width) + padding
+	position := Vector2{L.width - 40*S, L.height - 200*S} - size - padding
+
+	rl.DrawRectangleV(position, size, color_fill)
+	rl.DrawRectangleLinesEx(
+		{
+			position.x - thickness,
+			position.y - thickness,
+			size.x + 2 * thickness,
+			size.y + 2 * thickness,
+		},
+		thickness,
+		rl.BLACK,
+	)
+	draw_text(message, position + padding / 2., font_size, color_text, max_width = max_width)
+
+	hovered := rl.CheckCollisionPointRec(
+		rl.GetMousePosition(),
+		{x = position.x, y = position.y, width = size.x, height = size.y},
+	)
+	clicked := hovered && rl.IsMouseButtonPressed(.LEFT)
+	if clicked {
+		antagonist_story_continue()
+	}
+
+	button_pos := position + size
+
+	// if button(fmt.tprint("&gt;"), button_pos, font_size=L.font_size2, anchor=.RIGHT, text_color=color_text, hover_motion=false) {
+	// 	antagonist_story_continue()
+	// }
+}
+
+show_particles :: proc(dt: real) {
 	for &particle in app.particles {
 		if !particle.visible do continue
 
@@ -1609,10 +1778,385 @@ draw :: proc(dt: real) {
 			// rl.DrawSphereWires(position, 0.3, 5, 5, {0, 0, 0, color.a})
 		}
 	}
-	rl.EndMode3D()
+}
 
-	mouse_pos := rl.GetMousePosition()
+show_animations :: proc(dt: real){
+	for &animation in app.animations {
+		if !animation.visible do continue
 
+		if animation.delay > 0. {
+			animation.delay -= dt * config.game_speed
+			continue
+		}
+		animation.lifetime -= dt * config.game_speed
+		if animation.lifetime <= 0. {
+			animation.visible = false
+			if len(animation.text) > 0 do delete(animation.text)
+			continue
+		}
+
+		start_2d, end_2d: Vector2
+		if start_3d, is_vec3 := animation.start.(Vector3); is_vec3 {
+			start_2d = rl.GetWorldToScreen(start_3d, app.camera3d)
+		} else do start_2d = animation.start.(Vector2)
+
+		if end_3d, is_vec3 := animation.end.(Vector3); is_vec3 {
+			end_2d = rl.GetWorldToScreen(end_3d, app.camera3d)
+		} else do end_2d = animation.end.(Vector2)
+
+		// adapt to zoom in
+		font_size := L.font_size2 // * (1.+(1. - (app.camera3d.fovy-25)/5))
+
+		life_ratio := animation.lifetime / animation.start_lifetime
+		alpha := life_ratio > 0.3 ? 1.0 : life_ratio / 0.3
+		size_factor := splash(life_ratio)
+		font_size *= size_factor
+
+		x := math.lerp(start_2d.x, end_2d.x, 1. - life_ratio)
+		y := math.lerp(start_2d.y, end_2d.y, 1. - life_ratio)
+
+		icon_id, has_icon := animation.icon_id.?
+		if has_icon {
+			icon_size: f32 =
+				animation.icon_size > 0. ? animation.icon_size * size_factor : font_size * 4
+			draw_texture(
+				icon_id,
+				{x - icon_size / 2, y - icon_size / 2},
+				icon_size,
+				rl.ColorAlpha(animation.color, alpha),
+			)
+		}
+
+		if len(animation.text) == 0 do continue
+
+		// text_size := measure_text(animation.text, font_size)
+		// x -= text_size.x/2.
+		// y -= text_size.y/2.
+
+		// box_position := Vector2{x-5, y-5}
+		// if animation.anchor == .LEFT do box_position.x += text_size.x/2.
+		// if animation.anchor == .RIGHT do box_position.x -= text_size.x
+		text_color := rl.ColorAlpha(animation.color, alpha)
+		text_outline := rl.BLACK
+		box_fill := rl.BLANK
+		if !has_icon {
+			box_fill = rl.ColorAlpha(animation.color, alpha)
+			text_color = rl.ColorAlpha(rl.BLACK, alpha)
+			text_outline = rl.BLANK
+		}
+		draw_text(
+			animation.text,
+			{x, y},
+			font_size,
+			text_color,
+			outline = text_outline,
+			boxed = box_fill,
+			anchor = animation.anchor,
+		)
+	}
+
+	draw_icon_particles(dt)
+}
+
+show_ghost_board :: proc(){
+	human := &app.players[0]
+
+	fade_out()
+
+	board_size := rl.Vector2{920*S, L.height - 150*S}
+	board_position := rl.Vector2{(L.width - board_size.x) / 2., 50*S}
+	board_color := COLOR_PLAYERS[0] / 2
+	board_color.a = 255
+
+	draw_box(board_position, board_size, fill = board_color)
+
+	ghost_cols: i32 = 10 // @TODO: make this dynamic based on the max number of ghosts a player can have
+	ghost_size: f32 = L.font_size1 + 10*S
+	ghost_padding: f32 = 5*S
+	for i in 0 ..< human.ghosts_max {
+		ghost_index := i32(i)
+		row := ghost_index / ghost_cols
+		col := ghost_index % ghost_cols
+		position :=
+			board_position +
+			{20, 70}*S +
+			(ghost_size + ghost_padding) * rl.Vector2{f32(col), f32(row)}
+
+		if ghost_index >= i32(len(human.ghosts)) {
+			thickness: f32 = 2*S
+			draw_box(
+				position + {0, 2}*S,
+				{ghost_size, ghost_size - thickness} - thickness,
+				fill = board_color / 2,
+				thickness = thickness,
+			)
+			continue
+		}
+
+		ghost_number := human.ghosts[ghost_index]
+		active := contains(app.ghosts_selected[:], i32(ghost_index))
+
+		if dice_button(ghost_number, position, ghost_size, active_color = human.color, active = active, clickable = true) {
+			free_index := -1
+			for &slot, slot_index in app.ghosts_selected {
+				if slot == ghost_index {
+					slot = -1 // deselect if already selected
+					free_index = -1 // no further action
+					break
+				}
+				if slot == -1 {
+					free_index = slot_index
+					break
+				}
+			}
+			if free_index >= 0 {
+				app.ghosts_selected[free_index] = ghost_index
+			}
+		}
+	}
+	highlighted := [5]bool{}
+	ghost_selected_numbers := [5]i32{}
+	for i, ghost_index in app.ghosts_selected {
+		if i == -1 do break
+
+		ghost_selected_numbers[ghost_index] = human.ghosts[i]
+	}
+	enough_ghosts := !contains(app.ghosts_selected[:], i32(-1))
+	ghost_size2: f32 = L.font_size2 + 10*S
+	highest_score := 0.
+	// highest_combo := CombinationType_None
+	n_scored_combos := 0
+	for combo_type, c in CombinationType {
+		if combo_type == .None do continue
+
+		position := board_position + rl.Vector2{20, 150 + f32(c) * L.font_size2 * 1.6}*S
+		match, score, factor := test_combination(
+			combo_type,
+			ghost_selected_numbers[:],
+			&highlighted,
+		)
+		already_scored := combo_type in human.cycle.scored_combinations
+		if already_scored do n_scored_combos += 1
+		draw_text(
+			fmt.tprintf("%v", combo_type),
+			position,
+			L.font_size2,
+			(match && !already_scored) ? rl.RAYWHITE : rl.GRAY,
+			strikethrough = already_scored,
+		)
+		if !already_scored && match && enough_ghosts {
+			if factor > 0 {
+				draw_text(
+					fmt.tprintf("+%.f, x%.f", score, factor),
+					position + {600, 0}*S,
+					color = rl.RAYWHITE,
+				)
+			} else {
+				draw_text(fmt.tprintf("+%.f", score), position + {600, 0}*S, color = rl.RAYWHITE)
+			}
+
+			for ghost_number, g in ghost_selected_numbers {
+				dice_button(
+					ghost_number,
+					position + {300 + f32(g) * (ghost_size2 + 5), -7}*S,
+					ghost_size2,
+					active_color = human.color,
+					active = highlighted[g],
+					clickable = false,
+				)
+			}
+
+			if button("Score", position + {700, -4.}*S) {
+				human.cycle.scored_combinations += {combo_type}
+				human.roll.score += score // @TODO: Add it to roll score
+				ghosts_copy := make([dynamic]i32, len(human.ghosts), cap(human.ghosts))
+				defer delete(ghosts_copy)
+				copy(ghosts_copy[:], human.ghosts[:])
+				clear(&human.ghosts)
+
+				ghosts_discount := 5 - human.ghosts_costs_per_combination
+				for ghost, index in ghosts_copy {
+					if !contains(app.ghosts_selected[:], i32(index)) {
+						append(&human.ghosts, ghost)
+						continue
+					} else if ghosts_discount > 0 {
+						append(&human.ghosts, ghost)
+						ghosts_discount -= 1
+					}
+				}
+				app.ghosts_selected = {} - 1 // deselect everything
+				app.cards_offer = {}
+				cards_generate(app.cards_offer[:3], .FlashRollAndDiceCards)
+				state_change(.CARDS_OFFER)
+			}
+			if match && score > highest_score {
+				highest_score = score
+			}
+		}
+		highlighted = {}
+	}
+
+	text := "There is no matching combination"
+	if len(human.ghosts) < 5 {
+		text = fmt.tprint("Wait for at least 5 ghost dices to score combinations")
+	} else if contains(app.ghosts_selected[:], i32(-1)) {
+		text = fmt.tprintf(
+			"Select %v more ghost dices to score combinations",
+			count(app.ghosts_selected[:], i32(-1)),
+		)
+	} else if highest_score > 0 {
+		text = fmt.tprintf("Your best combination is worth %v points", highest_score)
+	}
+	draw_text(text, board_position + rl.Vector2{20, 20}*S, color=rl.RAYWHITE)
+	if button("ESC", board_position + rl.Vector2{board_size.x - 20, 20}*S, anchor = .RIGHT,) {
+		state_change(.WAIT_FOR_ROLL)
+		app.ghosts_selected = {-1, -1, -1, -1, -1}
+	}
+	if n_scored_combos == 15 {
+		if button("FINISH CYCLE", board_position + board_size - {20, 70}*S, anchor = .RIGHT,) {
+			add_text(
+				board_position + board_size / 2.,
+				fmt.aprint("CYCLE COMPLETED!"),
+				human.color,
+				2.,
+				font_size = L.font_size1,
+				anchor = TextAnchor.CENTER,
+			)
+			human.roll.score += math.floor(human.total_score) / 10.
+			app.ghosts_selected = {} - 1 // deselect everything
+			app.cards_offer = {}
+			cards_generate(app.cards_offer[:3], .CycleCards)
+			human.cycle.scored_combinations = {}
+			state_change(.CARDS_OFFER)
+		}
+	} else if n_scored_combos > 9 {
+		if len(app.antagonist.story_id) == 0 && !app.antagonist.tutorial_cycles {
+			antagonist_story("antagonist_tutorial_cycles")
+		}
+		if button(
+			"RUSH CYCLE",
+			board_position + board_size - {20, 70}*S,
+			L.font_size2,
+			anchor = .RIGHT,
+		) {
+			add_text(
+				board_position + board_size / 2.,
+				fmt.aprint("CYCLE COMPLETED BY RUSHING!"),
+				human.color,
+				2.,
+				font_size = L.font_size1,
+				anchor = TextAnchor.CENTER,
+			)
+			app.ghosts_selected = {} - 1 // deselect everything
+			app.cards_offer = {}
+			cards_generate(app.cards_offer[:2], .CycleCards)
+			human.cycle.scored_combinations = {}
+			state_change(.CARDS_OFFER)
+		}
+	} else {
+		draw_text(
+			fmt.tprintf("%v/15 combinations scored", n_scored_combos),
+			board_position + board_size - {20, 70}*S,
+			anchor = .RIGHT,
+		)
+	}
+
+	if len(app.antagonist.story_id) == 0 && !app.antagonist.tutorial_ghost_board {
+		app.antagonist.tutorial_ghost_board = true
+		antagonist_story("antagonist_tutorial_ghost_board")
+	}
+}
+
+show_cards_offer :: proc(){
+	fade_out()
+	human := &app.players[0]
+	app.die_selected = -1
+
+	text := "Choose one of these cards"
+	draw_text(
+		text,
+		{L.width / 2., L.height - 150*S},
+		L.font_size1,
+		rl.RAYWHITE,
+		anchor = .CENTER,
+	)
+
+	n_cards: i32
+	for card in app.cards_offer do if card.type != .CardNone do n_cards += 1
+
+	margin: f32 = 50.*S
+	mid_i32 := int(n_cards / 2)
+	mid_f32 := f32(n_cards) / 2.
+
+	hovered_card: ^Card = nil
+	hovered_card_index: i32
+	hovered_position: Vector2
+
+	for &card, c in app.cards_offer {
+		if card.type == .CardNone do continue
+
+		position: Vector2 = {
+			L.width / 2. - L.card_size.x / 2.,
+			(L.height - L.card_size.y) / 2.,
+		}
+		if n_cards % 2 == 1 {
+			if c == mid_i32 {
+				// nothing ...
+			} else if c < mid_i32 {
+				position.x -= f32(mid_i32 - c) * (L.card_size.x + margin)
+			} else {
+				position.x += f32(c - mid_i32) * (L.card_size.x + margin)
+			}
+		}
+		position.y += math.sin(f32(rl.GetTime()) + position.x) * SCALE(10)
+		hovered := card_is_hovered(position)
+		if hovered_card == nil && hovered {
+			hovered_card = &card
+			hovered_card_index = i32(c)
+			hovered_position = position
+		} else {
+			draw_card(card, position, with_info=false, hoverable=false)
+		}
+	}
+
+	if hovered_card != nil {
+		actions := []string{"KEEP", "ACTIVATE"}
+		if hovered_card.category == .DICE do actions = {"KEEP", "ASSIGN"}
+		else if hovered_card.category == .CYCLE do actions = {"ACTIVATE"}
+		_, action := draw_card(hovered_card^, hovered_position, actions = actions)
+		if action == 1 {
+			if hovered_card.category == .FLASH {
+				card_activate(human, hovered_card)
+				state_change(.WAIT_FOR_ROLL)
+				app.cards_offer = {}
+			} else if hovered_card.category == .ROLL {
+				card_activate(human, hovered_card)
+				append(&human.cards, hovered_card^)
+				state_change(.WAIT_FOR_ROLL)
+				app.cards_offer = {}
+			} else if hovered_card.category == .DICE {
+				app.card_selected = hovered_card^
+				state_change(.UPGRADE_DIE)
+				app.cards_offer = {}
+			}
+		} else if action == 0 {
+			if hovered_card.category == .CYCLE {
+				card_activate(human, hovered_card)
+			} else {
+				append(&human.cards, hovered_card^)
+			}
+			state_change(.WAIT_FOR_ROLL)
+			app.cards_offer = {}
+		}
+	}
+
+	if len(app.antagonist.story_id) == 0 && !app.antagonist.tutorial_cards {
+		app.antagonist.tutorial_cards = true
+		antagonist_story("antagonist_tutorial_cards")
+	}
+}
+
+show_player_stuff :: proc(dt: real){
 	for &player, p in app.players {
 		// Draw ghost dice on the side:
 		ghost_cols: i32 = 5 // @TODO: make this dynamic based on the max number of ghosts a player can have
@@ -1730,7 +2274,7 @@ draw :: proc(dt: real) {
 				position.y += f32(c) * (L.card_size.y + 40*S)
 			}
 			position.x += f32(c % 2)
-			hovered := card_is_hovered(position)
+			hovered := card_is_hovered(position) && app.state == .WAIT_FOR_ROLL
 			if hovered_card == nil && hovered {
 				hovered_card = &card
 				hovered_card_index = i32(c)
@@ -1741,6 +2285,7 @@ draw :: proc(dt: real) {
 		}
 
 		if hovered_card != nil {
+			fade_out()
 			actions := []string{}
 			if app.state == .WAIT_FOR_ROLL && p == 0 {
 				if hovered_card.category < .DICE do actions = hovered_card.active ? {"DISCARD"} : {"DISCARD", "ACTIVATE"}
@@ -1764,505 +2309,5 @@ draw :: proc(dt: real) {
 				card_discard(&player, hovered_card_index)
 			}
 		}
-	}
-
-	info := app.state == .WAIT_FOR_ROLL // || app.state == .UPGRADE_DIE
-	if info && app.die_selected != -1 {
-		selected := app.die_selected != -1
-		die := selected ? app.dice[app.die_selected] : app.dice[dice_hovered]
-		draw_die_info(die)
-	}
-
-	if len(app.antagonist.story_id) > 0 {
-		// Let's the bubble get bigger and smaller to make it more dynamic, and also changes the color a bit
-		time_factor := 1. + 0.05 * math.sin(f32(rl.GetTime()) * 5)
-		font_size := L.font_size1 * time_factor
-		thickness: f32 = 4.
-		max_width: f32 = 600*S * time_factor
-		padding: f32 = 20.*S
-		color_fill := rl.BLACK
-		color_text := app.players[1].color
-		message := get_text(app.antagonist.story_id, app.antagonist.index)
-		size := measure_text(message, font_size, max_width = max_width) + padding
-		position := Vector2{L.width - 40*S, L.height - 200*S} - size - padding
-
-		rl.DrawRectangleV(position, size, color_fill)
-		rl.DrawRectangleLinesEx(
-			{
-				position.x - thickness,
-				position.y - thickness,
-				size.x + 2 * thickness,
-				size.y + 2 * thickness,
-			},
-			thickness,
-			rl.BLACK,
-		)
-		draw_text(message, position + padding / 2., font_size, color_text, max_width = max_width)
-
-		hovered := rl.CheckCollisionPointRec(
-			mouse_pos,
-			{x = position.x, y = position.y, width = size.x, height = size.y},
-		)
-		clicked := hovered && rl.IsMouseButtonPressed(.LEFT)
-		if clicked {
-			antagonist_story_continue()
-		}
-
-		button_pos := position + size
-
-		// if button(fmt.tprint("&gt;"), button_pos, font_size=L.font_size2, anchor=.RIGHT, text_color=color_text, hover_motion=false) {
-		// 	antagonist_story_continue()
-		// }
-	}
-
-	if app.state == .CHARGING {
-		// fade_out()
-		// Draw a power bar at the center of the screen
-		width: f32 = 800.*S
-		height: f32 = 80.*S
-		x := (f32(L.width) - width) / 2.
-		y := (f32(L.height) - height) / 2.
-		rl.DrawRectangleV(
-			{x, y},
-			{app.power * width, height},
-			app.players[app.current_player].color,
-		)
-		rl.DrawRectangleLinesEx({x, y, width, height}, 2.*S, rl.BLACK)
-	} else if app.state == .GHOST_BOARD {
-		fade_out()
-		board_size := rl.Vector2{920*S, L.height - 150*S}
-		board_position := rl.Vector2{(L.width - board_size.x) / 2., 50*S}
-		board_color := COLOR_PLAYERS[0] / 2
-		board_color.a = 255
-
-		draw_box(board_position, board_size, fill = board_color)
-
-		ghost_cols: i32 = 10 // @TODO: make this dynamic based on the max number of ghosts a player can have
-		ghost_size: f32 = L.font_size1 + 10*S
-		ghost_padding: f32 = 5*S
-		for i in 0 ..< human.ghosts_max {
-			ghost_index := i32(i)
-			row := ghost_index / ghost_cols
-			col := ghost_index % ghost_cols
-			position :=
-				board_position +
-				{20, 70}*S +
-				(ghost_size + ghost_padding) * rl.Vector2{f32(col), f32(row)}
-
-			if ghost_index >= i32(len(human.ghosts)) {
-				thickness: f32 = 2*S
-				draw_box(
-					position + {0, 2}*S,
-					{ghost_size, ghost_size - thickness} - thickness,
-					fill = board_color / 2,
-					thickness = thickness,
-				)
-				continue
-			}
-
-			ghost_number := human.ghosts[ghost_index]
-			active := contains(app.ghosts_selected[:], i32(ghost_index))
-
-			if dice_button(ghost_number, position, ghost_size, active_color = human.color, active = active, clickable = true) {
-				free_index := -1
-				for &slot, slot_index in app.ghosts_selected {
-					if slot == ghost_index {
-						slot = -1 // deselect if already selected
-						free_index = -1 // no further action
-						break
-					}
-					if slot == -1 {
-						free_index = slot_index
-						break
-					}
-				}
-				if free_index >= 0 {
-					app.ghosts_selected[free_index] = ghost_index
-				}
-			}
-		}
-		highlighted := [5]bool{}
-		ghost_selected_numbers := [5]i32{}
-		for i, ghost_index in app.ghosts_selected {
-			if i == -1 do break
-
-			ghost_selected_numbers[ghost_index] = human.ghosts[i]
-		}
-		enough_ghosts := !contains(app.ghosts_selected[:], i32(-1))
-		ghost_size2: f32 = L.font_size2 + 10*S
-		highest_score := 0.
-		// highest_combo := CombinationType_None
-		n_scored_combos := 0
-		for combo_type, c in CombinationType {
-			if combo_type == .None do continue
-
-			position := board_position + rl.Vector2{20, 150 + f32(c) * L.font_size2 * 1.6}*S
-			match, score, factor := test_combination(
-				combo_type,
-				ghost_selected_numbers[:],
-				&highlighted,
-			)
-			already_scored := combo_type in human.cycle.scored_combinations
-			if already_scored do n_scored_combos += 1
-			draw_text(
-				fmt.tprintf("%v", combo_type),
-				position,
-				L.font_size2,
-				(match && !already_scored) ? rl.RAYWHITE : rl.GRAY,
-				strikethrough = already_scored,
-			)
-			if !already_scored && match && enough_ghosts {
-				if factor > 0 {
-					draw_text(
-						fmt.tprintf("+%.f, x%.f", score, factor),
-						position + {600, 0}*S,
-						color = rl.RAYWHITE,
-					)
-				} else {
-					draw_text(fmt.tprintf("+%.f", score), position + {600, 0}*S, color = rl.RAYWHITE)
-				}
-
-				for ghost_number, g in ghost_selected_numbers {
-					dice_button(
-						ghost_number,
-						position + {300 + f32(g) * (ghost_size2 + 5), -7}*S,
-						ghost_size2,
-						active_color = human.color,
-						active = highlighted[g],
-						clickable = false,
-					)
-				}
-
-				if button("Score", position + {700, -4.}*S) {
-					human.cycle.scored_combinations += {combo_type}
-					human.roll.score += score // @TODO: Add it to roll score
-					ghosts_copy := make([dynamic]i32, len(human.ghosts), cap(human.ghosts))
-					defer delete(ghosts_copy)
-					copy(ghosts_copy[:], human.ghosts[:])
-					clear(&human.ghosts)
-
-					ghosts_discount := 5 - human.ghosts_costs_per_combination
-					for ghost, index in ghosts_copy {
-						if !contains(app.ghosts_selected[:], i32(index)) {
-							append(&human.ghosts, ghost)
-							continue
-						} else if ghosts_discount > 0 {
-							append(&human.ghosts, ghost)
-							ghosts_discount -= 1
-						}
-					}
-					app.ghosts_selected = {} - 1 // deselect everything
-					app.cards_offer = {}
-					cards_generate(app.cards_offer[:3], .FlashRollAndDiceCards)
-					state_change(.CARDS_OFFER)
-				}
-				if match && score > highest_score {
-					highest_score = score
-				}
-			}
-			highlighted = {}
-		}
-
-		text := "There is no matching combination"
-		if len(human.ghosts) < 5 {
-			text = fmt.tprint("Wait for at least 5 ghost dices to score combinations")
-		} else if contains(app.ghosts_selected[:], i32(-1)) {
-			text = fmt.tprintf(
-				"Select %v more ghost dices to score combinations",
-				count(app.ghosts_selected[:], i32(-1)),
-			)
-		} else if highest_score > 0 {
-			text = fmt.tprintf("Your best combination is worth %v points", highest_score)
-		}
-		draw_text(text, board_position + rl.Vector2{20, 20}*S, color=rl.RAYWHITE)
-		if button("ESC", board_position + rl.Vector2{board_size.x - 20, 20}*S, anchor = .RIGHT,) {
-			state_change(.WAIT_FOR_ROLL)
-			app.ghosts_selected = {-1, -1, -1, -1, -1}
-		}
-		if n_scored_combos == 15 {
-			if button("FINISH CYCLE", board_position + board_size - {20, 70}*S, anchor = .RIGHT,) {
-				add_text(
-					board_position + board_size / 2.,
-					fmt.aprint("CYCLE COMPLETED!"),
-					human.color,
-					2.,
-					font_size = L.font_size1,
-					anchor = TextAnchor.CENTER,
-				)
-				human.roll.score += math.floor(human.total_score) / 10.
-				app.ghosts_selected = {} - 1 // deselect everything
-				app.cards_offer = {}
-				cards_generate(app.cards_offer[:3], .CycleCards)
-				human.cycle.scored_combinations = {}
-				state_change(.CARDS_OFFER)
-			}
-		} else if n_scored_combos > 9 {
-			if len(app.antagonist.story_id) == 0 && !app.antagonist.tutorial_cycles {
-				antagonist_story("antagonist_tutorial_cycles")
-			}
-			if button(
-				"RUSH CYCLE",
-				board_position + board_size - {20, 70}*S,
-				L.font_size2,
-				anchor = .RIGHT,
-			) {
-				add_text(
-					board_position + board_size / 2.,
-					fmt.aprint("CYCLE COMPLETED BY RUSHING!"),
-					human.color,
-					2.,
-					font_size = L.font_size1,
-					anchor = TextAnchor.CENTER,
-				)
-				app.ghosts_selected = {} - 1 // deselect everything
-				app.cards_offer = {}
-				cards_generate(app.cards_offer[:2], .CycleCards)
-				human.cycle.scored_combinations = {}
-				state_change(.CARDS_OFFER)
-			}
-		} else {
-			draw_text(
-				fmt.tprintf("%v/15 combinations scored", n_scored_combos),
-				board_position + board_size - {20, 70}*S,
-				anchor = .RIGHT,
-			)
-		}
-
-		if len(app.antagonist.story_id) == 0 && !app.antagonist.tutorial_ghost_board {
-			app.antagonist.tutorial_ghost_board = true
-			antagonist_story("antagonist_tutorial_ghost_board")
-		}
-	}
-
-	if app.state == .WAIT_FOR_ROLL {
-		// A button named "ROLL!" in the bottom, lower part of the screen
-		text := "Press <SPACE> to continue"
-		if button(
-			text,
-			{L.width / 2., L.height - 150*S},
-			size = V2{300, 80}*S,
-			font_size = L.font_size1,
-			color = rl.BLANK,
-			anchor = .CENTER,
-		) {
-			state_change(.CHARGING)
-		}
-	} else if app.state == .CARDS_OFFER {
-		fade_out()
-		app.die_selected = -1
-
-		text := "Choose one of these cards"
-		draw_text(
-			text,
-			{L.width / 2., L.height - 150*S},
-			L.font_size1,
-			rl.RAYWHITE,
-			anchor = .CENTER,
-		)
-
-		n_cards: i32
-		for card in app.cards_offer do if card.type != .CardNone do n_cards += 1
-
-		margin: f32 = 50.*S
-		mid_i32 := int(n_cards / 2)
-		mid_f32 := f32(n_cards) / 2.
-		for &card, c in app.cards_offer {
-			if card.type == .CardNone do continue
-
-			position: Vector2 = {
-				L.width / 2. - L.card_size.x / 2.,
-				(L.height - L.card_size.y) / 2.,
-			}
-			if n_cards % 2 == 1 {
-				if c == mid_i32 {
-					// nothing ...
-				} else if c < mid_i32 {
-					position.x -= f32(mid_i32 - c) * (L.card_size.x + margin)
-				} else {
-					position.x += f32(c - mid_i32) * (L.card_size.x + margin)
-				}
-			}
-			position.y += math.sin(f32(rl.GetTime()) + position.x) * 15*S
-
-			actions := []string{"KEEP", "ACTIVATE"}
-			if card.category == .DICE do actions = {"KEEP", "ASSIGN"}
-			else if card.category == .CYCLE do actions = {"ACTIVATE"}
-			_, action := draw_card(card, position, actions = actions)
-			if action == 1 {
-				if card.category == .FLASH {
-					card_activate(human, &card)
-					state_change(.WAIT_FOR_ROLL)
-					app.cards_offer = {}
-				} else if card.category == .ROLL {
-					card_activate(human, &card)
-					append(&human.cards, card)
-					state_change(.WAIT_FOR_ROLL)
-					app.cards_offer = {}
-				} else if card.category == .DICE {
-					app.card_selected = card
-					state_change(.UPGRADE_DIE)
-					app.cards_offer = {}
-				}
-			} else if action == 0 {
-				if card.category == .CYCLE {
-					card_activate(human, &card)
-				} else {
-					append(&human.cards, card)
-				}
-				state_change(.WAIT_FOR_ROLL)
-				app.cards_offer = {}
-			}
-		}
-
-		if len(app.antagonist.story_id) == 0 && !app.antagonist.tutorial_cards {
-			app.antagonist.tutorial_cards = true
-			antagonist_story("antagonist_tutorial_cards")
-		}
-	} else if app.state == .UPGRADE_DIE {
-		selected_die: ^Die
-		selected_face: i32 = -1
-		for &die in app.dice {
-			if die.state != .ALIVE || die.player != 0 do continue
-			hovered_face := draw_die_info(die)
-			if hovered_face != -1 {
-				selected_die = &die
-				selected_face = hovered_face
-			}
-		}
-		// app.card_selected.triggered = app.die_selected >= 0 ? 1. : 0.
-
-		text := "Choose a dice to assign this card to"
-		draw_text(
-			text,
-			{L.width / 2., L.height - 150*S},
-			L.font_size1,
-			rl.RAYWHITE,
-			anchor = .CENTER,
-		)
-		draw_card(app.card_selected, mouse_pos - {L.card_size.x / 2, L.card_size.y + 50*S})
-
-		if rl.IsMouseButtonPressed(.LEFT) && selected_face != -1 {
-			could_upgrade := card_assign(selected_die, app.card_selected, selected_face)
-			app.card_selected = {}
-
-			if !could_upgrade {
-				add_text(
-					selected_die.position,
-					fmt.aprint("Die has no free upgrade slots!"),
-					selected_die.color1,
-					1.5,
-				)
-			}
-			state_change(.WAIT_FOR_ROLL)
-		} else if rl.IsMouseButtonPressed(.RIGHT) || rl.IsKeyPressed(.ESCAPE) {
-			app.card_selected.triggered = 0.
-			append(&human.cards, app.card_selected)
-			app.card_selected = {}
-			add_text(mouse_pos, fmt.aprint("Keep card in hand!"), human.color, 1.5)
-			state_change(.WAIT_FOR_ROLL)
-		}
-	}
-
-	if app.state == .VICTORY || app.state == .DEFEAT {
-		text := "Press <SPACE> to continue"
-		draw_text(
-			text,
-			{L.width / 2., L.height - 150*S},
-			font_size = L.font_size1,
-			color = rl.RAYWHITE,
-			anchor = .CENTER,
-		)
-	}
-
-	for &animation in app.animations {
-		if !animation.visible do continue
-
-		if animation.delay > 0. {
-			animation.delay -= dt * config.game_speed
-			continue
-		}
-		animation.lifetime -= dt * config.game_speed
-		if animation.lifetime <= 0. {
-			animation.visible = false
-			if len(animation.text) > 0 do delete(animation.text)
-			continue
-		}
-
-		start_2d, end_2d: Vector2
-		if start_3d, is_vec3 := animation.start.(Vector3); is_vec3 {
-			start_2d = rl.GetWorldToScreen(start_3d, app.camera3d)
-		} else do start_2d = animation.start.(Vector2)
-
-		if end_3d, is_vec3 := animation.end.(Vector3); is_vec3 {
-			end_2d = rl.GetWorldToScreen(end_3d, app.camera3d)
-		} else do end_2d = animation.end.(Vector2)
-
-		// adapt to zoom in
-		font_size := L.font_size2 // * (1.+(1. - (app.camera3d.fovy-25)/5))
-
-		life_ratio := animation.lifetime / animation.start_lifetime
-		alpha := life_ratio > 0.3 ? 1.0 : life_ratio / 0.3
-		size_factor := splash(life_ratio)
-		font_size *= size_factor
-
-		x := math.lerp(start_2d.x, end_2d.x, 1. - life_ratio)
-		y := math.lerp(start_2d.y, end_2d.y, 1. - life_ratio)
-
-		icon_id, has_icon := animation.icon_id.?
-		if has_icon {
-			icon_size: f32 =
-				animation.icon_size > 0. ? animation.icon_size * size_factor : font_size * 4
-			draw_texture(
-				icon_id,
-				{x - icon_size / 2, y - icon_size / 2},
-				icon_size,
-				rl.ColorAlpha(animation.color, alpha),
-			)
-		}
-
-		if len(animation.text) == 0 do continue
-
-		// text_size := measure_text(animation.text, font_size)
-		// x -= text_size.x/2.
-		// y -= text_size.y/2.
-
-		// box_position := Vector2{x-5, y-5}
-		// if animation.anchor == .LEFT do box_position.x += text_size.x/2.
-		// if animation.anchor == .RIGHT do box_position.x -= text_size.x
-		text_color := rl.ColorAlpha(animation.color, alpha)
-		text_outline := rl.BLACK
-		box_fill := rl.BLANK
-		if !has_icon {
-			box_fill = rl.ColorAlpha(animation.color, alpha)
-			text_color = rl.ColorAlpha(rl.BLACK, alpha)
-			text_outline = rl.BLANK
-		}
-		draw_text(
-			animation.text,
-			{x, y},
-			font_size,
-			text_color,
-			outline = text_outline,
-			boxed = box_fill,
-			anchor = animation.anchor,
-		)
-	}
-
-	draw_icon_particles(dt)
-}
-
-wait :: proc(duration: real) {
-	app.state_timer = duration / config.game_speed
-}
-
-state_change :: proc(new_state: GameState, wait: f32 = 0.) {
-	app.state_before = app.state
-	app.state = new_state
-	app.state_clock = 0.
-	app.state_timer = wait / config.game_speed
-
-	if new_state == .CHARGING {
-		camera_reset()
-		app.die_selected = -1
 	}
 }

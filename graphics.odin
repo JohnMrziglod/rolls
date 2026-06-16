@@ -1,5 +1,6 @@
 package game
 
+import "core:container/handle_map"
 import "core:math"
 import "core:math/linalg"
 import "core:math/rand"
@@ -65,6 +66,7 @@ splash :: proc(t: f32) -> f32 {
 button :: proc(text: string, position: rl.Vector2, size:rl.Vector2={1, 1}, color:rl.Color=rl.BLACK, active_color:rl.Color=rl.BLANK,
 		font_size:f32=-1., clickable:bool=true, padding:f32=10., text_color:=rl.WHITE, anchor:TextAnchor=.LEFT, hover_motion:bool=true) -> bool{
 	font_size := font_size > 0. ? font_size : L.font_size2
+	padding := SCALE(padding)
 	text_size := measure_text(text, font_size) + padding
 
 	// highlight it if the mouse is hovering over it
@@ -79,7 +81,7 @@ button :: proc(text: string, position: rl.Vector2, size:rl.Vector2={1, 1}, color
 	if anchor == .CENTER do box.x -= box.width / 2.
 
 	hovered := clickable && rl.CheckCollisionPointRec(rl.GetMousePosition(), box)
-	if hovered && hover_motion do box.y += math.sin(f32(rl.GetTime())*10)*5	// make the button float up and down a bit
+	if hovered && hover_motion do box.y += SCALE(math.sin(f32(rl.GetTime())*10)*5)	// make the button float up and down a bit
 
 	active_color := active_color == rl.BLANK ? rl.ColorBrightness(color, 1.2) : active_color
 
@@ -319,27 +321,31 @@ add_text_vec_vec :: proc (
 	}
 }
 
-measure_text :: proc(text: string, font_size: f32, spacing:f32=1.0, max_width:f32=9999) -> rl.Vector2 {
-	return draw_text(text, {0, 0}, font_size, spacing=spacing, max_width=max_width, draw=false)
+measure_text :: proc(text: string, font_size: f32, spacing:f32=1.0, max_width:f32=9999, boxed:bool=false) -> rl.Vector2 {
+	return draw_text(text, {0, 0}, font_size, spacing=spacing, max_width=max_width, draw=false, boxed=boxed? rl.RAYWHITE : rl.BLANK)
 }
 
 draw_text :: proc(text: string, position: rl.Vector2, font_size: f32=-1.,
 		color: rl.Color=rl.RAYWHITE, spacing:f32=1.0, line_spacing:f32=1.2, max_width:f32=9999,
-		strikethrough:bool=false, overline:bool=false, boxed:rl.Color=rl.BLANK, box_width:f32=-1, box_offset:f32=0.,
-		padding:f32=10,
-		anchor:TextAnchor=.LEFT, draw:bool=true, highlight_color:rl.Color=rl.RAYWHITE,
+		strikethrough:bool=false, overline:bool=false, boxed:rl.Color=rl.BLANK, box_width:f32=-1,
+		padding:f32=10, anchor:TextAnchor=.LEFT, draw:bool=true, highlight_color:rl.Color=rl.RAYWHITE,
 		outline:rl.Color=rl.BLANK) -> rl.Vector2{
 
 	font_size := font_size > 0. ? font_size : L.font_size2
+	padding := SCALE(padding)
 
 	position := position
+	max_width := max_width
+	if boxed != rl.BLANK && max_width != 9999. do max_width -= 2*padding
 	if anchor == .RIGHT do position.x -= measure_text(text, font_size, spacing, max_width).x
 	if anchor == .CENTER do position.x -= measure_text(text, font_size, spacing, max_width).x / 2.
-	if boxed != rl.BLANK {
-	    box_size := measure_text(text, font_size, spacing, max_width)+2*padding
-		if box_width > 0 do box_size.x = box_width
-	    draw_rounded_box(position - padding, box_size, boxed)
-        // position += {padding, padding}
+	if boxed != rl.BLANK{
+		if draw {
+			box_size := measure_text(text, font_size, spacing, max_width)+2*padding
+			if box_width > 0 do box_size.x = box_width
+			draw_rounded_box(position, box_size, boxed)
+		}
+		position += padding
 	}
 
 	outline := outline
@@ -367,11 +373,21 @@ draw_text :: proc(text: string, position: rl.Vector2, font_size: f32=-1.,
 			if r == ']' {
     			in_tag = false
        			if in_icon{
+          			// Somehow this doesn't work yet
+          			if text_offset_x+2.+font_size > max_width{
+	       				// we draw it onto the next line
+						text_offset_y += line_spacing * f32(font.baseSize) * scale_factor
+						text_offset_x = 0.
+             		}
           			if draw{
 						draw_texture_by_string(strings.to_string(icon_id),
-							position + rl.Vector2{text_offset_x+2., text_offset_y}, font_size*scale_factor, highlight_color)
+							position + rl.Vector2{text_offset_x+2., text_offset_y}, font_size, highlight_color)
              		}
-					text_offset_x += font_size*scale_factor+4.
+					text_offset_x += font_size+4.
+					text_size = {
+						math.max(text_size.x, text_offset_x),
+						math.max(text_size.y, text_offset_y + f32(font.baseSize) * scale_factor)
+					}
 				}
        			in_icon = false
     			continue
@@ -396,6 +412,7 @@ draw_text :: proc(text: string, position: rl.Vector2, font_size: f32=-1.,
 
 		glyph_width :f32= 0.
 		next_word_length :f32= 0.
+		next_in_tag := false
 		for nr, j in text[i:] {
 		    if nr == '[' {
                 break
@@ -434,7 +451,7 @@ draw_text :: proc(text: string, position: rl.Vector2, font_size: f32=-1.,
 			    rl.DrawTextCodepoint(
 					font, r,
 					position + rl.Vector2{text_offset_x, text_offset_y},
-					font_size, highlighted ? rl.GRAY : color)
+					font_size, highlighted ? rl.Color{120, 120, 120, 255} : color)
 			}
 		}
 
@@ -463,6 +480,11 @@ draw_text :: proc(text: string, position: rl.Vector2, font_size: f32=-1.,
 		}
 	}
 
+	if boxed != rl.BLANK {
+		text_size += padding
+		text_size.x = math.max(text_size.x, box_width)
+	}
+
 	return text_size
 }
 
@@ -475,7 +497,7 @@ draw_rounded_box :: proc(position, size: rl.Vector2, fill:rl.Color=rl.BLANK, rad
 
 	draw_box(position, size, fill, outline={0, 0, 0, fill.a}, roundness=roundness)
 }
-draw_box :: proc(position, size: rl.Vector2, fill:rl.Color=rl.BLANK, outline:rl.Color=rl.BLACK, thickness:f32=5., roundness:f32=0.) {
+draw_box :: proc(position, size: rl.Vector2, fill:rl.Color=rl.BLANK, outline:rl.Color=rl.BLACK, thickness:f32=6., roundness:f32=0.) {
 	box := rl.Rectangle{x=position.x, y=position.y, width=size.x, height=size.y}
 	if roundness > 0.{
 		segments :i32= 0
@@ -548,12 +570,16 @@ fade_out :: proc(){
 draw_card :: proc(
 		card: Card, position: rl.Vector2, color:rl.Color=rl.BLANK, actions:[]string={},
 		with_title:bool=true, with_icon:bool=true, with_info:bool=true, hoverable:bool=true,
+		upside_down:bool=false,
 ) -> (bool, i32){
     size := L.card_size
    	font_size :f32= L.font_size2-2
-	padding :f32= 10//SCALE(10)
-	margin: f32 = 12//SCALE(12)
+	padding :f32= SCALE(12)
+	margin: f32 = SCALE(12)
 	header_height := font_size+2*padding
+
+	// if upside_down we draw the towards upside (useful when drawing towards the bottom of the screen)
+	direction :f32= upside_down ? -1. : 1.
 
 	color := color
 	if color == rl.BLANK do color = COLOR_CARDS[card.category]
@@ -565,7 +591,7 @@ draw_card :: proc(
 	position := position
 	if hovered{
 		color = rl.ColorBrightness(color, 0.1)
-		position.y += -10.*S
+		position.y += SCALE(-10)
 	}
 
 	if card.active {
@@ -608,11 +634,11 @@ draw_card :: proc(
 		draw_texture(reflect.enum_string(card.type), icon_position, icon_size+math.sin(f32(rl.GetTime())+30*f32(card.type))*3*S, icon_color,
 			rotation=math.sin(f32(rl.GetTime())+10*f32(card.type))*3*S)
 	} else {
-		margin = 0.
+		// margin = 0.
 	}
 
 	if hovered {
-		button_pos := position + size + {-10, -45}*S
+		button_pos := position + size + {-10, -50}*S
 
 		for action, i in actions {
 			if button(action, button_pos, font_size=font_size, anchor=.RIGHT) do return hovered, i32(i)
@@ -625,7 +651,7 @@ draw_card :: proc(
 
 	show_description := hovered || !with_icon
 	text_pos := position
-	if with_title || with_icon do text_pos += {0, size.y+margin}+padding
+	if with_title || with_icon do text_pos += {0, size.y+2*margin}
 	if show_description {
 	    ids := []string{"description", "description2"}
 		for id in ids{
@@ -634,13 +660,42 @@ draw_card :: proc(
 			text := card_fill_vars(card, get_text(card.type, id))
             text_size := draw_text(
                     text, text_pos, font_size, rl.BLACK,
-                    max_width=size.x-(text_pos.x-position.x), highlight_color=color,
-                    boxed=color, box_width=size.x, box_offset=padding)
-            text_pos.y += text_size.y + 2*padding + margin
+                    max_width=size.x, highlight_color=color,
+                    boxed=color, box_width=size.x)
+            draw_term_info(text, text_pos, color, padding, margin)
+            text_pos.y += text_size.y + 3*margin
 		}
 	}
 
 	return hovered, -1
+}
+fade :: proc(color: rl.Color, ratio:f32=0.5) -> rl.Color {
+	return rl.ColorAlpha(color, ratio)
+}
+draw_term_info :: proc(text: string, position: Vector2, color: rl.Color, padding, margin:f32){
+	// Draw an additional info box for all highlighted terms that have an info entry in app.texts
+	font_size := L.font_size2-2
+	direction :f32= position.x < L.width/2. ? 1. : -1.
+	delta := Vector2{L.card_size.x+margin, 0}
+	info_size: Vector2
+
+	for term, info in INFO{
+		if !strings.contains(text, term) do continue
+
+		info := info
+		if strings.starts_with(info, "[i") && strings.ends_with(info, "]") {
+			icon_size :f32= 100
+			draw_rounded_box(position+direction*delta, {L.card_size.x, icon_size+font_size}, fill=color)
+			info_size = draw_text(fmt.tprintf("[h]%v:[h]", term), position+direction*delta+padding, font_size, color=rl.BLACK, max_width=L.card_size.x)
+			draw_texture(info[2:len(info)-1], position+direction*delta+{0, info_size.y}+padding, icon_size, tint=rl.BLACK)
+			info_size.y += icon_size
+		} else {
+			info_size = draw_text(info, position+direction*delta, font_size, color=rl.BLACK,
+				max_width=L.card_size.x, boxed=color)
+		}
+
+		delta.x += info_size.x+margin
+	}
 }
 
 draw_die_info :: proc(die: Die, extended:bool=false) -> i32{
@@ -650,8 +705,8 @@ draw_die_info :: proc(die: Die, extended:bool=false) -> i32{
 	margin := SCALE(10.)
     padding := SCALE(4.)
 
-    box_size := Vector2{6*icon_size+10*padding, icon_size+3*padding+L.font_size2}+2.*margin
-    draw_box(position-margin, box_size, fill=rl.ColorAlpha(die.color1, 0.8), thickness=0.)
+    // box_size := Vector2{6*icon_size+10*padding, icon_size+3*padding+L.font_size2}+2.*margin
+    // draw_box(position-margin, box_size, fill=rl.ColorAlpha(die.color1, 0.8), thickness=0.)
 
     card: Card
     card_position: Vector2
@@ -680,11 +735,11 @@ draw_die_info :: proc(die: Die, extended:bool=false) -> i32{
 			}
 			hovered_upgrade_index = i32(u)
         }
-        draw_box({dest.x, dest.y}-padding, {}+icon_size+2*padding, fill=upgraded ? color : rl.ColorAlpha(color, 0.8), thickness=1)
+        draw_box({dest.x, dest.y}-padding, {}+icon_size+2*padding, fill=upgraded ? color : rl.ColorAlpha(color, 0.9), thickness=1)
         draw_texture(tp, upgrade_pos, icon_size, tint=upgraded ? rl.BLACK : rl.RAYWHITE/2)
     }
     if card.type != .CardNone {
-    	draw_card(card, position+{-margin+4., box_size.y+margin}, with_icon=false)
+    	draw_card(card, position+{0, icon_size+2*margin}, with_icon=false)
     }
 
     if extended {

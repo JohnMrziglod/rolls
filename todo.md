@@ -5,8 +5,9 @@
 - copy cat: copies the abilities from the upgrade on its left
 - vodooist: This die creates a ghost joker die when it dies.
 - mirror: Retriggers the abilities from the upgrade on its left.
+- average joe: This die scores the average of all dice extra.
 
-# tactic cards (yellow)
+# flash cards (yellow)
 - bonus points: get some score points once, also with x2 factor
 - upgrade dice cards: some dice upgrades reach next level
 - upgrade combinations: all combinations that contain a pair, get +5 Score
@@ -14,6 +15,7 @@
 - ghost refill: fill all ghost spots with random ghost dice
 - create two random roll cards
 - create two random dice cards
+- create two random flash cards
 - duplicate a random hand card
 - recreate your last used tactic card
 
