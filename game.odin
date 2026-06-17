@@ -206,7 +206,7 @@ game_init :: proc(){
 			{
 				color                        = COLOR_PLAYERS[1],
 				id                           = 1,
-				n_dice                       = 6,
+				n_dice                       = 20,
 				ghosts_costs_per_combination = 5,
 				ghosts_max                   = 10,
 				max_lifetime_roll_cards      = 2, //ghosts={1, 2, 3, 4, 5}
@@ -291,13 +291,11 @@ game_handle_input :: proc(dt: f32){
 		game.speed -= .5
 	}
 	if rl.IsKeyPressed(rl.KeyboardKey.G) {
-		game.cards_offer = {}
-		cards_generate(game.cards_offer[:5], .FlashRollAndDiceCards)
-		state_change(.CARDS_OFFER)
+		state_change(.GHOST_BOARD)
 	}
 	if rl.IsKeyPressed(rl.KeyboardKey.H) {
 		game.cards_offer = {}
-		cards_generate(game.cards_offer[:5], .CycleCards)
+		cards_generate(game.cards_offer[:5], .FlashRollAndDiceCards)
 		state_change(.CARDS_OFFER)
 	}
 
@@ -1075,7 +1073,7 @@ show_ghost_board :: proc(){
 
 	ghost_cols: i32 = 10 // @TODO: make this dynamic based on the max number of ghosts a player can have
 	ghost_size: f32 = L.font_size1 + 10*S
-	ghost_padding: f32 = 5*S
+	ghost_padding: f32 = 10*S
 	for i in 0 ..< human.ghosts_max {
 		ghost_index := i32(i)
 		row := ghost_index / ghost_cols
@@ -1099,7 +1097,7 @@ show_ghost_board :: proc(){
 		ghost_number := human.ghosts[ghost_index]
 		active := contains(game.ghosts_selected[:], i32(ghost_index))
 
-		if dice_button(ghost_number, position, ghost_size, active_color = human.color, active = active, clickable = true) {
+		if dice_button(ghost_number, position, ghost_size, active_color=human.color, active=active, clickable=true) {
 			free_index := -1
 			for &slot, slot_index in game.ghosts_selected {
 				if slot == ghost_index {
@@ -1132,7 +1130,7 @@ show_ghost_board :: proc(){
 	for combo_type, c in CombinationType {
 		if combo_type == .None do continue
 
-		position := board_position + rl.Vector2{20, 150 + f32(c) * L.font_size2 * 1.6}*S
+		position := board_position + rl.Vector2{20*S, 150*S + f32(c)*L.font_size2*1.6}
 		match, score, factor := test_combination(
 			combo_type,
 			ghost_selected_numbers[:],
@@ -1161,7 +1159,7 @@ show_ghost_board :: proc(){
 			for ghost_number, g in ghost_selected_numbers {
 				dice_button(
 					ghost_number,
-					position + {300 + f32(g) * (ghost_size2 + 5), -7}*S,
+					position + {300*S + f32(g) * (ghost_size2 + 5*S), -7*S},
 					ghost_size2,
 					active_color = human.color,
 					active = highlighted[g],
@@ -1211,7 +1209,7 @@ show_ghost_board :: proc(){
 		text = fmt.tprintf("Your best combination is worth %v points", highest_score)
 	}
 	draw_text(text, board_position + rl.Vector2{20, 20}*S, color=rl.RAYWHITE)
-	if button("ESC", board_position + rl.Vector2{board_size.x - 20, 20}*S, anchor = .RIGHT,) {
+	if button("ESC", board_position + rl.Vector2{board_size.x- 20*S, 20*S}, anchor = .RIGHT,) {
 		state_change(.WAIT_FOR_ROLL)
 		game.ghosts_selected = {-1, -1, -1, -1, -1}
 	}
