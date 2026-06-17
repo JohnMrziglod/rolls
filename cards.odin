@@ -45,14 +45,15 @@ CardType :: enum i32{
 	CardDice_Pirate,
 	CardDice_Randomizer,
 	CardDice_Researcher,
-	CardDice_SuperHero,
 	CardDice_Tank,
 	CardDice_Train,
 	CardDice_Veteran,
 	CardDice_WarHero,
 		DiceCards,				// <- Until we got dice cards
-	CardDice_Unique_SuperHero,
-	CardDice_Unique_VIP,
+	CardDice_BirthdayKid,
+	CardDice_Introvert,
+	CardDice_SuperHero,
+	CardDice_VIP,
 		UniqueDiceCards,		// <- Until here we get unique dice cards
 	CardCycle_ExtraDie,
 	CardCycle_EternalRoll,
@@ -71,6 +72,151 @@ Card :: struct{
 	active: bool,
 	lifetime: i32,		// Number of rolls until discard
 	triggered: f32,		// How long it should be displayed as triggered in seconds
+}
+
+cards_battle :: proc(dt: real) {
+	for &player, p in game.players {
+		player.roll.effects = {}
+		other_player := &game.players[(p + 1) % N_PLAYERS]
+
+		for &card, c in player.cards {
+			if !card.active || card.already_scored do continue
+
+			player.roll.effects[card.type] = {}
+
+			position := L.hand_positions[p] + L.card_size / 2.
+			// if len(player.cards) > 5 {
+			// 	position.y += L.hand_area_height / f32(len(player.cards)) * f32(c)
+			// } else {
+			// 	position.y += f32(c) * (30 + L.card_size.y)
+			// }
+			#partial switch card.type {
+			case .CardRoll_Attack:
+				for &dice, d in game.dice {
+					if dice.state != .ALIVE || dice.player != u8(p) do continue
+					dice.attack += 1
+					add_text(
+						dice.position,
+						fmt.aprint("+1 ATTACK"),
+						COLOR_CARDS[card.category],
+						lifetime = 0.6,
+					)
+				}
+			case .CardRoll_Defense:
+				for &dice, d in game.dice {
+					if dice.state != .ALIVE || dice.player != u8(p) do continue
+					dice.health += 1
+					add_text(
+						dice.position,
+						fmt.aprint("+1 HEALTH"),
+						COLOR_CARDS[card.category],
+						lifetime = 0.6,
+					)
+				}
+			case .CardRoll_Doppelgeist:
+				ghosts := player.ghosts
+				for ghost in ghosts {
+					if i32(len(player.ghosts)) >= player.ghosts_max do clear(&player.ghosts)
+					append(&player.ghosts, ghost)
+				}
+				slice.sort(player.ghosts[:])
+			case .CardRoll_GhostHour:
+				ghost_score: sco
+				for ghost in player.ghosts do ghost_score += sco(ghost)
+				player.roll.score += ghost_score
+				add_text(
+					position,
+					fmt.aprintf("+%.f FROM GHOSTS!", ghost_score),
+					COLOR_CARDS[card.category],
+					lifetime = 1.,
+				)
+			case .CardRoll_HappyHour:
+				player.roll.factor += 2
+				add_text(position, fmt.aprint("ROLL SCORE X2"), player.color, lifetime = 1.)
+			case .CardRoll_MarketCrash:
+				for &dice, d in game.dice {
+					for &upgrade, u in dice.upgrades {
+						position := dice.position - f32(u) * Vector3{0, 2, 0}
+						text: string
+
+						#partial switch upgrade.type {
+						case .CardDice_Investor:
+							upgrade.var1 *= 0.5
+							add_text(
+								dice.position,
+								fmt.aprint("MARKET CRASH: LOSING 50%"),
+								COLOR_CARDS[card.category],
+							)
+						}
+					}
+				}
+			case .CardRoll_Suidice:
+				// Find dice with highest number
+				suidice_index := -1
+				suidice_number: i32 = 0
+				for &dice, d in game.dice {
+					if dice.state != .ALIVE || dice.player != u8(p) do continue
+
+					if dice.current_number > suidice_number {
+						suidice_index = d
+						suidice_number = dice.current_number
+					}
+				}
+
+				if suidice_index != -1 {
+					suidice := &game.dice[suidice_index]
+
+					dice_killed(suidice)
+					add_text(suidice.position, fmt.aprint("SUIDICE!"), suidice.color1)
+
+					for &dice, d in game.dice {
+						if dice.state != .ALIVE || dice.player == u8(p) do continue
+
+						dice_killed(&dice, suidice)
+					}
+				}
+			case .CardRoll_TombRaider:
+				if len(other_player.ghosts) == 0 {
+					add_text(
+						position,
+						fmt.aprint("NO GHOSTS TO STEAL"),
+						COLOR_CARDS[card.category],
+						lifetime = 1.,
+					)
+				} else {
+					if i32(len(player.ghosts)) >= player.ghosts_max do clear(&player.ghosts)
+					index_stolen := rand.int32_range(0, i32(len(other_player.ghosts)))
+					append(&player.ghosts, other_player.ghosts[index_stolen])
+					ordered_remove(&other_player.ghosts, index_stolen)
+					add_text(
+						position,
+						fmt.aprint("STEALING GHOSTS!"),
+						COLOR_CARDS[card.category],
+						lifetime = 1.,
+					)
+				}
+				// Sort the ghost dices (makes other things easier later on also for the human player)
+				slice.sort(player.ghosts[:])
+			case:
+				continue
+			}
+
+			player.roll.score_counter += 1
+
+			pitch: f32 = 1.0 + ((p == 0) ? 0.1 : -0.1) * f32(player.roll.score_counter)
+			play_sound(6, volume = 0.5, pitch = pitch)
+
+			card.triggered = 1.0
+			card.already_scored = true
+			return
+		}
+	}
+
+	state_change(.DICES_BATTLE, 0.3)
+}
+
+cards_scoring :: proc(dt: real) {
+	state_change(.SCORING_SUMMARY, wait = 0.4)
 }
 
 CardGenerateTypes :: enum{AllCards, FlashCards, RollCards, FlashRollAndDiceCards, DiceCards, UniqueDiceCards, CycleCards}
@@ -180,8 +326,8 @@ card_activate :: proc(player: ^Player, card: ^Card){
 		player.max_lifetime_roll_cards += 1
 	case .CardCycle_ExtraDie:
 		// player.n_dice += 1
-		append(&app.dice, Die{player=player.id, state=.DEAD, color1=player.color, color2=rl.BLACK})
-		dice_init(&app.dice[len(app.dice)-1])
+		append(&game.dice, Die{player=player.id, state=.DEAD, color1=player.color, color2=rl.BLACK})
+		dice_init(&game.dice[len(game.dice)-1])
 	case .CardCycle_Graveyard:
 		player.ghosts_max += 1
 	case .CardCycle_GhostDiscount:
@@ -189,7 +335,7 @@ card_activate :: proc(player: ^Player, card: ^Card){
 		if player.ghosts_costs_per_combination < 1 do player.ghosts_costs_per_combination=1
 	}
 
-	for &dice, d in app.dice{
+	for &dice, d in game.dice{
 		if dice.player != player.id || dice.state != .ALIVE do continue
 
 		for &upgrade in dice.upgrades{
@@ -237,7 +383,7 @@ card_assign :: proc(die: ^Die, card: Card, index:i32=-1) -> bool{
 			die.color1, 1.5, icon_id=icon_index_from_card(card.type))
 
 		die.upgrades[index] = card
-		card_activate(&app.players[die.player], &die.upgrades[index])
+		card_activate(&game.players[die.player], &die.upgrades[index])
 		die.upgrades[index].triggered = 0.
 		apply_dice_upgrades(0.)	// @FIXME: Is that good?
 

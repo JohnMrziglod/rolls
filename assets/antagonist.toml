@@ -34,3 +34,11 @@ antagonist_wins
 /3="I don't think you have it in you."
 /4="I'd like to say it was a pleasure..."
 /5="but I don't like to lie."
+
+Antagonist_TheMathematician
+/1="People think it's pure chance but come on now, it's all about the numbers."
+/2="I calculate every possible outcome before you are even making a move."
+/3="Bad luck is just the inability to understand basic math."
+/4="Let's see if you can keep up with my calculations."
+/5="My data shows that you are going to lose."
+/6="My daughter knows more about calculating than you, and she is not even 5."

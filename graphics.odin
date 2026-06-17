@@ -181,7 +181,7 @@ draw_die_face :: proc(face: int, die_size: f32, texture: rl.Texture, tc, ts: Vec
 
 draw_die :: proc(dice: Die, hoverable:bool=false) -> bool {
 	size := dice.shape.(ShapeBox).half_size
-	ray := rl.GetScreenToWorldRay(rl.GetMousePosition(), app.camera3d)
+	ray := rl.GetScreenToWorldRay(rl.GetMousePosition(), game.camera3d)
 
     // Check collision between ray and b
     collision := rl.GetRayCollisionBox(ray, {min=dice.position-size, max=dice.position+size})
@@ -236,7 +236,7 @@ draw_die :: proc(dice: Die, hoverable:bool=false) -> bool {
 }
 
 add_particles :: proc(position: Vector3, color: rl.Color){
-	for &particles in app.particles{
+	for &particles in game.particles{
 		if particles.visible do continue
 
 		for i in 0 ..< len(particles.positions) {
@@ -253,7 +253,7 @@ add_particles :: proc(position: Vector3, color: rl.Color){
 }
 
 add_icon_particles :: proc(position, area: Vector2, texture_ids: []Vector2, color: rl.Color, lifetime:f32=2.){
-	for &particle in app.icon_particles[:200]{
+	for &particle in game.icon_particles[:200]{
 		particle.position = position+{rand.float32_range(0, area.x), rand.float32_range(0, area.y)}
 		// particle.velocity = random_vector2(-200., 200.)
 		particle.velocity.y = rand.float32_range(50, 1000)
@@ -264,7 +264,7 @@ add_icon_particles :: proc(position, area: Vector2, texture_ids: []Vector2, colo
 }
 
 draw_icon_particles :: proc(dt: real){
-	for &particle, i in app.icon_particles{
+	for &particle, i in game.icon_particles{
 		if particle.lifetime <= 0. do return
 
 		draw_texture_by_index(particle.texture_id, particle.position, 30.,
@@ -272,7 +272,7 @@ draw_icon_particles :: proc(dt: real){
 			rotation=math.sin((f32(rl.GetTime())+f32(i))*10)*20
 		)
 		particle.position += particle.velocity * dt
-		particle.lifetime -= dt * config.game_speed
+		particle.lifetime -= dt * game.speed
 	}
 }
 
@@ -300,7 +300,7 @@ add_text_vec_vec :: proc (
 		font_size: f32=-1, anchor:TextAnchor=.CENTER, delay:f32=0.,
 		icon_id:Maybe(Vector2)=nil, icon_size:f32=0.) {
 
-	for &a in app.animations{
+	for &a in game.animations{
 		if a.visible do continue
 
 		a = {
@@ -679,18 +679,20 @@ draw_term_info :: proc(text: string, position: Vector2, color: rl.Color, padding
 	delta := Vector2{L.card_size.x+margin, 0}
 	info_size: Vector2
 
+	color := rl.GRAY
+
 	for term, info in INFO{
 		if !strings.contains(text, term) do continue
 
 		info := info
 		if strings.starts_with(info, "[i") && strings.ends_with(info, "]") {
 			icon_size :f32= 100
-			draw_rounded_box(position+direction*delta, {L.card_size.x, icon_size+font_size}, fill=color)
+			draw_rounded_box(position+direction*delta, {L.card_size.x, icon_size+font_size+2*padding}, fill=color)
 			info_size = draw_text(fmt.tprintf("[h]%v:[h]", term), position+direction*delta+padding, font_size, color=rl.BLACK, max_width=L.card_size.x)
 			draw_texture(info[2:len(info)-1], position+direction*delta+{0, info_size.y}+padding, icon_size, tint=rl.BLACK)
 			info_size.y += icon_size
 		} else {
-			info_size = draw_text(info, position+direction*delta, font_size, color=rl.BLACK,
+			info_size = draw_text(fmt.tprintf("%v:[n]%v", term, info), position+direction*delta, font_size, color=rl.BLACK,
 				max_width=L.card_size.x, boxed=color)
 		}
 
@@ -700,7 +702,7 @@ draw_term_info :: proc(text: string, position: Vector2, color: rl.Color, padding
 
 draw_die_info :: proc(die: Die, extended:bool=false) -> i32{
 	hovered_upgrade_index :i32= -1
-	position := rl.GetWorldToScreen(die.position, app.camera3d)
+	position := rl.GetWorldToScreen(die.position, game.camera3d)
 	icon_size := SCALE(50.)
 	margin := SCALE(10.)
     padding := SCALE(4.)
@@ -729,8 +731,8 @@ draw_die_info :: proc(die: Die, extended:bool=false) -> i32{
 			if upgraded {
 			  	card_position = upgrade_pos + {-L.card_size.x/2.+icon_size/2., icon_size+10}
 				card = upgrade
-			} else if app.card_selected.category == .DICE{
-				tp = icon_index_from_card(app.card_selected.type)
+			} else if game.card_selected.category == .DICE{
+				tp = icon_index_from_card(game.card_selected.type)
    				color = COLOR_CARDS[.DICE]
 			}
 			hovered_upgrade_index = i32(u)

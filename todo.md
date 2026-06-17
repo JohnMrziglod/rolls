@@ -6,6 +6,9 @@
 - vodooist: This die creates a ghost joker die when it dies.
 - mirror: Retriggers the abilities from the upgrade on its left.
 - average joe: This die scores the average of all dice extra.
+- (unique) birthday kid: duplicates one of your hand cards
+- (unique) introvert: multiplies its own points by empty upgrade slots on the same die
+- (unique) genius: creates a cycle card
 
 # flash cards (yellow)
 - bonus points: get some score points once, also with x2 factor
@@ -18,20 +21,59 @@
 - create two random flash cards
 - duplicate a random hand card
 - recreate your last used tactic card
+- mechanic: if in hand, you can reclaim a dice card from an upgraded die
+- 
 
 # antagonists
 - Each antagonists has a special army of dice and some starting roll cards with a high lifetime
-- The NAIVE: Is the first opponent, has nothing and gives tutorial
-- The MIRROR: Is the last antagonist and has the same dice, upgrades and cards as you.
+- The NOOB: Is the first opponent, has nothing and gives tutorial. 
+  You encounter him later again. He is obsessed with you, he improved. 
+  In the final stage, he is driven by madness and became... like you (nickname: Mirror? Fanatic? Stalker?)
 - The MOGUL: journalists, influencers
 - The CEO: investors, hedge funds
-- The Fascist: tanks, generals + fake news
+- The Fascist: tanks, generals, !VIP! + fake news
 - The Aggressor: assassins + full attack
 - The Chaos: anarchists + suidice, market crash
 - The Tycoon: trains, engineers
-- The Scientist: librarians, historians, researchers
+- The Scientist: librarians, historians, researchers, !genius!
 - The Spiritual: mediums + ghost hour, doppel geist
-- The PARTY: optimists + happy hour
+- The PARTY: optimists, !birthday kid! + happy hour
 - The Mathematician: power ups, plus ones
+- The Calm: average joes, !introvert!
+- The Outlaw: pirates + tomb raider
 
 daskennstdudochschonpassmalauf
+
+
+# Structure
+
+## States
+Menu
+  Main
+  Settings
+  Credits
+Game
+  SaveAndExit,
+	AntagonistWelcome,
+	
+	WaitForRoll,
+	Charging,
+	PreRolling,
+	Rolling,
+	
+	DiceUpgrades,
+	CardsBattle,
+	DicesBattle,
+	DiceDeaths,
+	DiceScoring,
+	CardsScoring,
+	ScoringSummary,
+	
+	WaitForAI,
+	
+	GhostBoard,
+	CardsOffer,
+	UpgradeDie,
+	
+	Victory,
+	Defeat,

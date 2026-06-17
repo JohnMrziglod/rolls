@@ -3,12 +3,13 @@ package game
 import "core:fmt"
 import rl "vendor:raylib"
 
-menu :: proc(dt:real=0., loading:bool=false){
+menu_loop :: proc(dt:f32=0., loading:bool=false){
 	if rl.IsKeyPressed(rl.KeyboardKey.SPACE) || rl.IsMouseButtonPressed(rl.MouseButton.LEFT) {
-		app.state = app.state_before
-	}
-	if rl.IsKeyPressed(rl.KeyboardKey.ESCAPE) {
-		app.state = .EXIT
+		app.state = .Game
+	} else if rl.IsKeyPressed(rl.KeyboardKey.ESCAPE) {
+		app.state = .Exit
+
+		return
 	}
 
 	rl.BeginDrawing()

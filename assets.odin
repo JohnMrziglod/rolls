@@ -84,7 +84,7 @@ load_data :: proc(texts_buffer: ^string, path: string) {
 
 INFO: map[string]string
 load_info :: proc(){
-	INFO["TOP FACE"] = "[iHelp_TopFace]"
+	INFO["TOP FACE"] = "Whatever is at the top side of your die after it stops rolling."//"[iHelp_TopFace]"
 	INFO["ROLL SCORE"] = "The accumulated score of all your dice and combination points. Will be added to your total score at the end of the roll."
 	INFO["ROLL FACTOR"] = "The number that multiplies your roll score. Can be increased by certain cards or effects."
 }

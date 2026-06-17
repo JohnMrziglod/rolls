@@ -7,20 +7,20 @@ CAMERA_MAX_HEIGHT :f32: 50.
 
 camera_zoom :: proc(position: Vector3){
 	return
-	// app.camera3d.desired_target = position
+	// game.camera3d.desired_target = position
 	// // never look down directly...
-	// app.camera3d.desired_position = {position.x, 40, position.z}
-	// app.camera3d.desired_fovy = 50
+	// game.camera3d.desired_position = {position.x, 40, position.z}
+	// game.camera3d.desired_fovy = 50
 }
 
 camera_reset :: proc(){
-	app.camera3d.desired_target = {0, 0, 3.0}
-	app.camera3d.desired_position = {
-		0.,//math.cos(app.camera3d.angle)*30.,
+	game.camera3d.desired_target = {0, 0, 3.0}
+	game.camera3d.desired_position = {
+		0.,//math.cos(game.camera3d.angle)*30.,
 		CAMERA_MAX_HEIGHT,
-		3.0,// math.sin(app.camera3d.angle)*30.
+		3.0,// math.sin(game.camera3d.angle)*30.
 	}
-	app.camera3d.desired_fovy = 40
+	game.camera3d.desired_fovy = 40
 }
 
 ring_position_2d :: proc(index: int, radius: f32) -> (Vector2, TextAnchor){
