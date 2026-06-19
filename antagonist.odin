@@ -44,6 +44,7 @@ antagonist_set :: proc(id: AntagonistID) {
 
 show_antagonist_welcome :: proc() {
 	fade_out()
+	delay :: f32(0.3)
 
 	ai := &game.players[1]
 	color := ai.color
@@ -57,14 +58,26 @@ show_antagonist_welcome :: proc() {
 
 	message := get_text(reflect.enum_string(game.antagonist.id), "title")
 	char_duration :f32= 0.2
-	n_visible_chars := min(int(game.state_clock/char_duration), len(message))
-	draw_text(message[:n_visible_chars], board_position+padding, font_size, color)
-
 	spelling_time := char_duration * f32(len(message))
-	if game.state_clock-0.3<spelling_time do return
+	spelling_done := game.state_clock-delay>spelling_time
 
-	icon_size := splash((game.state_clock-spelling_time-0.3)/0.5, 1.) * board_size/2.
-	draw_antagonist(game.antagonist.id, board_position + board_size/2., icon_size, color)
+	n_visible_chars := min(int(game.state_clock/char_duration), len(message))
+	draw_text(message[:n_visible_chars], board_position+padding, font_size, color, underline=spelling_done)
+
+	if !spelling_done do return
+
+	icon_size := splash((game.state_clock-spelling_time-delay)/0.5, 1.) * board_size/2. * 1.3
+	icon_position := board_position + board_size/2. - {0, SCALE(100)}
+	draw_antagonist(game.antagonist.id, icon_position, icon_size, color)
+
+	subline_clock := game.state_clock-spelling_time-delay-1.0
+	if subline_clock < 0. do return
+	subline_font_size := splash(subline_clock/0.5, 1.) * L.font_size2
+	draw_text("1st  ANTAGONIST", board_position+padding+{0, font_size+10*S}, subline_font_size, color)
+
+	font_size = L.font_size1
+	position := board_position + {padding, icon_position.y+icon_size/2.+padding}
+	draw_text("[h]ABILITIES:[h] [iCardRoll_HappyHour] + 6x [iDieFace6] with 2x [iCardDice_Optimist], 4x [iCardDice_PlusOne]\n[h]SCORE TO WIN:[h] 1000", position, font_size, color)
 }
 
 antagonist_story :: proc(story_id: string, index: i32 = 1) {

@@ -327,7 +327,7 @@ measure_text :: proc(text: string, font_size: f32, spacing:f32=1.0, max_width:f3
 
 draw_text :: proc(text: string, position: rl.Vector2, font_size: f32=-1.,
 		color: rl.Color=rl.RAYWHITE, spacing:f32=1.0, line_spacing:f32=1.2, max_width:f32=9999,
-		strikethrough:bool=false, overline:bool=false, boxed:rl.Color=rl.BLANK, box_width:f32=-1,
+		strikethrough:bool=false, overline:bool=false, underline:bool=false, boxed:rl.Color=rl.BLANK, box_width:f32=-1,
 		padding:f32=10, anchor:TextAnchor=.LEFT, draw:bool=true, highlight_color:rl.Color=rl.RAYWHITE,
 		outline:rl.Color=rl.BLANK) -> rl.Vector2{
 
@@ -380,8 +380,9 @@ draw_text :: proc(text: string, position: rl.Vector2, font_size: f32=-1.,
 						text_offset_x = 0.
              		}
           			if draw{
+             			draw_box(position + rl.Vector2{text_offset_x, text_offset_y-2*S}, {4., 4.}*S+font_size, fill=color, thickness=0)
 						draw_texture_by_string(strings.to_string(icon_id),
-							position + rl.Vector2{text_offset_x+2., text_offset_y}, font_size, highlight_color)
+							position + rl.Vector2{text_offset_x+2.*S, text_offset_y}, font_size, highlight_color)
              		}
 					text_offset_x += font_size+4.
 					text_size = {
@@ -471,12 +472,17 @@ draw_text :: proc(text: string, position: rl.Vector2, font_size: f32=-1.,
 				position + rl.Vector2{text_size.x,  text_size.y / 2.},
 				font_size / 10., color)
 		}
-
 		if overline {
 			rl.DrawLineEx(
 				position + rl.Vector2{0,  -font_size / 5.},
 				position + rl.Vector2{text_size.x,  -font_size / 5.},
 				font_size / 10., color)
+		}
+		if underline {
+			rl.DrawLineEx(
+				position + rl.Vector2{0,  font_size},
+				position + rl.Vector2{text_size.x,  font_size},
+				min(font_size / 10., 1.), color)
 		}
 	}
 
@@ -545,7 +551,7 @@ draw_antagonist :: proc(id: AntagonistID, position: Vector2, size: f32, tint:rl.
 
 	// Draw the background texture first:
 	tp := (ts * (sub_texture_index+{0,1})).yx
-	bg_size := size * 1.3
+	bg_size := size * (1.+sine_wave(1, 0.05, 3.1))
 	bg_rotation := rotation + sine_wave(1, 2)
 	dest := rl.Rectangle{x=position.x, y=position.y, width=bg_size, height=bg_size}
 	rl.DrawTexturePro(texture, {x=tp.x, y=tp.y, width=ts.x, height=ts.y}, dest, {}+bg_size/2., bg_rotation, tint)
@@ -556,7 +562,7 @@ draw_antagonist :: proc(id: AntagonistID, position: Vector2, size: f32, tint:rl.
 	// position.x += (rl.GetMousePosition().x-position.x)/L.width * 50.
 	// position.y += (rl.GetMousePosition().y-position.y)/L.height * 50.
 	rotation := rotation + sine_wave(1, 3)
-	size := size * 0.8
+	size := size * (0.5+sine_wave(1, 0.1))
 	dest = rl.Rectangle{x=position.x, y=position.y, width=size, height=size}
 	rl.DrawTexturePro(texture, {x=tp.x, y=tp.y, width=ts.x, height=ts.y}, dest, {}+size/2., rotation, tint)
 }
@@ -585,7 +591,7 @@ draw_full_texture :: proc(texture: rl.Texture, position, size: Vector2, tint: rl
 }
 
 fade_out :: proc(){
-	draw_box({-200, -200}, {L.width+400, L.height+400}, fill=rl.ColorAlpha(rl.BLACK, 0.6), thickness=0)
+	draw_box({-200, -200}, {L.width+400, L.height+400}, fill=rl.ColorAlpha(rl.BLACK, 0.5), thickness=0)
 }
 
 draw_card :: proc(
