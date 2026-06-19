@@ -55,6 +55,7 @@ main :: proc() {
 	app.textures = {
 		rl.LoadTexture("assets/textures/die.png"),
 		rl.LoadTexture("assets/textures/title.png"),
+		rl.LoadTexture("assets/textures/antagonists.png"),
 	}
 	for &texture in app.textures {
 		rl.GenTextureMipmaps(&texture)
@@ -112,7 +113,7 @@ main :: proc() {
 
 	files: [2]string
 	load_data(&files[0], "assets/cards.toml")
-	load_data(&files[1], "assets/antagonist.toml")
+	load_data(&files[1], "assets/antagonists.toml")
 	defer {
 		for file in files do defer delete(file)
 	}

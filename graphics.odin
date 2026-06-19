@@ -53,14 +53,14 @@ Animation :: struct{
 	anchor: TextAnchor,
 }
 
-splash :: proc(t: f32) -> f32 {
-	t := 1.-t
+splash :: proc(t: f32, min_:f32=0., max_:f32=4.) -> f32 {
+	t := max(1.-t, 0.)
     A :f32= 30.0   // intensity
     B :f32= 5.0  // decay speed
 
     decay_term := 2.*math.exp(-B * t)
 
-    return A * t * decay_term
+    return max(A * t * decay_term, min_) * (1. - t) + max_ * t
 }
 
 button :: proc(text: string, position: rl.Vector2, size:rl.Vector2={1, 1}, color:rl.Color=rl.BLACK, active_color:rl.Color=rl.BLANK,
@@ -538,6 +538,29 @@ icon_index_from_card :: proc(card_type: CardType) -> Vector2 {
 	return app.sub_textures[reflect.enum_string(card_type)] or_else {1, 0}
 }
 
+draw_antagonist :: proc(id: AntagonistID, position: Vector2, size: f32, tint:rl.Color=rl.BLANK, rotation:f32=0.){
+	texture := app.textures[2]
+	sub_texture_index := icon_index_from_id(reflect.enum_string(id))
+	ts := Vector2{256, 256}
+
+	// Draw the background texture first:
+	tp := (ts * (sub_texture_index+{0,1})).yx
+	bg_size := size * 1.3
+	bg_rotation := rotation + sine_wave(1, 2)
+	dest := rl.Rectangle{x=position.x, y=position.y, width=bg_size, height=bg_size}
+	rl.DrawTexturePro(texture, {x=tp.x, y=tp.y, width=ts.x, height=ts.y}, dest, {}+bg_size/2., bg_rotation, tint)
+
+	tp = (ts * sub_texture_index).yx
+	position := position
+	position.y += sine_wave(1, 3)
+	// position.x += (rl.GetMousePosition().x-position.x)/L.width * 50.
+	// position.y += (rl.GetMousePosition().y-position.y)/L.height * 50.
+	rotation := rotation + sine_wave(1, 3)
+	size := size * 0.8
+	dest = rl.Rectangle{x=position.x, y=position.y, width=size, height=size}
+	rl.DrawTexturePro(texture, {x=tp.x, y=tp.y, width=ts.x, height=ts.y}, dest, {}+size/2., rotation, tint)
+}
+
 draw_texture :: proc{draw_texture_by_index, draw_texture_by_string, draw_full_texture}
 draw_texture_by_index :: proc(texture_id:Vector2={0,1}, position: Vector2, size: f32, tint:rl.Color=rl.BLACK, rotation:f32=0.){
 	texture := app.textures[0]
@@ -551,8 +574,6 @@ draw_texture_by_string :: proc(texture_id: string, position: Vector2, size: f32,
 	texture := app.textures[0]
 	ts := TextureFaceSize
 	tp := (ts * icon_index_from_id(texture_id) ).yx
-
-	// if texture_id in app.sub_textures do tp = ts.yx * .yx
 
 	dest := rl.Rectangle{x=position.x+size/2., y=position.y+size/2., width=size, height=size}
 	rl.DrawTexturePro(texture, {x=tp.x, y=tp.y, width=ts.x, height=ts.y}, dest, {}+size/2., rotation, tint)

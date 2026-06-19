@@ -35,6 +35,10 @@ antagonist_wins
 /4="I'd like to say it was a pleasure..."
 /5="but I don't like to lie."
 
+Antagonist_TheNoob
+/title="The Noob"
+/texture_id=[0,0]
+
 Antagonist_TheMathematician
 /1="People think it's pure chance but come on now, it's all about the numbers."
 /2="I calculate every possible outcome before you are even making a move."

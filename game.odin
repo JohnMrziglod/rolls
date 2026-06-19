@@ -53,8 +53,6 @@ Die :: struct {
 }
 
 GameState :: enum {
-	EXIT,
-	MENU,
 	ANTAGONIST_WELCOME,
 	TUTORIAL,
 	WAIT_FOR_ROLL,
@@ -193,7 +191,7 @@ game_init :: proc(){
 
 		// font = rl.LoadFont("assets/j_audio_cassette.otf"),
 		bg_color        = rl.ColorBrightness(COLOR_PLAYERS[0], COLOR_SHIFT),
-		state           = .PRE_ROLLING,
+		state           = .ANTAGONIST_WELCOME,
 		players         = {
 			{
 				color                        = COLOR_PLAYERS[0],
@@ -206,7 +204,7 @@ game_init :: proc(){
 			{
 				color                        = COLOR_PLAYERS[1],
 				id                           = 1,
-				n_dice                       = 20,
+				n_dice                       = 6,
 				ghosts_costs_per_combination = 5,
 				ghosts_max                   = 10,
 				max_lifetime_roll_cards      = 2, //ghosts={1, 2, 3, 4, 5}
@@ -251,10 +249,8 @@ game_loop :: proc(dt: f32) {
 
 	game_handle_input(dt)
 
-	fmt.println("FPS: ", rl.GetFPS(), " dt: ", dt, " speed: ", game.speed, " state: ", game.state, " state timer:", game.state_timer)
 	game_update(dt)
 
-	// draw everything:
 	game_draw(dt)
 }
 
@@ -273,7 +269,10 @@ game_handle_input :: proc(dt: f32){
 		game.camera3d.angle += (delta.x + delta.y) * math.RAD_PER_DEG * dt * 5
 	}
 
-	if rl.IsKeyPressed(rl.KeyboardKey.ESCAPE) {
+	key_pressed := rl.GetKeyPressed()
+
+	#partial switch (key_pressed) {
+	case rl.KeyboardKey.ESCAPE:
 		if game.state == .GHOST_BOARD {
 			state_change(.WAIT_FOR_ROLL)
 			game.ghosts_selected = {-1, -1, -1, -1, -1}
@@ -282,26 +281,27 @@ game_handle_input :: proc(dt: f32){
 		} else {
 			app.state = .Menu
 		}
-	}
+	case rl.KeyboardKey.UP:
+		game.speed += 0.5
+	case rl.KeyboardKey.DOWN:
+		game.speed -= 0.5
+	case rl.KeyboardKey.G:
+		if game.state == .WAIT_FOR_ROLL do state_change(.GHOST_BOARD)
+	case rl.KeyboardKey.A:
+		if game.state == .WAIT_FOR_ROLL do state_change(.ANTAGONIST_WELCOME)
+	case rl.KeyboardKey.H:
+		if game.state == .WAIT_FOR_ROLL {
+			game.cards_offer = {}
+			cards_generate(game.cards_offer[:5], .FlashRollAndDiceCards)
+			state_change(.CARDS_OFFER)
+		}
+	case rl.KeyboardKey.SPACE:
+		if game.state == .WAIT_FOR_ROLL {
+			state_change(.CHARGING)
+			game.antagonist.wanted_power = rand.float32_range(0.3, 1.)
+		} else if game.state >= .VICTORY {
 
-	if rl.IsKeyPressed(rl.KeyboardKey.F) {
-		game.speed += .5
-	}
-	if rl.IsKeyPressed(rl.KeyboardKey.D) {
-		game.speed -= .5
-	}
-	if rl.IsKeyPressed(rl.KeyboardKey.G) {
-		state_change(.GHOST_BOARD)
-	}
-	if rl.IsKeyPressed(rl.KeyboardKey.H) {
-		game.cards_offer = {}
-		cards_generate(game.cards_offer[:5], .FlashRollAndDiceCards)
-		state_change(.CARDS_OFFER)
-	}
-
-	if game.state == .WAIT_FOR_ROLL && rl.IsKeyPressed(rl.KeyboardKey.SPACE) {
-		state_change(.CHARGING)
-		game.antagonist.wanted_power = rand.float32_range(0.3, 1.)
+		}
 	}
 
 	// Max power is reached after 3 seconds of charging)
@@ -316,28 +316,28 @@ game_handle_input :: proc(dt: f32){
 		camera_shake(2.0, 0.5)
 	}
 
-	// if len(game.antagonist.story_id) > 0 {
-	// 	if rl.IsKeyPressed(rl.KeyboardKey.SPACE) {
-	// 		antagonist_story_continue()
-	// 		// @TODO: Stop the other code?
-	// 	}
-	// }
+	// // if len(game.antagonist.story_id) > 0 {
+	// // 	if rl.IsKeyPressed(rl.KeyboardKey.SPACE) {
+	// // 		antagonist_story_continue()
+	// // 		// @TODO: Stop the other code?
+	// // 	}
+	// // }
 
-	if game.state >= .VICTORY && rl.IsKeyPressed(rl.KeyboardKey.SPACE) {
-		game.antagonist.win_score *= game.state == .VICTORY ? 10. : 1.
-		game.players[0].total_score = 0
-		game.players[0].roll = {}
-		game.players[1].total_score = 0
-		game.players[1].roll = {}
-		text := fmt.aprintf("Next score is %v!", game.antagonist.win_score)
-		add_text(
-			Vector2{L.width / 2., L.height / 2.},
-			text,
-			font_size = L.font_size1,
-			color = rl.RAYWHITE,
-		)
-		state_change(.WAIT_FOR_ROLL)
-	}
+	// if game.state >= .VICTORY && rl.IsKeyPressed(rl.KeyboardKey.SPACE) {
+	// 	game.antagonist.win_score *= game.state == .VICTORY ? 10. : 1.
+	// 	game.players[0].total_score = 0
+	// 	game.players[0].roll = {}
+	// 	game.players[1].total_score = 0
+	// 	game.players[1].roll = {}
+	// 	text := fmt.aprintf("Next score is %v!", game.antagonist.win_score)
+	// 	add_text(
+	// 		Vector2{L.width / 2., L.height / 2.},
+	// 		text,
+	// 		font_size = L.font_size1,
+	// 		color = rl.RAYWHITE,
+	// 	)
+	// 	state_change(.WAIT_FOR_ROLL)
+	// }
 }
 
 game_update :: proc(dt: real){
@@ -594,138 +594,6 @@ end_of_level :: proc(dt: real) {
 	// state_change(.WAIT_FOR_ROLL)
 }
 
-wait_for_ai :: proc() {
-	// Some actions that the AI could do...
-	ai := &game.players[1]
-
-	if len(ai.ghosts) >= 5 {
-		// @TODO: how do we find the best selection of dice?
-		counter := [6]i32{} // dice number -> count
-		for ghost_number, i in ai.ghosts {
-			counter[ghost_number - 1] += 1
-		}
-		lower_straight := slice.min(counter[:5]) > 0
-		upper_straight := slice.min(counter[1:]) > 0
-		has_pairs := slice.max(counter[:]) > 1
-
-		best_indices := [dynamic]i32{}
-		defer delete(best_indices)
-
-		if lower_straight || upper_straight {
-			// If we have a straight, we want to keep all the numbers that are part
-			// of the straight and get rid of the others
-			last_number: i32 = 0
-			for ghost_number, i in ai.ghosts {
-				if ghost_number > last_number {
-					append(&best_indices, i32(i))
-					last_number = ghost_number
-				}
-			}
-		} else if has_pairs {
-			// If we have pairs, we want to keep all the numbers that are part of a pair
-			#reverse for ghost_number, i in ai.ghosts {
-				if counter[ghost_number - 1] > 1 && len(best_indices) < 5 {
-					append(&best_indices, i32(i))
-				}
-			}
-
-			// Fill up with other dice:
-			#reverse for ghost_number, i in ai.ghosts {
-				if len(best_indices) < 5 && !contains(best_indices[:], i32(i)) {
-					append(&best_indices, i32(i))
-				}
-			}
-		} else {
-			// Choose random dices...
-			for i in 0 ..< len(ai.ghosts) do append(&best_indices, i32(i))
-			rand.shuffle(best_indices[:])
-		}
-
-		best_numbers := [5]i32{}
-		for index, i in best_indices[:5] do best_numbers[i] = ai.ghosts[index]
-
-		best_score, best_factor: sco
-		best_combo: CombinationType = .None
-		highlighted := [5]bool{}
-
-		for combo_type, c in CombinationType {
-			if combo_type == .None do continue
-
-			match, score, factor := test_combination(combo_type, best_numbers[:], &highlighted)
-			if match && (factor > best_factor || score > best_score) {
-				best_factor = factor
-				best_score = score
-				best_combo = combo_type
-			}
-		}
-
-		// Only use ghosts if we expect a high score or if we might lose our ghosts...
-		// If there are many dice left, the chances are high that there are many ghost
-		// dice next round
-		n_alive: i32 = 0
-		for &die, d in game.dice {
-			// The max number of ghosts next round, is the number of ghosts we have now
-			// + the number of alive dice of the defensive player (roll cards not included)
-			if die.state == .ALIVE && die.player != game.current_player do n_alive += 1
-		}
-		if best_score > 0 &&
-		   (best_score > 20 || best_factor > 0 || i32(len(ai.ghosts)) + n_alive > ai.ghosts_max) {
-			ai.roll.score += best_score
-			ai.roll.factor += best_factor
-
-			not_wanted_cards := bit_set[CardType] {
-				.CardRoll_Exorcism,
-				.CardRoll_FakeNews,
-				.CardRoll_MarketCrash,
-				.CardRoll_WhiteElephant,
-			}
-			cards := [3]Card{}
-			cards_generate(cards[:], .FlashRollAndDiceCards)
-			for card in cards {
-				if card.type in not_wanted_cards do continue
-				append(&ai.cards, card)
-				break
-			}
-
-			ghosts_copy := make([dynamic]i32, len(ai.ghosts), cap(ai.ghosts))
-			defer delete(ghosts_copy)
-			copy(ghosts_copy[:], ai.ghosts[:])
-			clear(&ai.ghosts)
-
-			for ghost, index in ghosts_copy {
-				if !contains(best_indices[:5], i32(index)) do append(&ai.ghosts, ghost)
-			}
-		}
-	}
-
-	if len(ai.cards) > 0 {
-		cards_to_discard := [dynamic]i32{}
-		defer delete(cards_to_discard)
-		for &card, c in ai.cards {
-			if card.active do continue
-
-			#partial switch card.category {
-			case .ROLL:
-				card_activate(ai, &card)
-			case .DICE:
-				for &die in game.dice {
-					if die.state != .ALIVE || die.player != 1 do continue
-					if card_assign(&die, card) {
-						append(&cards_to_discard, i32(c))
-						break
-					}
-				}
-			}
-		}
-
-		#reverse for index in cards_to_discard {
-			ordered_remove(&ai.cards, index)
-		}
-	}
-
-	state_change(.WAIT_FOR_ROLL)
-}
-
 game_draw :: proc(dt: real) {
 	human := &game.players[0]
 
@@ -812,6 +680,8 @@ game_draw :: proc(dt: real) {
 		rl.DrawRectangleLinesEx({x, y, width, height}, 2.*S, rl.BLACK)
 	case .GHOST_BOARD:
 		show_ghost_board()
+	case .ANTAGONIST_WELCOME:
+		show_antagonist_welcome()
 	case .WAIT_FOR_ROLL:
 		text := "Press <SPACE> to continue"
 		if button(
