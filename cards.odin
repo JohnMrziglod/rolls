@@ -166,13 +166,13 @@ cards_battle :: proc(dt: real) {
 				if suidice_index != -1 {
 					suidice := &game.dice[suidice_index]
 
-					dice_killed(suidice)
+					die_death(suidice)
 					add_text(suidice.position, fmt.aprint("SUIDICE!"), suidice.color1)
 
 					for &dice, d in game.dice {
 						if dice.state != .ALIVE || dice.player == u8(p) do continue
 
-						dice_killed(&dice, suidice)
+						die_death(&dice, suidice)
 					}
 				}
 			case .CardRoll_TombRaider:

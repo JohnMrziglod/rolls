@@ -140,8 +140,6 @@ dice_upgrades :: proc(dt: real) {
 }
 
 dice_battle :: proc(dt: real) {
-	fmt.printfln("dice_battle: %v", game.battle)
-
 	if game.battle.state != .Over {
 		battle := &game.battle
 		battle.timer += dt * game.speed
@@ -235,6 +233,19 @@ dice_battle :: proc(dt: real) {
 
 	game.battle.seen = {}
 
+	// Show me the immortal ones
+	for &player, p in game.players {
+		if .CardRoll_Immortality not_in player.roll.effects do continue
+
+		for d in player.dice_sorted {
+			die := &game.dice[d]
+
+			if die.health > 0 || die.state != .ALIVE do continue
+
+			add_text(die.position, fmt.aprint("IMMORTAL!"), die.color1, 2.0)
+		}
+	}
+
 	state_change(.DICE_DEATHS, 0.1)
 }
 
@@ -242,10 +253,14 @@ dice_deaths :: proc(dt: real) {
 	for &die, d in game.dice {
 		if die.health > 0 || die.state != .ALIVE do continue
 
-		dice_killed(&die)
+		// Immortal ones cannot die
+		if .CardRoll_Immortality in game.players[die.player].roll.effects do continue
+
+		die_death(&die)
 		wait(1.)
 		return
 	}
+
 	state_change(.DICE_SCORING, 0.4)
 }
 
@@ -505,7 +520,7 @@ dice_kills :: proc(killer: ^Die, victim: ^Die) {
 	}
 }
 
-dice_killed :: proc(victim: ^Die, killer: ^Die=nil){
+die_death :: proc(victim: ^Die, killer: ^Die=nil){
 	player := &game.players[victim.player]
 	player2 := &game.players[(victim.player+1) % 2]
 

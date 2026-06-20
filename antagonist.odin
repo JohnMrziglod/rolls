@@ -23,6 +23,8 @@ AntagonistID :: enum{
 	// Tycoon,
 }
 
+TutorialID :: enum{Begin1, Begin2, GhostBoard, Cards, Cycles, Introduction}
+
 Antagonist :: struct {
 	id:				AntagonistID,
 	past_ids:		bit_set[AntagonistID],
@@ -31,10 +33,8 @@ Antagonist :: struct {
 	index:       	i32,
 	wanted_power:	f32,
 	win_score:  	sco,
-	tutorial2:            bool,
-	tutorial_ghost_board: bool,
-	tutorial_cards:       bool,
-	tutorial_cycles:      bool,
+	tutorials:		bit_set[TutorialID],
+	tutorials_off:	bool,
 }
 
 antagonist_set :: proc(id: AntagonistID) {
@@ -42,9 +42,9 @@ antagonist_set :: proc(id: AntagonistID) {
 	game.antagonist.past_ids += {id}
 }
 
-show_antagonist_welcome :: proc() {
+show_antagonist_introduction :: proc() {
 	fade_out()
-	delay :: f32(0.3)
+	delay :: f32(1.0)
 
 	ai := &game.players[1]
 	color := ai.color
@@ -66,18 +66,29 @@ show_antagonist_welcome :: proc() {
 
 	if !spelling_done do return
 
-	icon_size := splash((game.state_clock-spelling_time-delay)/0.5, 1.) * board_size/2. * 1.3
+	icon_size := splash_shrink((game.state_clock-spelling_time-delay)/0.5, 1.) * board_size/2. * 1.3
 	icon_position := board_position + board_size/2. - {0, SCALE(100)}
 	draw_antagonist(game.antagonist.id, icon_position, icon_size, color)
 
-	subline_clock := game.state_clock-spelling_time-delay-1.0
-	if subline_clock < 0. do return
-	subline_font_size := splash(subline_clock/0.5, 1.) * L.font_size2
+	subline_clock := game.state_clock-spelling_time-delay//-1.0
+	// if subline_clock < 0. do return
+	subline_font_size := splash_shrink(subline_clock/0.5, 1.) * L.font_size2
 	draw_text("1st  ANTAGONIST", board_position+padding+{0, font_size+10*S}, subline_font_size, color)
+
+	if subline_clock-2.0 < 0. do return
 
 	font_size = L.font_size1
 	position := board_position + {padding, icon_position.y+icon_size/2.+padding}
 	draw_text("[h]ABILITIES:[h] [iCardRoll_HappyHour] + 6x [iDieFace6] with 2x [iCardDice_Optimist], 4x [iCardDice_PlusOne]\n[h]SCORE TO WIN:[h] 1000", position, font_size, color)
+
+	if rl.IsKeyPressed(rl.KeyboardKey.SPACE) || continue_button() do state_change(.WAIT_FOR_ROLL)
+}
+
+tutorial :: proc(id: TutorialID){
+	if game.antagonist.tutorials_off || id in game.antagonist.tutorials do return
+
+	game.antagonist.tutorials += {id}
+	antagonist_story(fmt.aprintf("tutorial/%s", reflect.enum_string(id)))
 }
 
 antagonist_story :: proc(story_id: string, index: i32 = 1) {

@@ -53,7 +53,7 @@ Die :: struct {
 }
 
 GameState :: enum {
-	ANTAGONIST_WELCOME,
+	ANTAGONIST_INTRODUCTION,
 	TUTORIAL,
 	WAIT_FOR_ROLL,
 	CHARGING,
@@ -191,7 +191,7 @@ game_init :: proc(){
 
 		// font = rl.LoadFont("assets/j_audio_cassette.otf"),
 		bg_color        = rl.ColorBrightness(COLOR_PLAYERS[0], COLOR_SHIFT),
-		state           = .ANTAGONIST_WELCOME,
+		state           = .ANTAGONIST_INTRODUCTION,
 		players         = {
 			{
 				color                        = COLOR_PLAYERS[0],
@@ -288,13 +288,13 @@ game_handle_input :: proc(dt: f32){
 	case rl.KeyboardKey.G:
 		if game.state == .WAIT_FOR_ROLL do state_change(.GHOST_BOARD)
 	case rl.KeyboardKey.A:
-		if game.state == .WAIT_FOR_ROLL do state_change(.ANTAGONIST_WELCOME)
+		if game.state == .WAIT_FOR_ROLL do state_change(.ANTAGONIST_INTRODUCTION)
 	case rl.KeyboardKey.H:
-		if game.state == .WAIT_FOR_ROLL {
+		// if game.state == .WAIT_FOR_ROLL {
 			game.cards_offer = {}
 			cards_generate(game.cards_offer[:5], .FlashRollAndDiceCards)
 			state_change(.CARDS_OFFER)
-		}
+		// }
 	case rl.KeyboardKey.SPACE:
 		if game.state == .WAIT_FOR_ROLL {
 			state_change(.CHARGING)
@@ -503,6 +503,7 @@ rolling :: proc(duration: real) {
 }
 
 play_sound :: proc(sound_id: i32, volume: f32 = 1., pitch: f32 = 1.) {
+	volume :f32= 0.
 	sound := app.sounds[sound_id]
 	rl.StopSound(sound)
 	rl.SetSoundVolume(sound, volume * 1.)
@@ -680,18 +681,11 @@ game_draw :: proc(dt: real) {
 		rl.DrawRectangleLinesEx({x, y, width, height}, 2.*S, rl.BLACK)
 	case .GHOST_BOARD:
 		show_ghost_board()
-	case .ANTAGONIST_WELCOME:
-		show_antagonist_welcome()
+	case .ANTAGONIST_INTRODUCTION:
+		show_antagonist_introduction()
 	case .WAIT_FOR_ROLL:
 		text := "Press <SPACE> to continue"
-		if button(
-			text, {L.width / 2., L.height - 150*S},
-			size = V2{300, 80}*S,
-			font_size = L.font_size1,
-			color = rl.BLANK, anchor = .CENTER,
-		) {
-			state_change(.CHARGING)
-		}
+		if continue_button() do state_change(.CHARGING)
 	case .CARDS_OFFER:
 		show_cards_offer()
 	case .UPGRADE_DIE:

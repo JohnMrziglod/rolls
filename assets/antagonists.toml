@@ -1,48 +1,53 @@
-antagonist_tutorial1
+Tutorial_Begin1
 /1="Oh... a newcomer!"
 /2="Leave! Run for your lives!"
 /3="Haha.. just kidding."
 /4="You probably don't even know how to play, don't you?"
-antagonist_tutorial2
+Tutorial_Begin2
 /1="We roll against each other."
 /2="Our dice will attack and kill each other if they show the same number."
 /3="Dead dice become GHOST DICE."
 /4="Use them to score COMBINATIONS[n]and obtain CARDS."
 /5="Whoever reaches 1000 POINTS wins."
-antagonist_tutorial_ghost_board
+Tutorial_GhostBoard
 /1="You can combine your GHOST DICE to score COMBINATIONS."
 /2="You must select exactly five GHOST DICE to score one COMBINATION."
 /3="A COMBINATION gives you extra POINTS and a CARD."
-antagonist_tutorial_cards
+Tutorial_Cards
 /1="CARDS give you special abilities that can turn the tide of the game."
 /2="DICE CARDS are RED, you can upgrade your DICE permanently with them."
 /3="ROLL CARDS are GREEN, their effects are limited for a few ROLLs."
-antagonist_tutorial_cycles
+Tutorial_Cycles
 /1="After scoring some COMBINATIONS, you can FINISH or RUSH a CYCLE."
 /2="When FINISHING (scoring all possible combinations), you get a hefty SCORE bonus and can choose a mighty CYCLE CARD."
 /3="CYCLE CARDs are blue and have permanent, powerful effects."
 /4="When RUSHING a cycle, you only have to score ten COMBINATIONS, you get a CYCLE CARD but no SCORE bonus."
+Tutorial_Introduction
+/1="Oh, you wanna know my name?"
+/2="So you can tell your mother about me?"
+/3="I am..."
 
-antagonist_defeat
+Antagonist_TheNoob
+/title="THE NOOB"
+/texture_id=[0,0]
+Antagonist_TheNoob/Defeat
 /1="How could that..."
 /2="No way, you are playing for the first time!"
 /3="You are a dirty little cheater, aren't you?"
-/4="F*** off!"
-antagonist_wins
+/4="I hate people who don't take this game seriously!!"
+Antagonist_TheNoob/Victory
 /1="I told you..."
 /2="Not very surprising."
 /3="I don't think you have it in you."
 /4="I'd like to say it was a pleasure..."
 /5="but I don't like to lie."
 
-Antagonist_TheNoob
-/title="THE NOOB"
-/texture_id=[0,0]
-
 Antagonist_TheMathematician
+/title="THE NOOB"
+/texture_id=[0,2]
 /1="People think it's pure chance but come on now, it's all about the numbers."
 /2="I calculate every possible outcome before you are even making a move."
 /3="Bad luck is just the inability to understand basic math."
 /4="Let's see if you can keep up with my calculations."
-/5="My data shows that you are going to lose."
-/6="My daughter knows more about calculating than you, and she is not even 5."
+/5="My numbers show that you are going to lose."
+/6="My daughter knows more about this game than you, and she is not even 5."

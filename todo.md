@@ -1,5 +1,22 @@
 - allow to swap face upgrades of die (but not to current top face?)
 
+
+# ablauf
+- Tutorial_Begin1
+- One Roll
+- Tutorial_Begin2
+- Many other rolls
+- When reaching X score, Tutorial_Introduction
+- When losing:
+  - Antagonist_TheNoob/Victory
+  - Level repeats
+- When winning:
+  - Antagonist_TheNoob/Defeat
+  - Show achievements... and unlocked items, etc.
+  - Ready for next level?
+  - Next level (win score * 100), choose a random antagonist (or scale them by difficulty)
+  - 
+
 # dice cards
 - spikes: This die eliminates all opponent's dice that it touches
 - copy cat: copies the abilities from the upgrade on its left

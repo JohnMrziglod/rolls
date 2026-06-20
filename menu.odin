@@ -4,14 +4,6 @@ import "core:fmt"
 import rl "vendor:raylib"
 
 menu_loop :: proc(dt:f32=0., loading:bool=false){
-	if rl.IsKeyPressed(rl.KeyboardKey.SPACE) || rl.IsMouseButtonPressed(rl.MouseButton.LEFT) {
-		app.state = .Game
-	} else if rl.IsKeyPressed(rl.KeyboardKey.ESCAPE) {
-		app.state = .Exit
-
-		return
-	}
-
 	rl.BeginDrawing()
 	defer rl.EndDrawing()
 
@@ -22,7 +14,11 @@ menu_loop :: proc(dt:f32=0., loading:bool=false){
 	// rl.DrawTextureV(texture,
 	// 	{(L.width-f32(texture.width))/2., (L.height-f32(texture.height))/2.}, rl.WHITE)
 
-	text := fmt.tprint("Press SPACE to continue")
-	if loading do text = fmt.tprint("Loading...")
-	draw_text(text, {L.width/2, L.height-100*S}, font_size=L.font_size1, color=rl.WHITE, anchor=.CENTER)
+	if loading {
+		draw_text("Loading...", {L.width/2, L.height-100*S}, L.font_size2, anchor=.CENTER)
+		return
+	}
+
+	if rl.IsKeyPressed(rl.KeyboardKey.SPACE) || continue_button() do app.state = .Game
+	if rl.IsKeyPressed(rl.KeyboardKey.ESCAPE) do app.state = .Exit
 }

@@ -60,7 +60,23 @@ splash :: proc(t: f32, min_:f32=0., max_:f32=4.) -> f32 {
 
     decay_term := 2.*math.exp(-B * t)
 
-    return max(A * t * decay_term, min_) * (1. - t) + max_ * t
+    return max(A * t * decay_term, min_)
+}
+splash_shrink :: proc(t: f32, min_:f32=0) -> f32{
+	t := max(1.-2*t, 0.)
+	A :f32= 40.0   // intensity
+
+    return 1.+A*t*t
+}
+
+continue_button :: proc() -> bool{
+	return button(
+		"Press <SPACE> to continue", {L.width / 2., L.height - 100*S},
+		size = V2{300, 50}*S,
+		font_size = L.font_size2,
+		color = rl.BLANK, anchor = .CENTER,
+	)
+	// return draw_text(text, {L.width/2, L.height-100*S}, L.font_size2+sine_wave(5, 2), anchor=.CENTER)
 }
 
 button :: proc(text: string, position: rl.Vector2, size:rl.Vector2={1, 1}, color:rl.Color=rl.BLACK, active_color:rl.Color=rl.BLANK,
@@ -326,7 +342,7 @@ measure_text :: proc(text: string, font_size: f32, spacing:f32=1.0, max_width:f3
 }
 
 draw_text :: proc(text: string, position: rl.Vector2, font_size: f32=-1.,
-		color: rl.Color=rl.RAYWHITE, spacing:f32=1.0, line_spacing:f32=1.2, max_width:f32=9999,
+		color: rl.Color=rl.WHITE, spacing:f32=1.0, line_spacing:f32=1.2, max_width:f32=9999,
 		strikethrough:bool=false, overline:bool=false, underline:bool=false, boxed:rl.Color=rl.BLANK, box_width:f32=-1,
 		padding:f32=10, anchor:TextAnchor=.LEFT, draw:bool=true, highlight_color:rl.Color=rl.RAYWHITE,
 		outline:rl.Color=rl.BLANK) -> rl.Vector2{
@@ -728,7 +744,6 @@ draw_term_info :: proc(text: string, position: Vector2, color: rl.Color, padding
 }
 
 draw_die_info :: proc(die: Die, extended:bool=false) -> i32{
-	hovered_upgrade_index :i32= -1
 	position := rl.GetWorldToScreen(die.position, game.camera3d)
 	icon_size := SCALE(50.)
 	margin := SCALE(10.)
@@ -739,16 +754,16 @@ draw_die_info :: proc(die: Die, extended:bool=false) -> i32{
 
     card: Card
     card_position: Vector2
+
+    hovered_upgrade_index :i32= -1
+    hovered_color: rl.Color
 	#reverse for upgrade, u in die.upgrades{
 		upgrade_pos := position + f32(u)*Vector2{icon_size+2*padding, 0.}
 		upgraded := upgrade.type != .CardNone
 
         tp := Vector2{0, f32(die.faces[u]-1)} // Standard face number
-        color: rl.Color
-       	if !upgraded {
-            color = die.color1
-        } else {
-        	color = COLOR_CARDS[.DICE]
+        color:= die.color1
+       	if upgraded {
        		tp = icon_index_from_card(upgrade.type)
         }
 
@@ -760,15 +775,16 @@ draw_die_info :: proc(die: Die, extended:bool=false) -> i32{
 				card = upgrade
 			} else if game.card_selected.category == .DICE{
 				tp = icon_index_from_card(game.card_selected.type)
-   				color = COLOR_CARDS[.DICE]
+   				// color = COLOR_CARDS[.DICE]
 			}
 			hovered_upgrade_index = i32(u)
+			hovered_color = color
         }
         draw_box({dest.x, dest.y}-padding, {}+icon_size+2*padding, fill=upgraded ? color : rl.ColorAlpha(color, 0.9), thickness=1)
         draw_texture(tp, upgrade_pos, icon_size, tint=upgraded ? rl.BLACK : rl.RAYWHITE/2)
     }
     if card.type != .CardNone {
-    	draw_card(card, position+{0, icon_size+2*margin}, with_icon=false)
+    	draw_card(card, position+{0, icon_size+2*margin}, with_icon=false, color=hovered_color)
     }
 
     if extended {
