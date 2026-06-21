@@ -73,8 +73,9 @@ continue_button :: proc() -> bool{
 	return button(
 		"Press <SPACE> to continue", {L.width / 2., L.height - 100*S},
 		size = V2{300, 50}*S,
-		font_size = L.font_size2,
+		font_size = L.font_size2+sine_wave(5, 2),
 		color = rl.BLANK, anchor = .CENTER,
+		hover_motion=false,
 	)
 	// return draw_text(text, {L.width/2, L.height-100*S}, L.font_size2+sine_wave(5, 2), anchor=.CENTER)
 }
@@ -607,7 +608,7 @@ draw_full_texture :: proc(texture: rl.Texture, position, size: Vector2, tint: rl
 }
 
 fade_out :: proc(){
-	draw_box({-200, -200}, {L.width+400, L.height+400}, fill=rl.ColorAlpha(rl.BLACK, 0.5), thickness=0)
+	draw_box({-200, -200}, {L.width+400, L.height+400}, fill=rl.ColorAlpha(rl.BLACK, 0.3), thickness=0)
 }
 
 draw_card :: proc(

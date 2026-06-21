@@ -54,8 +54,8 @@ Die :: struct {
 
 GameState :: enum {
 	ANTAGONIST_INTRODUCTION,
-	TUTORIAL,
-	WAIT_FOR_ROLL,
+
+	WAIT_FOR_PLAYER,
 	CHARGING,
 	PRE_ROLLING,
 	ROLLING,
@@ -67,6 +67,7 @@ GameState :: enum {
 	CARDS_SCORING,
 	SCORING_SUMMARY, // only for the animations (all points are flying in)
 	WAIT_FOR_AI,
+
 	GHOST_BOARD,
 	CARDS_OFFER,
 	UPGRADE_DIE,
@@ -191,7 +192,7 @@ game_init :: proc(){
 
 		// font = rl.LoadFont("assets/j_audio_cassette.otf"),
 		bg_color        = rl.ColorBrightness(COLOR_PLAYERS[0], COLOR_SHIFT),
-		state           = .ANTAGONIST_INTRODUCTION,
+		state           = .WAIT_FOR_PLAYER,
 		players         = {
 			{
 				color                        = COLOR_PLAYERS[0],
@@ -231,14 +232,10 @@ game_init :: proc(){
 
 	dice_reset(first_round = true)
 
-	// game.antagonist = {
-	// 	win_score           = 1000,
-	// 	tutorial2            = true,
-	// 	tutorial_cards       = true,
-	// 	tutorial_ghost_board = true,
-	// 	tutorial_cycles      = true,
-	// }
-	// antagonist_story("antagonist_tutorial1")
+	game.antagonist = {
+		win_score           = 1000,
+	}
+	tutorial(.Begin1)
 }
 
 game_loop :: proc(dt: f32) {
@@ -274,10 +271,10 @@ game_handle_input :: proc(dt: f32){
 	#partial switch (key_pressed) {
 	case rl.KeyboardKey.ESCAPE:
 		if game.state == .GHOST_BOARD {
-			state_change(.WAIT_FOR_ROLL)
+			state_change(.WAIT_FOR_PLAYER)
 			game.ghosts_selected = {-1, -1, -1, -1, -1}
 		} else if game.state == .UPGRADE_DIE || game.state == .CARDS_OFFER {
-			state_change(.WAIT_FOR_ROLL)
+			state_change(.WAIT_FOR_PLAYER)
 		} else {
 			app.state = .Menu
 		}
@@ -286,17 +283,22 @@ game_handle_input :: proc(dt: f32){
 	case rl.KeyboardKey.DOWN:
 		game.speed -= 0.5
 	case rl.KeyboardKey.G:
-		if game.state == .WAIT_FOR_ROLL do state_change(.GHOST_BOARD)
+		if game.state == .WAIT_FOR_PLAYER do state_change(.GHOST_BOARD)
 	case rl.KeyboardKey.A:
-		if game.state == .WAIT_FOR_ROLL do state_change(.ANTAGONIST_INTRODUCTION)
+		if game.state == .WAIT_FOR_PLAYER do state_change(.ANTAGONIST_INTRODUCTION)
 	case rl.KeyboardKey.H:
-		// if game.state == .WAIT_FOR_ROLL {
+		// if game.state == .WAIT_FOR_PLAYER {
 			game.cards_offer = {}
 			cards_generate(game.cards_offer[:5], .FlashRollAndDiceCards)
 			state_change(.CARDS_OFFER)
 		// }
 	case rl.KeyboardKey.SPACE:
-		if game.state == .WAIT_FOR_ROLL {
+		if antagonist_is_speaking() {
+			antagonist_story_continue()
+			return
+		}
+
+		if game.state == .WAIT_FOR_PLAYER {
 			state_change(.CHARGING)
 			game.antagonist.wanted_power = rand.float32_range(0.3, 1.)
 		} else if game.state >= .VICTORY {
@@ -316,13 +318,6 @@ game_handle_input :: proc(dt: f32){
 		camera_shake(2.0, 0.5)
 	}
 
-	// // if len(game.antagonist.story_id) > 0 {
-	// // 	if rl.IsKeyPressed(rl.KeyboardKey.SPACE) {
-	// // 		antagonist_story_continue()
-	// // 		// @TODO: Stop the other code?
-	// // 	}
-	// // }
-
 	// if game.state >= .VICTORY && rl.IsKeyPressed(rl.KeyboardKey.SPACE) {
 	// 	game.antagonist.win_score *= game.state == .VICTORY ? 10. : 1.
 	// 	game.players[0].total_score = 0
@@ -336,7 +331,7 @@ game_handle_input :: proc(dt: f32){
 	// 		font_size = L.font_size1,
 	// 		color = rl.RAYWHITE,
 	// 	)
-	// 	state_change(.WAIT_FOR_ROLL)
+	// 	state_change(.WAIT_FOR_PLAYER)
 	// }
 }
 
@@ -592,7 +587,7 @@ end_of_level :: proc(dt: real) {
 			if p > 1 do break
 		}
 	}
-	// state_change(.WAIT_FOR_ROLL)
+	// state_change(.WAIT_FOR_PLAYER)
 }
 
 game_draw :: proc(dt: real) {
@@ -602,7 +597,7 @@ game_draw :: proc(dt: real) {
 	defer rl.EndDrawing()
 
 	anti_bg := rl.Color{}
-	if game.state == .WAIT_FOR_ROLL {
+	if game.state == .WAIT_FOR_PLAYER {
 		ratio := game.state_timer / 3.
 		color1 := rl.ColorBrightness(COLOR_PLAYERS[game.current_player], COLOR_SHIFT)
 		color2 := rl.ColorBrightness(
@@ -633,7 +628,7 @@ game_draw :: proc(dt: real) {
 	)
 	rl.DrawCubeWires(rl.Vector3{0.0, -.6, .0}, AREA_SIZE, 1.0, AREA_SIZE, rl.BLACK)
 
-	if game.state == .WAIT_FOR_ROLL &&
+	if game.state == .WAIT_FOR_PLAYER &&
 	   (rl.IsMouseButtonPressed(.LEFT) || rl.IsMouseButtonPressed(.RIGHT)) {
 		game.die_selected = -1
 	}
@@ -641,7 +636,7 @@ game_draw :: proc(dt: real) {
 	dice_hovered := -1
 	for &dice, d in game.dice {
 		if dice.state != .ALIVE do continue
-		hoverable := game.state == .WAIT_FOR_ROLL
+		hoverable := game.state == .WAIT_FOR_PLAYER
 		if draw_die(dice, hoverable = hoverable) {
 			dice_hovered = d
 			if rl.IsMouseButtonPressed(.LEFT) {
@@ -652,17 +647,6 @@ game_draw :: proc(dt: real) {
 
 	show_particles(dt)
 	rl.EndMode3D()
-
-	info := game.state == .WAIT_FOR_ROLL // || game.state == .UPGRADE_DIE
-	if info && game.die_selected != -1 {
-		selected := game.die_selected != -1
-		die := selected ? game.dice[game.die_selected] : game.dice[dice_hovered]
-		draw_die_info(die)
-	}
-
-	// if len(game.antagonist.story_id) > 0 {
-	// 	draw_antagonist_story()
-	// }
 
 	show_player_stuff(dt)
 	#partial switch game.state {
@@ -683,9 +667,8 @@ game_draw :: proc(dt: real) {
 		show_ghost_board()
 	case .ANTAGONIST_INTRODUCTION:
 		show_antagonist_introduction()
-	case .WAIT_FOR_ROLL:
-		text := "Press <SPACE> to continue"
-		if continue_button() do state_change(.CHARGING)
+	case .WAIT_FOR_PLAYER:
+		if !antagonist_is_speaking() && continue_button() do state_change(.CHARGING)
 	case .CARDS_OFFER:
 		show_cards_offer()
 	case .UPGRADE_DIE:
@@ -704,6 +687,15 @@ game_draw :: proc(dt: real) {
 	}
 
 	show_animations(dt)
+
+	info := game.state == .WAIT_FOR_PLAYER // || game.state == .UPGRADE_DIE
+	if info && game.die_selected != -1 {
+		selected := game.die_selected != -1
+		die := selected ? game.dice[game.die_selected] : game.dice[dice_hovered]
+		draw_die_info(die)
+	}
+
+	show_antagonist_story()
 }
 
 wait :: proc(duration: real) {
@@ -760,46 +752,50 @@ show_upgrade_die :: proc(){
 				1.5,
 			)
 		}
-		state_change(.WAIT_FOR_ROLL)
+		state_change(.WAIT_FOR_PLAYER)
 	} else if rl.IsMouseButtonPressed(.RIGHT) || rl.IsKeyPressed(.ESCAPE) {
 		game.card_selected.triggered = 0.
 		append(&human.cards, game.card_selected)
 		game.card_selected = {}
 		add_text(mouse_pos, fmt.aprint("Keep card in hand!"), human.color, 1.5)
-		state_change(.WAIT_FOR_ROLL)
+		state_change(.WAIT_FOR_PLAYER)
 	}
 }
 
-draw_antagonist_story :: proc(){
+show_antagonist_story :: proc(){
+	if len(game.antagonist.story_id) == 0 do return
 
 	// Let's the bubble get bigger and smaller to make it more dynamic, and also changes the color a bit
 	time_factor := 1. + 0.05 * math.sin(f32(rl.GetTime()) * 5)
 	font_size := L.font_size1 * time_factor
+	sub_font_size := (font_size-1)/2.
 	thickness: f32 = 4.
 	max_width: f32 = 600*S * time_factor
 	padding: f32 = 20.*S
 	color_fill := rl.BLACK
 	color_text := game.players[1].color
-	message := get_text(game.antagonist.story_id, game.antagonist.index)
+	message := get_text(game.antagonist.story_id, game.antagonist.story_index)
 	size := measure_text(message, font_size, max_width = max_width) + padding
+	extra_space := measure_text("Press <SPACE> to continue", sub_font_size).y + padding
 	position := Vector2{L.width - 40*S, L.height - 200*S} - size - padding
 
-	rl.DrawRectangleV(position, size, color_fill)
+	rl.DrawRectangleV(position, size+{0,extra_space}, color_fill)
 	rl.DrawRectangleLinesEx(
 		{
 			position.x - thickness,
 			position.y - thickness,
 			size.x + 2 * thickness,
-			size.y + 2 * thickness,
+			size.y+extra_space + 2 * thickness,
 		},
 		thickness,
 		rl.BLACK,
 	)
-	draw_text(message, position + padding / 2., font_size, color_text, max_width = max_width)
+	draw_text(message, position + padding / 2., font_size, color_text, max_width=max_width)
+	draw_text("Press <SPACE> to continue", position + {padding / 2.,size.y}, sub_font_size, color_text)
 
 	hovered := rl.CheckCollisionPointRec(
 		rl.GetMousePosition(),
-		{x = position.x, y = position.y, width = size.x, height = size.y},
+		{x = position.x, y = position.y, width = size.x, height = size.y+extra_space},
 	)
 	clicked := hovered && rl.IsMouseButtonPressed(.LEFT)
 	if clicked {
@@ -807,8 +803,7 @@ draw_antagonist_story :: proc(){
 	}
 
 	button_pos := position + size
-
-	// if button(fmt.tprint("&gt;"), button_pos, font_size=L.font_size2, anchor=.RIGHT, text_color=color_text, hover_motion=false) {
+	// if button(fmt.tprint("<SPACE>"), button_pos, font_size=L.font_size2, anchor=.RIGHT, text_color=color_text, hover_motion=false) {
 	// 	antagonist_story_continue()
 	// }
 }
@@ -930,8 +925,8 @@ show_ghost_board :: proc(){
 
 	board_size := rl.Vector2{920*S, L.height - 150*S}
 	board_position := rl.Vector2{(L.width - board_size.x) / 2., 50*S}
-	board_color := COLOR_PLAYERS[0] / 2
-	board_color.a = 255
+	board_color := color_brighten(COLOR_PLAYERS[0], 0.8)
+	text_color := rl.BLACK
 
 	draw_box(board_position, board_size, fill = board_color)
 
@@ -1006,7 +1001,7 @@ show_ghost_board :: proc(){
 			fmt.tprintf("%v", combo_type),
 			position,
 			L.font_size2,
-			(match && !already_scored) ? rl.RAYWHITE : rl.GRAY,
+			(!already_scored) ? text_color : rl.GRAY,
 			strikethrough = already_scored,
 		)
 		if !already_scored && match && enough_ghosts {
@@ -1072,9 +1067,9 @@ show_ghost_board :: proc(){
 	} else if highest_score > 0 {
 		text = fmt.tprintf("Your best combination is worth %v points", highest_score)
 	}
-	draw_text(text, board_position + rl.Vector2{20, 20}*S, color=rl.RAYWHITE)
+	draw_text(text, board_position + rl.Vector2{20, 20}*S, color=text_color)
 	if button("ESC", board_position + rl.Vector2{board_size.x- 20*S, 20*S}, anchor = .RIGHT,) {
-		state_change(.WAIT_FOR_ROLL)
+		state_change(.WAIT_FOR_PLAYER)
 		game.ghosts_selected = {-1, -1, -1, -1, -1}
 	}
 	if n_scored_combos == 15 {
@@ -1095,9 +1090,7 @@ show_ghost_board :: proc(){
 			state_change(.CARDS_OFFER)
 		}
 	} else if n_scored_combos > 9 {
-		if len(game.antagonist.story_id) == 0 && !game.antagonist.tutorial_cycles {
-			antagonist_story("antagonist_tutorial_cycles")
-		}
+		tutorial(.Cycles)
 		if button(
 			"RUSH CYCLE",
 			board_position + board_size - {20, 70}*S,
@@ -1123,13 +1116,11 @@ show_ghost_board :: proc(){
 			fmt.tprintf("%v/15 combinations scored", n_scored_combos),
 			board_position + board_size - {20, 70}*S,
 			anchor = .RIGHT,
+			color=text_color
 		)
 	}
 
-	if len(game.antagonist.story_id) == 0 && !game.antagonist.tutorial_ghost_board {
-		game.antagonist.tutorial_ghost_board = true
-		antagonist_story("antagonist_tutorial_ghost_board")
-	}
+	tutorial(.GhostBoard)
 }
 
 show_cards_offer :: proc(){
@@ -1192,12 +1183,12 @@ show_cards_offer :: proc(){
 		if action == 1 {
 			if hovered_card.category == .FLASH {
 				card_activate(human, hovered_card)
-				state_change(.WAIT_FOR_ROLL)
+				state_change(.WAIT_FOR_PLAYER)
 				game.cards_offer = {}
 			} else if hovered_card.category == .ROLL {
 				card_activate(human, hovered_card)
 				append(&human.cards, hovered_card^)
-				state_change(.WAIT_FOR_ROLL)
+				state_change(.WAIT_FOR_PLAYER)
 				game.cards_offer = {}
 			} else if hovered_card.category == .DICE {
 				game.card_selected = hovered_card^
@@ -1210,15 +1201,12 @@ show_cards_offer :: proc(){
 			} else {
 				append(&human.cards, hovered_card^)
 			}
-			state_change(.WAIT_FOR_ROLL)
+			state_change(.WAIT_FOR_PLAYER)
 			game.cards_offer = {}
 		}
 	}
 
-	if len(game.antagonist.story_id) == 0 && !game.antagonist.tutorial_cards {
-		game.antagonist.tutorial_cards = true
-		antagonist_story("antagonist_tutorial_cards")
-	}
+	tutorial(.Cards)
 }
 
 show_player_stuff :: proc(dt: real){
@@ -1247,7 +1235,7 @@ show_player_stuff :: proc(dt: real){
 			}
 			ghost_number := player.ghosts[ghost_index]
 
-			clickable := game.state == .WAIT_FOR_ROLL && p == 0
+			clickable := game.state == .WAIT_FOR_PLAYER && p == 0
 			if dice_button(
 				ghost_number,
 				position,
@@ -1259,7 +1247,7 @@ show_player_stuff :: proc(dt: real){
 				game.ghosts_selected[0] = i32(i)
 			}
 		}
-		if p == 0 && game.state == .WAIT_FOR_ROLL {
+		if p == 0 && game.state == .WAIT_FOR_PLAYER {
 			combos := possible_combinations(player.ghosts[:])
 			combos_counter := 0
 			for combo in combos {
@@ -1339,7 +1327,7 @@ show_player_stuff :: proc(dt: real){
 				position.y += f32(c) * (L.card_size.y + 40*S)
 			}
 			position.x += f32(c % 2)
-			hovered := card_is_hovered(position) && game.state == .WAIT_FOR_ROLL
+			hovered := card_is_hovered(position) && game.state == .WAIT_FOR_PLAYER
 			if hovered_card == nil && hovered {
 				hovered_card = &card
 				hovered_card_index = i32(c)
@@ -1352,14 +1340,14 @@ show_player_stuff :: proc(dt: real){
 		if hovered_card != nil {
 			fade_out()
 			actions := []string{}
-			if game.state == .WAIT_FOR_ROLL && p == 0 {
+			if game.state == .WAIT_FOR_PLAYER && p == 0 {
 				if hovered_card.category < .DICE do actions = hovered_card.active ? {"DISCARD"} : {"DISCARD", "ACTIVATE"}
 				else if hovered_card.category == .DICE do actions = {"DISCARD", "ASSIGN"}
 				else if hovered_card.category == .CYCLE do actions = {"DISCARD", "ACTIVATE"}
 			}
 			_, action := draw_card(hovered_card^, hovered_position, actions = actions)
 
-			if game.state == .WAIT_FOR_ROLL && action == 1 {
+			if game.state == .WAIT_FOR_PLAYER && action == 1 {
 				if hovered_card.category == .FLASH {
 					card_activate(&player, hovered_card)
 					card_discard(&player, hovered_card_index, silent = true)

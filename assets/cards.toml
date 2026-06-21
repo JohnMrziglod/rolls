@@ -76,7 +76,7 @@ CardDice_Anarchist
 /description="This die adds the number of eliminated dice in this roll to its score."
 CardDice_Antenna
 /title="ANTENNA"
-/description="This die multiplies its score by the pips of your other surviving dice with ANTENNA."
+/description="This die multiplies its score by the PIPS of your other surviving dice with ANTENNA."
 /texture_id=[1,4]
 CardDice_Assassin
 /title="ASSASSIN"
@@ -85,7 +85,7 @@ CardDice_Assassin
 /texture_id=[1,1]
 CardDice_Drunk
 /title="DRUNK"
-/description="This die attacks another antagonist's dice regardless of matching their pips."
+/description="This die attacks another antagonist's dice regardless of matching their PIPS."
 /texture_id=[1,18]
 CardDice_Engineer
 /title="ENGINEER"
@@ -94,13 +94,13 @@ CardDice_Engineer
 /texture_id=[1,14]
 CardDice_Optimist
 /title="OPTIMIST"
-/description="This die only shows the numbers [iDieFace4], [iDieFace5] and [iDieFace6]."
-/description2="When on [h]TOP FACE[h], this die adds the pips of your surviving dice greater or equal [iDieFace4] to its score."
+/description="This die only shows the PIPS [iDieFace4], [iDieFace5] and [iDieFace6]."
+/description2="When on [h]TOP FACE[h], this die adds the PIPS of your surviving dice greater or equal [iDieFace4] to its score."
 /texture_id=[1,9]
 CardDice_Pessimist
 /title="PESSIMIST"
-/description="This die only shows the numbers [iDieFace1], [iDieFace2] and [iDieFace3]."
-/description2="When on [h]TOP FACE[h], this die multiplies its score by the pips of your surviving dice lower or equal [iDieFace3]."
+/description="This die only shows the PIPS [iDieFace1], [iDieFace2] and [iDieFace3]."
+/description2="When on [h]TOP FACE[h], this die multiplies its score by the PIPS of your surviving dice lower or equal [iDieFace3]."
 /texture_id=[1,8]
 CardDice_General
 /title="GENERAL"
@@ -117,7 +117,7 @@ CardDice_Journalist
 /texture_id=[1,6]
 CardDice_Medium
 /title="MEDIUM"
-/description="Adds the number of GHOST DICE to die's SCORE."
+/description="This die adds the sum of the GHOST DICE's PIPS to its score."
 /texture_id=[1,15]
 CardDice_PlusOne
 /title="PLUS ONE"

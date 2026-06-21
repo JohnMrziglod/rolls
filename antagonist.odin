@@ -30,11 +30,24 @@ Antagonist :: struct {
 	past_ids:		bit_set[AntagonistID],
 	level:			u32,					// move to the next level as soon as all antagonists have been met.
 	story_id:    	string,
-	index:       	i32,
+	story_index:       	i32,
+	blocking:		bool,
 	wanted_power:	f32,
 	win_score:  	sco,
 	tutorials:		bit_set[TutorialID],
 	tutorials_off:	bool,
+}
+
+tutorial :: proc(id: TutorialID) -> bool{
+	if len(game.antagonist.story_id) != 0 do return false
+	if game.antagonist.tutorials_off || id in game.antagonist.tutorials do return false
+
+	game.antagonist.tutorials += {id}
+
+	// Tutorials are always blocking
+	antagonist_story(fmt.aprintf("Tutorial_%s", reflect.enum_string(id)), blocking=true)
+
+	return true
 }
 
 antagonist_set :: proc(id: AntagonistID) {
@@ -81,30 +94,29 @@ show_antagonist_introduction :: proc() {
 	position := board_position + {padding, icon_position.y+icon_size/2.+padding}
 	draw_text("[h]ABILITIES:[h] [iCardRoll_HappyHour] + 6x [iDieFace6] with 2x [iCardDice_Optimist], 4x [iCardDice_PlusOne]\n[h]SCORE TO WIN:[h] 1000", position, font_size, color)
 
-	if rl.IsKeyPressed(rl.KeyboardKey.SPACE) || continue_button() do state_change(.WAIT_FOR_ROLL)
+	if rl.IsKeyPressed(rl.KeyboardKey.SPACE) || continue_button() do state_change(.WAIT_FOR_PLAYER)
 }
 
-tutorial :: proc(id: TutorialID){
-	if game.antagonist.tutorials_off || id in game.antagonist.tutorials do return
-
-	game.antagonist.tutorials += {id}
-	antagonist_story(fmt.aprintf("tutorial/%s", reflect.enum_string(id)))
+antagonist_is_speaking :: proc() -> bool{
+	return len(game.antagonist.story_id) != 0
 }
 
-antagonist_story :: proc(story_id: string, index: i32 = 1) {
+antagonist_story :: proc(story_id: string, index: i32 = 1, blocking:bool=false) {
 	game.antagonist.story_id = story_id
-	game.antagonist.index = index
+	game.antagonist.story_index = index
+	game.antagonist.blocking = blocking
 }
 antagonist_story_continue :: proc() {
 	if len(game.antagonist.story_id) == 0 do return
 
-	game.antagonist.index += 1
-	text_id := fmt.aprintf("%s/%d", game.antagonist.story_id, game.antagonist.index)
+	game.antagonist.story_index += 1
+	text_id := fmt.aprintf("%s/%d", game.antagonist.story_id, game.antagonist.story_index)
 	if text_id in app.texts {
-		antagonist_story(game.antagonist.story_id, game.antagonist.index)
+		antagonist_story(game.antagonist.story_id, game.antagonist.story_index)
 	} else {
 		game.antagonist.story_id = ""
-		game.antagonist.index = 0
+		game.antagonist.story_index = 0
+		game.antagonist.blocking = false
 	}
 }
 
@@ -219,7 +231,7 @@ wait_for_ai :: proc() {
 			if card.active do continue
 
 			#partial switch card.category {
-			case .ROLL:
+			case .ROLL, .FLASH:
 				card_activate(ai, &card)
 			case .DICE:
 				for &die in game.dice {
@@ -237,5 +249,7 @@ wait_for_ai :: proc() {
 		}
 	}
 
-	state_change(.WAIT_FOR_ROLL)
+	state_change(.WAIT_FOR_PLAYER)
+
+	tutorial(.Begin2)
 }

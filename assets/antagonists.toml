@@ -8,7 +8,7 @@ Tutorial_Begin2
 /2="Our dice will attack and kill each other if they show the same number."
 /3="Dead dice become GHOST DICE."
 /4="Use them to score COMBINATIONS[n]and obtain CARDS."
-/5="Whoever reaches 1000 POINTS wins."
+/5="Whoever reaches 1000 POINTS first wins."
 Tutorial_GhostBoard
 /1="You can combine your GHOST DICE to score COMBINATIONS."
 /2="You must select exactly five GHOST DICE to score one COMBINATION."
