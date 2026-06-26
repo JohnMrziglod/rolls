@@ -1,6 +1,4 @@
 - allow to swap face upgrades of die (but not to current top face?)
-- draw die info over cards (except the one which is assigning)
-- cards: fix margin between info boxes
 
 # ablauf
 - Tutorial_Begin1

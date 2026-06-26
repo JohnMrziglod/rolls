@@ -233,7 +233,7 @@ game_init :: proc(){
 	dice_reset(first_round = true)
 
 	game.antagonist = {
-		win_score           = 1000,
+		win_score = 10,
 	}
 	tutorial(.Begin1)
 }
@@ -267,7 +267,6 @@ game_handle_input :: proc(dt: f32){
 	}
 
 	key_pressed := rl.GetKeyPressed()
-
 	#partial switch (key_pressed) {
 	case rl.KeyboardKey.ESCAPE:
 		if game.state == .GHOST_BOARD {
@@ -278,10 +277,14 @@ game_handle_input :: proc(dt: f32){
 		} else {
 			app.state = .Menu
 		}
-	case rl.KeyboardKey.UP:
-		game.speed += 0.5
-	case rl.KeyboardKey.DOWN:
-		game.speed -= 0.5
+	case rl.KeyboardKey.UP, rl.KeyboardKey.DOWN:
+		game.speed += key_pressed == rl.KeyboardKey.UP ? 0.5 : -0.5
+		add_text(
+			Vector2{L.width / 2., L.height / 2.},
+			fmt.aprintf("Speed: %.1f", game.speed),
+			font_size = L.font_size1,
+			color = rl.RAYWHITE,
+		)
 	case rl.KeyboardKey.G:
 		if game.state == .WAIT_FOR_PLAYER do state_change(.GHOST_BOARD)
 	case rl.KeyboardKey.A:
@@ -551,11 +554,13 @@ scoring_summary :: proc(dt: real) {
 	}
 
 	if game.players[0].total_score >= game.antagonist.win_score {
-		antagonist_story("antagonist_defeat")
+		story_id := fmt.aprintf("%v/Defeat", game.antagonist.id)
+		antagonist_story(story_id, blocking=true)
 		state_change(.VICTORY)
 		return
 	} else if game.players[1].total_score >= game.antagonist.win_score {
-		antagonist_story("antagonist_wins")
+		story_id := fmt.aprintf("%v/Victory", game.antagonist.id)
+		antagonist_story(story_id, blocking=true)
 		state_change(.DEFEAT)
 		return
 	}
@@ -567,6 +572,9 @@ scoring_summary :: proc(dt: real) {
 }
 
 end_of_level :: proc(dt: real) {
+	// we wait until antagonist has finished talking...
+	if antagonist_is_speaking() do return
+
 	game.state_timer = 0.5
 
 	victor: u8 = game.state == .VICTORY ? 0 : 1
@@ -587,7 +595,6 @@ end_of_level :: proc(dt: real) {
 			if p > 1 do break
 		}
 	}
-	// state_change(.WAIT_FOR_PLAYER)
 }
 
 game_draw :: proc(dt: real) {
@@ -673,17 +680,8 @@ game_draw :: proc(dt: real) {
 		show_cards_offer()
 	case .UPGRADE_DIE:
 		show_upgrade_die()
-	}
-
-	if game.state == .VICTORY || game.state == .DEFEAT {
-		text := "Press <SPACE> to continue"
-		draw_text(
-			text,
-			{L.width / 2., L.height - 150*S},
-			font_size = L.font_size1,
-			color = rl.RAYWHITE,
-			anchor = .CENTER,
-		)
+	case .VICTORY, .DEFEAT:
+		if !antagonist_is_speaking() do show_antagonist_introduction()
 	}
 
 	show_animations(dt)
@@ -763,6 +761,7 @@ show_upgrade_die :: proc(){
 }
 
 show_antagonist_story :: proc(){
+	fmt.printfln("show_antagonist_story: %v, %v", game.antagonist.story_id, game.antagonist.story_index)
 	if len(game.antagonist.story_id) == 0 do return
 
 	// Let's the bubble get bigger and smaller to make it more dynamic, and also changes the color a bit
@@ -1256,18 +1255,16 @@ show_player_stuff :: proc(dt: real){
 				combos_counter += 1
 			}
 			if combos_counter > 0 {
+				tutorial(.GhostDice)
+
 				text := fmt.aprintf("%v COMBINATIONS!", combos_counter)
 				position := L.ghost_positions[p]
 				position.x += (ghost_dx * f32(ghost_cols)) / 2.
 				position.y += ghost_size // + L.font_size2/.2
 				font_size := L.font_size2 * (1. + 0.5 * splash(game.state_clock))
 				draw_text(
-					text,
-					position,
-					color = player.color,
-					font_size = font_size,
-					anchor = .CENTER,
-					outline = rl.BLACK,
+					text, position, font_size, player.color,
+					anchor=.CENTER, outline=rl.BLACK,
 				)
 			}
 		}

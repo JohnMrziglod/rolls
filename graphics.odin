@@ -579,7 +579,7 @@ draw_antagonist :: proc(id: AntagonistID, position: Vector2, size: f32, tint:rl.
 	// position.x += (rl.GetMousePosition().x-position.x)/L.width * 50.
 	// position.y += (rl.GetMousePosition().y-position.y)/L.height * 50.
 	rotation := rotation + sine_wave(1, 3)
-	size := size * (0.5+sine_wave(1, 0.1))
+	size := size * (1.0+sine_wave(1, 0.1))
 	dest = rl.Rectangle{x=position.x, y=position.y, width=size, height=size}
 	rl.DrawTexturePro(texture, {x=tp.x, y=tp.y, width=ts.x, height=ts.y}, dest, {}+size/2., rotation, tint)
 }
@@ -695,9 +695,10 @@ draw_card :: proc(
 
 	show_description := hovered || !with_icon
 	text_pos := position
-	if with_title || with_icon do text_pos += {0, size.y+2*margin}
+	if with_title || with_icon do text_pos += {0, size.y+SCALE(10)}
 	if show_description {
 	    ids := []string{"description", "description2"}
+		previous_info_height: f32
 		for id in ids{
 		    if !has_text(card.type, id) do continue
 
@@ -705,43 +706,61 @@ draw_card :: proc(
             text_size := draw_text(
                     text, text_pos, font_size, rl.BLACK,
                     max_width=size.x, highlight_color=color,
-                    boxed=color, box_width=size.x)
-            draw_term_info(text, text_pos, color, padding, margin)
-            text_pos.y += text_size.y + 3*margin
+                    boxed=color, box_width=size.x, padding=10)
+            previous_info_height = draw_term_info(text, text_pos, color, padding, margin)
+            text_pos.y += max(text_size.y, previous_info_height)+SCALE(2*10.)
 		}
 	}
+
+	reset_info()
 
 	return hovered, -1
 }
 fade :: proc(color: rl.Color, ratio:f32=0.5) -> rl.Color {
 	return rl.ColorAlpha(color, ratio)
 }
-draw_term_info :: proc(text: string, position: Vector2, color: rl.Color, padding, margin:f32){
+draw_term_info :: proc(text: string, position: Vector2, color: rl.Color, padding, margin:f32) -> f32{
 	// Draw an additional info box for all highlighted terms that have an info entry in app.texts
 	font_size := L.font_size2-2
 	direction :f32= position.x < L.width/2. ? 1. : -1.
-	delta := Vector2{L.card_size.x+margin, 0}
+	delta := Vector2{L.card_size.x+SCALE(10), 0}
 	info_size: Vector2
+	max_info_height: f32
 
 	color := rl.GRAY
+	color.a = 180
 
-	for term, info in INFO{
-		if !strings.contains(text, term) do continue
+	mentioned: map[string]bool
+	defer delete(mentioned)
 
-		info := info
-		if strings.starts_with(info, "[i") && strings.ends_with(info, "]") {
-			icon_size :f32= 100
-			draw_rounded_box(position+direction*delta, {L.card_size.x, icon_size+font_size+2*padding}, fill=color)
-			info_size = draw_text(fmt.tprintf("[h]%v:[h]", term), position+direction*delta+padding, font_size, color=rl.BLACK, max_width=L.card_size.x)
-			draw_texture(info[2:len(info)-1], position+direction*delta+{0, info_size.y}+padding, icon_size, tint=rl.BLACK)
-			info_size.y += icon_size
-		} else {
-			info_size = draw_text(fmt.tprintf("%v:[n]%v", term, info), position+direction*delta, font_size, color=rl.BLACK,
-				max_width=L.card_size.x, boxed=color)
+	for term, &info in INFO{
+		if info.shown || !strings.contains(text, term) do continue
+
+		info.shown = true
+
+		info_size = draw_text(fmt.tprintf("%v:[n]%v", term, info.text), position+direction*delta, font_size, color=rl.BLACK,
+			max_width=L.card_size.x, boxed=color, box_width=L.card_size.x)
+		max_info_height = max(max_info_height, info_size.y)
+		delta.x += L.card_size.x + SCALE(10)
+
+		for another_term in INFO{
+			if strings.contains(info.text, another_term) do mentioned[another_term] = true
 		}
-
-		delta.x += info_size.x+margin
 	}
+
+	// Do it again for mentioned terms
+	for term in mentioned{
+		info := &INFO[term]
+		if info.shown do continue
+
+		info.shown = true
+		info_size = draw_text(fmt.tprintf("%v:[n]%v", term, info.text), position+direction*delta, font_size, color=rl.BLACK,
+			max_width=L.card_size.x, boxed=color, box_width=L.card_size.x)
+		max_info_height = max(max_info_height, info_size.y)
+		delta.x += L.card_size.x + SCALE(10)
+	}
+
+	return max_info_height
 }
 
 draw_die_info :: proc(die: Die, extended:bool=false) -> i32{

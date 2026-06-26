@@ -6,13 +6,14 @@ Tutorial_Begin1
 Tutorial_Begin2
 /1="We roll against each other."
 /2="Our dice will attack and kill each other if they show the same number."
-/3="Dead dice become GHOST DICE."
-/4="Use them to score COMBINATIONS[n]and obtain CARDS."
-/5="Whoever reaches 1000 POINTS first wins."
+/3="Whoever reaches 1000 POINTS first wins."
+Tutorial_GhostDice
+/1="Dead dice become GHOST DICE."
+/2="If you have 5 GHOST DICE, you can score a COMBINATION."
+/2="Use them to get a SCORE BONUS and a CARD."
 Tutorial_GhostBoard
-/1="You can combine your GHOST DICE to score COMBINATIONS."
-/2="You must select exactly five GHOST DICE to score one COMBINATION."
-/3="A COMBINATION gives you extra POINTS and a CARD."
+/1="You must select exactly five GHOST DICE to score one COMBINATION."
+/2="A COMBINATION gives you a SCORE bonus and a CARD."
 Tutorial_Cards
 /1="CARDS give you special abilities that can turn the tide of the game."
 /2="DICE CARDS are RED, you can upgrade your DICE permanently with them."
@@ -41,13 +42,16 @@ Antagonist_TheNoob/Victory
 /3="I don't think you have it in you."
 /4="I'd like to say it was a pleasure..."
 /5="but I don't like to lie."
+Antagonist_TheDictator
+/title="THE DICTATOR"
+/texture_id=[0,2]
 
 Antagonist_TheMathematician
-/title="THE NOOB"
-/texture_id=[0,2]
+/title="THE MATHEMATICIAN"
+/texture_id=[0,4]
 /1="People think it's pure chance but come on now, it's all about the numbers."
 /2="I calculate every possible outcome before you are even making a move."
 /3="Bad luck is just the inability to understand basic math."
 /4="Let's see if you can keep up with my calculations."
 /5="My numbers show that you are going to lose."
-/6="My daughter knows more about this game than you, and she is not even 5."
+/6="My son knows more about this game than you, and he is not even 5."

@@ -12,7 +12,7 @@ AntagonistID :: enum{
 	// Calm,
 	// CEO,
 	// Chaos,
-	// Fascist,
+	Antagonist_TheDictator,
 	Antagonist_TheMathematician,
 	// Mirror,
 	// Mogul,
@@ -23,7 +23,7 @@ AntagonistID :: enum{
 	// Tycoon,
 }
 
-TutorialID :: enum{Begin1, Begin2, GhostBoard, Cards, Cycles, Introduction}
+TutorialID :: enum{Begin1, Begin2, GhostDice, GhostBoard, Cards, Cycles, Introduction}
 
 Antagonist :: struct {
 	id:				AntagonistID,
@@ -70,7 +70,7 @@ show_antagonist_introduction :: proc() {
 	draw_box(board_position, {}+board_size, fill=rl.BLACK)
 
 	message := get_text(reflect.enum_string(game.antagonist.id), "title")
-	char_duration :f32= 0.2
+	char_duration :f32= 0.16
 	spelling_time := char_duration * f32(len(message))
 	spelling_done := game.state_clock-delay>spelling_time
 
@@ -83,9 +83,9 @@ show_antagonist_introduction :: proc() {
 	icon_position := board_position + board_size/2. - {0, SCALE(100)}
 	draw_antagonist(game.antagonist.id, icon_position, icon_size, color)
 
-	subline_clock := game.state_clock-spelling_time-delay//-1.0
-	// if subline_clock < 0. do return
-	subline_font_size := splash_shrink(subline_clock/0.5, 1.) * L.font_size2
+	subline_clock := game.state_clock-spelling_time-delay-1.0
+	if subline_clock < 0. do return
+	subline_font_size := L.font_size2// * splash_shrink(subline_clock/0.5, 1.)
 	draw_text("1st  ANTAGONIST", board_position+padding+{0, font_size+10*S}, subline_font_size, color)
 
 	if subline_clock-2.0 < 0. do return
@@ -101,19 +101,22 @@ antagonist_is_speaking :: proc() -> bool{
 	return len(game.antagonist.story_id) != 0
 }
 
-antagonist_story :: proc(story_id: string, index: i32 = 1, blocking:bool=false) {
+antagonist_story :: proc(story_id: string, index: i32=1, blocking:bool=false) {
+	fmt.println("antagonist story:", story_id, index, blocking)
 	game.antagonist.story_id = story_id
 	game.antagonist.story_index = index
 	game.antagonist.blocking = blocking
 }
 antagonist_story_continue :: proc() {
+	fmt.println("story continue:", game.antagonist.story_id, game.antagonist.story_index, game.antagonist.blocking)
 	if len(game.antagonist.story_id) == 0 do return
 
 	game.antagonist.story_index += 1
-	text_id := fmt.aprintf("%s/%d", game.antagonist.story_id, game.antagonist.story_index)
+	text_id := fmt.tprintf("%s/%d", game.antagonist.story_id, game.antagonist.story_index)
 	if text_id in app.texts {
 		antagonist_story(game.antagonist.story_id, game.antagonist.story_index)
 	} else {
+		delete(game.antagonist.story_id)
 		game.antagonist.story_id = ""
 		game.antagonist.story_index = 0
 		game.antagonist.blocking = false
