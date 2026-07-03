@@ -84,7 +84,7 @@ button :: proc(text: string, position: rl.Vector2, size:rl.Vector2={1, 1}, color
 		font_size:f32=-1., clickable:bool=true, padding:f32=10., text_color:=rl.WHITE, anchor:TextAnchor=.LEFT, hover_motion:bool=true) -> bool{
 	font_size := font_size > 0. ? font_size : L.font_size2
 	padding := SCALE(padding)
-	text_size := measure_text(text, font_size) + padding
+	text_size := measure_text(text, font_size) + 2*padding
 
 	// highlight it if the mouse is hovering over it
 	box := rl.Rectangle{
@@ -104,7 +104,7 @@ button :: proc(text: string, position: rl.Vector2, size:rl.Vector2={1, 1}, color
 
 	position := rl.Vector2{box.x, box.y}
 	draw_box(position-{0, box.height-text_size.y}/2., {box.width, box.height}, color, thickness=0.)
-	text_position := position + {box.width-text_size.x, 0} / 2. + padding/2.
+	text_position := position + {box.width-text_size.x, 0} / 2. + padding
 	// Debug box for text position
 	// rl.DrawRectangleV(text_position, text_size, rl.RED)
 	draw_text(text, text_position, font_size, text_color)

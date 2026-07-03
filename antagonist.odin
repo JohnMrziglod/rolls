@@ -1,6 +1,7 @@
 package game
 
 import "core:fmt"
+import "core:math"
 import "core:math/rand"
 import "core:reflect"
 import "core:slice"
@@ -13,6 +14,7 @@ AntagonistID :: enum{
 	// CEO,
 	// Chaos,
 	Antagonist_TheDictator,
+	// TheEntertainer
 	Antagonist_TheMathematician,
 	// Mirror,
 	// Mogul,
@@ -27,6 +29,7 @@ TutorialID :: enum{Begin1, Begin2, GhostDice, GhostBoard, Cards, Cycles, Introdu
 
 Antagonist :: struct {
 	id:				AntagonistID,
+	name:			string,
 	past_ids:		bit_set[AntagonistID],
 	level:			u32,					// move to the next level as soon as all antagonists have been met.
 	story_id:    	string,
@@ -50,14 +53,33 @@ tutorial :: proc(id: TutorialID) -> bool{
 	return true
 }
 
+antagonist_next :: proc(){
+	possible_antagonists: [dynamic]AntagonistID
+	for antagonist_id in AntagonistID {
+		if antagonist_id in game.antagonist.past_ids do continue
+		append(&possible_antagonists, antagonist_id)
+	}
+
+	if len(possible_antagonists) == 0 {
+		fmt.println("No more antagonists available!")
+		return
+	}
+
+	rand.shuffle(possible_antagonists[:])
+
+	antagonist_set(possible_antagonists[0])
+}
+
 antagonist_set :: proc(id: AntagonistID) {
 	game.antagonist.id = id
 	game.antagonist.past_ids += {id}
+	game.antagonist.name = get_text(reflect.enum_string(game.antagonist.id), "name")
+	state_change(.ANTAGONIST_INTRODUCTION)
 }
 
-show_antagonist_introduction :: proc() {
+show_antagonist_details :: proc() {
 	fade_out()
-	delay :: f32(1.0)
+	delay :: f32(.5)
 
 	ai := &game.players[1]
 	color := ai.color
@@ -69,7 +91,7 @@ show_antagonist_introduction :: proc() {
 
 	draw_box(board_position, {}+board_size, fill=rl.BLACK)
 
-	message := get_text(reflect.enum_string(game.antagonist.id), "title")
+	message := game.antagonist.name
 	char_duration :f32= 0.16
 	spelling_time := char_duration * f32(len(message))
 	spelling_done := game.state_clock-delay>spelling_time
@@ -78,15 +100,14 @@ show_antagonist_introduction :: proc() {
 	draw_text(message[:n_visible_chars], board_position+padding, font_size, color, underline=spelling_done)
 
 	if !spelling_done do return
-
-	icon_size := splash_shrink((game.state_clock-spelling_time-delay)/0.5, 1.) * board_size/2. * 1.3
-	icon_position := board_position + board_size/2. - {0, SCALE(100)}
-	draw_antagonist(game.antagonist.id, icon_position, icon_size, color)
-
-	subline_clock := game.state_clock-spelling_time-delay-1.0
-	if subline_clock < 0. do return
 	subline_font_size := L.font_size2// * splash_shrink(subline_clock/0.5, 1.)
 	draw_text("1st  ANTAGONIST", board_position+padding+{0, font_size+10*S}, subline_font_size, color)
+
+	subline_clock := game.state_clock-spelling_time-delay-0.8
+	if subline_clock < 0. do return
+	icon_size := splash_shrink(subline_clock, 1.) * board_size/2. * 1.3
+	icon_position := board_position + board_size/2. - {0, SCALE(100)}
+	draw_antagonist(game.antagonist.id, icon_position, icon_size, color)
 
 	if subline_clock-2.0 < 0. do return
 
@@ -94,7 +115,66 @@ show_antagonist_introduction :: proc() {
 	position := board_position + {padding, icon_position.y+icon_size/2.+padding}
 	draw_text("[h]ABILITIES:[h] [iCardRoll_HappyHour] + 6x [iDieFace6] with 2x [iCardDice_Optimist], 4x [iCardDice_PlusOne]\n[h]SCORE TO WIN:[h] 1000", position, font_size, color)
 
+	if game.state == .VICTORY{
+		draw_text("YOU WON!", board_position+board_size/2, L.font_size1+SCALE(10), rl.BLACK, anchor=.CENTER, boxed=COLOR_PLAYERS[0])
+	} else if game.state == .DEFEAT{
+		draw_text("YOU LOST!", board_position+board_size/2, L.font_size1+SCALE(10), rl.BLACK, anchor=.CENTER, boxed=rl.RED)
+	}
+
 	if rl.IsKeyPressed(rl.KeyboardKey.SPACE) || continue_button() do state_change(.WAIT_FOR_PLAYER)
+}
+
+show_antagonist_story :: proc(){
+	if len(game.antagonist.story_id) == 0 do return
+
+	// Let's the bubble get bigger and smaller to make it more dynamic, and also changes the color a bit
+	time_factor := f32(1.)
+	if game.antagonist.blocking do time_factor += 0.05 * math.sin(f32(rl.GetTime()) * 5)
+
+	font_size := L.font_size1 * time_factor
+	sub_font_size := (font_size-1)/2.
+	thickness: f32 = 4.
+	max_width: f32 = 600*S * time_factor
+	padding: f32 = 20.*S
+	color_fill := rl.BLACK
+	color_text := game.players[1].color
+	message := get_text(game.antagonist.story_id, game.antagonist.story_index)
+	size := measure_text(message, font_size, max_width = max_width) + padding
+	extra_space := measure_text("Press <SPACE> to continue", sub_font_size).y + padding
+	position := Vector2{L.width - 40*S, L.height - 200*S} - size - padding
+
+	// SPECIAL TREATMENT if we have end of level screen or antagonist introduction
+	if game.state == .VICTORY || game.state == .DEFEAT{
+		position = {3*L.width/4, L.height/2} - size - padding
+	}
+
+	rl.DrawRectangleV(position, size+{0,extra_space}, color_fill)
+	rl.DrawRectangleLinesEx(
+		{
+			position.x - thickness,
+			position.y - thickness,
+			size.x + 2 * thickness,
+			size.y+extra_space + 2 * thickness,
+		},
+		thickness,
+		rl.BLACK,
+	)
+	draw_text(message, position + padding / 2., font_size, color_text, max_width=max_width)
+	draw_text("Press <SPACE> to continue", position + {padding / 2.,size.y}, sub_font_size, color_text)
+
+	hovered := rl.CheckCollisionPointRec(
+		rl.GetMousePosition(),
+		{x = position.x, y = position.y, width = size.x, height = size.y+extra_space},
+	)
+	clicked := hovered && rl.IsMouseButtonPressed(.LEFT)
+	if clicked {
+		antagonist_story_continue()
+	}
+
+	button_pos := position + size
+	// if button(fmt.tprint("<SPACE>"), button_pos, font_size=L.font_size2, anchor=.RIGHT, text_color=color_text, hover_motion=false) {
+	// 	antagonist_story_continue()
+	// }
 }
 
 antagonist_is_speaking :: proc() -> bool{
@@ -116,11 +196,14 @@ antagonist_story_continue :: proc() {
 	if text_id in app.texts {
 		antagonist_story(game.antagonist.story_id, game.antagonist.story_index)
 	} else {
-		delete(game.antagonist.story_id)
-		game.antagonist.story_id = ""
-		game.antagonist.story_index = 0
-		game.antagonist.blocking = false
+		antagonist_story_cancel()
 	}
+}
+antagonist_story_cancel :: proc(){
+	delete(game.antagonist.story_id)
+	game.antagonist.story_id = ""
+	game.antagonist.story_index = 0
+	game.antagonist.blocking = false
 }
 
 wait_for_ai :: proc() {

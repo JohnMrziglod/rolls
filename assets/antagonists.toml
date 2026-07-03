@@ -29,7 +29,7 @@ Tutorial_Introduction
 /3="I am..."
 
 Antagonist_TheNoob
-/title="THE NOOB"
+/name="THE NOOB"
 /texture_id=[0,0]
 Antagonist_TheNoob/Defeat
 /1="How could that..."
@@ -43,11 +43,11 @@ Antagonist_TheNoob/Victory
 /4="I'd like to say it was a pleasure..."
 /5="but I don't like to lie."
 Antagonist_TheDictator
-/title="THE DICTATOR"
+/name="THE DICTATOR"
 /texture_id=[0,2]
 
 Antagonist_TheMathematician
-/title="THE MATHEMATICIAN"
+/name="THE MATHEMATICIAN"
 /texture_id=[0,4]
 /1="People think it's pure chance but come on now, it's all about the numbers."
 /2="I calculate every possible outcome before you are even making a move."

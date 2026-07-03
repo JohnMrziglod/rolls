@@ -5,11 +5,7 @@ import "core:fmt"
 import "core:math"
 import "core:math/linalg"
 import "core:math/rand"
-import "core:os"
-import "core:reflect"
 import "core:slice"
-import "core:sort"
-import "core:strings"
 import rl "vendor:raylib"
 
 sco :: f64
@@ -54,6 +50,7 @@ Die :: struct {
 
 GameState :: enum {
 	ANTAGONIST_INTRODUCTION,
+	ANTAGONIST_FAREWELL,		// Last goodbye before game (level) over
 
 	WAIT_FOR_PLAYER,
 	CHARGING,
@@ -71,6 +68,7 @@ GameState :: enum {
 	GHOST_BOARD,
 	CARDS_OFFER,
 	UPGRADE_DIE,
+
 	VICTORY,
 	DEFEAT,
 }
@@ -192,7 +190,7 @@ game_init :: proc(){
 
 		// font = rl.LoadFont("assets/j_audio_cassette.otf"),
 		bg_color        = rl.ColorBrightness(COLOR_PLAYERS[0], COLOR_SHIFT),
-		state           = .WAIT_FOR_PLAYER,
+		state           = .VICTORY,
 		players         = {
 			{
 				color                        = COLOR_PLAYERS[0],
@@ -219,7 +217,7 @@ game_init :: proc(){
 		},
 		power=2.,
 		antagonist={
-			win_score=1000,
+			win_score=10,
 		}
 	}
 	camera_reset()
@@ -232,10 +230,8 @@ game_init :: proc(){
 
 	dice_reset(first_round = true)
 
-	game.antagonist = {
-		win_score = 10,
-	}
-	tutorial(.Begin1)
+	antagonist_set(.Antagonist_TheNoob)
+	// tutorial(.Begin1)
 }
 
 game_loop :: proc(dt: f32) {
@@ -320,22 +316,6 @@ game_handle_input :: proc(dt: f32){
 		state_change(.PRE_ROLLING)
 		camera_shake(2.0, 0.5)
 	}
-
-	// if game.state >= .VICTORY && rl.IsKeyPressed(rl.KeyboardKey.SPACE) {
-	// 	game.antagonist.win_score *= game.state == .VICTORY ? 10. : 1.
-	// 	game.players[0].total_score = 0
-	// 	game.players[0].roll = {}
-	// 	game.players[1].total_score = 0
-	// 	game.players[1].roll = {}
-	// 	text := fmt.aprintf("Next score is %v!", game.antagonist.win_score)
-	// 	add_text(
-	// 		Vector2{L.width / 2., L.height / 2.},
-	// 		text,
-	// 		font_size = L.font_size1,
-	// 		color = rl.RAYWHITE,
-	// 	)
-	// 	state_change(.WAIT_FOR_PLAYER)
-	// }
 }
 
 game_update :: proc(dt: real){
@@ -385,7 +365,7 @@ game_update :: proc(dt: real){
 	case .WAIT_FOR_AI:
 		wait_for_ai()
 	case .VICTORY, .DEFEAT:
-		end_of_level(dt)
+		update_level_end()
 	}
 }
 
@@ -454,7 +434,7 @@ rolling :: proc(duration: real) {
 			{0, 1, 0},
 			{0, -1, 0},
 			{1, 0, 0},
-			{0, 0, 0 - 1}, // 6
+			{0, 0, -1}, // 6
 		}
 
 		highest_face_height: f32 = -1.
@@ -553,14 +533,18 @@ scoring_summary :: proc(dt: real) {
 		}
 	}
 
-	if game.players[0].total_score >= game.antagonist.win_score {
-		story_id := fmt.aprintf("%v/Defeat", game.antagonist.id)
-		antagonist_story(story_id, blocking=true)
+	player_won := game.players[0].total_score >= game.antagonist.win_score && game.players[0].total_score > game.players[1].total_score
+	antagonist_won := game.players[1].total_score >= game.antagonist.win_score && game.players[1].total_score > game.players[0].total_score
+	if player_won{
+		// story_id := fmt.aprintf("%v/Defeat", game.antagonist.id)
+		// antagonist_story(story_id, blocking=true)
+		// story_id := fmt.aprintf("%v/Victory", game.antagonist.id)
+		// antagonist_story(story_id, blocking=true)
+		antagonist_story_cancel()
 		state_change(.VICTORY)
 		return
-	} else if game.players[1].total_score >= game.antagonist.win_score {
-		story_id := fmt.aprintf("%v/Victory", game.antagonist.id)
-		antagonist_story(story_id, blocking=true)
+	} else if antagonist_won {
+		antagonist_story_cancel()
 		state_change(.DEFEAT)
 		return
 	}
@@ -571,11 +555,8 @@ scoring_summary :: proc(dt: real) {
 	camera_reset()
 }
 
-end_of_level :: proc(dt: real) {
-	// we wait until antagonist has finished talking...
-	if antagonist_is_speaking() do return
-
-	game.state_timer = 0.5
+update_level_end :: proc() {
+	game.state_timer = 0.5		// generate new particles every 0.5 seconds
 
 	victor: u8 = game.state == .VICTORY ? 0 : 1
 	loser: u8 = game.state == .DEFEAT ? 0 : 1
@@ -595,6 +576,70 @@ end_of_level :: proc(dt: real) {
 			if p > 1 do break
 		}
 	}
+}
+
+show_level_end :: proc(){
+	if game.state_clock < 0.5 do return
+
+	player_won := game.state == .VICTORY
+
+	fade_out()
+	delay :: f32(.5)
+
+	ai := &game.players[1]
+	text_color := rl.BLACK
+
+	font_size := L.font_size1+20*S
+	board_size := min(L.width, L.height)-200*S
+	board_position := rl.Vector2{(L.width - board_size) / 2., 50*S}
+	padding := font_size
+
+	draw_box(board_position, {}+board_size, fill=player_won ? COLOR_PLAYERS[0] : rl.RED)
+
+	message := player_won ? "YOU WON" : "YOU LOST"
+	char_duration :f32= 0.16
+	spelling_time := char_duration * f32(len(message))
+	spelling_done := game.state_clock-delay>spelling_time
+
+	n_visible_chars := min(int(game.state_clock/char_duration), len(message))
+	draw_text(message[:n_visible_chars], board_position+padding, font_size, text_color, underline=spelling_done)
+
+	if !spelling_done do return
+	subline_font_size := L.font_size2// * splash_shrink(subline_clock/0.5, 1.)
+	draw_text(fmt.tprintf("against %v", game.antagonist.name), board_position+padding+{0, font_size+10*S}, subline_font_size, text_color)
+
+	subline_clock := game.state_clock-spelling_time-delay-0.8
+	if subline_clock < 0. do return
+	icon_size := splash_shrink(subline_clock, 1.) * board_size/2. * 1.3
+	icon_position := board_position + board_size/2. - {0, SCALE(100)}
+	draw_antagonist(game.antagonist.id, icon_position, icon_size, rl.RED)
+
+	if subline_clock-2.0 < 0. do return
+	font_size = L.font_size1
+	position := board_position + {padding, icon_position.y+icon_size/2.+padding}
+
+	if game.state == .VICTORY && button("START NEXT LEVEL", position, font_size=font_size){
+		next_level()
+	} else if game.state == .DEFEAT {
+		if button("RESTART", position){
+			game_init()
+			return
+		}
+		if button("MAIN MENU", position+{board_size/2., 0}){
+			app.state = .Menu
+			return
+		}
+	}
+}
+
+next_level :: proc(){
+	antagonist_next()
+
+	game.antagonist.win_score *= 10.
+	game.players[0].total_score = 0
+	game.players[0].roll = {}
+	game.players[1].total_score = 0
+	game.players[1].roll = {}
 }
 
 game_draw :: proc(dt: real) {
@@ -673,7 +718,7 @@ game_draw :: proc(dt: real) {
 	case .GHOST_BOARD:
 		show_ghost_board()
 	case .ANTAGONIST_INTRODUCTION:
-		show_antagonist_introduction()
+		show_antagonist_details()
 	case .WAIT_FOR_PLAYER:
 		if !antagonist_is_speaking() && continue_button() do state_change(.CHARGING)
 	case .CARDS_OFFER:
@@ -681,7 +726,7 @@ game_draw :: proc(dt: real) {
 	case .UPGRADE_DIE:
 		show_upgrade_die()
 	case .VICTORY, .DEFEAT:
-		if !antagonist_is_speaking() do show_antagonist_introduction()
+		show_level_end()
 	}
 
 	show_animations(dt)
@@ -758,53 +803,6 @@ show_upgrade_die :: proc(){
 		add_text(mouse_pos, fmt.aprint("Keep card in hand!"), human.color, 1.5)
 		state_change(.WAIT_FOR_PLAYER)
 	}
-}
-
-show_antagonist_story :: proc(){
-	fmt.printfln("show_antagonist_story: %v, %v", game.antagonist.story_id, game.antagonist.story_index)
-	if len(game.antagonist.story_id) == 0 do return
-
-	// Let's the bubble get bigger and smaller to make it more dynamic, and also changes the color a bit
-	time_factor := 1. + 0.05 * math.sin(f32(rl.GetTime()) * 5)
-	font_size := L.font_size1 * time_factor
-	sub_font_size := (font_size-1)/2.
-	thickness: f32 = 4.
-	max_width: f32 = 600*S * time_factor
-	padding: f32 = 20.*S
-	color_fill := rl.BLACK
-	color_text := game.players[1].color
-	message := get_text(game.antagonist.story_id, game.antagonist.story_index)
-	size := measure_text(message, font_size, max_width = max_width) + padding
-	extra_space := measure_text("Press <SPACE> to continue", sub_font_size).y + padding
-	position := Vector2{L.width - 40*S, L.height - 200*S} - size - padding
-
-	rl.DrawRectangleV(position, size+{0,extra_space}, color_fill)
-	rl.DrawRectangleLinesEx(
-		{
-			position.x - thickness,
-			position.y - thickness,
-			size.x + 2 * thickness,
-			size.y+extra_space + 2 * thickness,
-		},
-		thickness,
-		rl.BLACK,
-	)
-	draw_text(message, position + padding / 2., font_size, color_text, max_width=max_width)
-	draw_text("Press <SPACE> to continue", position + {padding / 2.,size.y}, sub_font_size, color_text)
-
-	hovered := rl.CheckCollisionPointRec(
-		rl.GetMousePosition(),
-		{x = position.x, y = position.y, width = size.x, height = size.y+extra_space},
-	)
-	clicked := hovered && rl.IsMouseButtonPressed(.LEFT)
-	if clicked {
-		antagonist_story_continue()
-	}
-
-	button_pos := position + size
-	// if button(fmt.tprint("<SPACE>"), button_pos, font_size=L.font_size2, anchor=.RIGHT, text_color=color_text, hover_motion=false) {
-	// 	antagonist_story_continue()
-	// }
 }
 
 show_particles :: proc(dt: real) {

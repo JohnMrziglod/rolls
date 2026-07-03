@@ -22,6 +22,8 @@
 - vodooist: This die creates a ghost joker die when it dies.
 - mirror: Retriggers the abilities from the upgrade on its left.
 - average joe: This die scores the average of all dice extra.
+- dancer: when there are dice showing 5 and 6, this die scores +15.
+- driver: This die multiplies its score if it last pips were lower than the current ones.
 - (unique) birthday kid: duplicates one of your hand cards
 - (unique) introvert: multiplies its own points by empty upgrade slots on the same die
 - (unique) genius: creates a cycle card
