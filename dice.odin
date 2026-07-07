@@ -29,8 +29,7 @@ dice_init :: proc(die: ^Die, position := Vector3{0, 1000, 0}) {
 		inverse_mass = 1. / mass,
 		can_sleep = true,
 		player = die.player,
-		color1 = die.color1,
-		color2 = die.color2,
+		color = die.color,
 		current_number = 0,
 		current_score = 0,
 		attack = 1,
@@ -47,7 +46,7 @@ dice_reset :: proc(power: f32 = 1., first_round: bool = false) {
 			for i in 0 ..< player.n_dice {
 				append(
 					&game.dice,
-					Die{player = player.id, color1 = player.color, color2 = rl.BLACK},
+					Die{player=player.id, color=player.color},
 				)
 			}
 		}
@@ -124,7 +123,7 @@ dice_upgrades :: proc(dt: real) {
 				add_text(
 					die.position,
 					text,
-					die.color1,
+					die.color,
 					delay = delay,
 					lifetime = duration,
 					icon_id = icon_index_from_card(upgrade.type),
@@ -179,8 +178,8 @@ dice_battle :: proc(dt: real) {
 				// if die1.health == 0 do game.players[die2.player].roll.kills += 1
 				// if die2.health == 0 do game.players[die1.player].roll.kills += 1
 
-				add_particles(die1.position, die1.color1)
-				add_particles(die2.position, die2.color1)
+				add_particles(die1.position, die1.color)
+				add_particles(die2.position, die2.color)
 				add_text(die1.position, fmt.aprint("FIGHT!"), rl.RAYWHITE, 1.5)
 
 				sound := app.sounds[5]
@@ -242,7 +241,7 @@ dice_battle :: proc(dt: real) {
 
 			if die.health > 0 || die.state != .ALIVE do continue
 
-			add_text(die.position, fmt.aprint("IMMORTAL!"), die.color1, 2.0)
+			add_text(die.position, fmt.aprint("IMMORTAL!"), die.color, 2.0)
 		}
 	}
 
@@ -365,7 +364,7 @@ dice_scoring :: proc(dt: real) {
 							add_text(
 								die2.position,
 								fmt.aprintf("+%v", die2.current_number),
-								die2.color1,
+								die2.color,
 								delay = delay,
 								lifetime = duration,
 								icon_id = icon_index_from_id("CardDice_Optimist"),
@@ -391,7 +390,7 @@ dice_scoring :: proc(dt: real) {
 					add_text(
 						die2.position,
 						fmt.aprintf("+%v", die2.current_number),
-						die2.color1,
+						die2.color,
 						delay = delay,
 						lifetime = duration,
 						icon_id = icon_index_from_id("CardDice_Pirate"),
@@ -413,7 +412,7 @@ dice_scoring :: proc(dt: real) {
 							add_text(
 								die2.position,
 								fmt.aprintf("+%v", die2.current_number),
-								die2.color1,
+								die2.color,
 								delay = delay,
 								lifetime = duration,
 								icon_id = icon_index_from_id("CardDice_Pessimist"),
@@ -440,7 +439,7 @@ dice_scoring :: proc(dt: real) {
 						add_text(
 							die2.position,
 							fmt.aprintf("+%v", die2.current_number),
-							die2.color1,
+							die2.color,
 							delay = delay,
 							lifetime = duration,
 							icon_id = icon_index_from_id("CardDice_Train"),
@@ -477,7 +476,7 @@ dice_scoring :: proc(dt: real) {
 					add_text(
 						die.position,
 						text,
-						die.color1,
+						die.color,
 						delay = delay,
 						lifetime = duration,
 						icon_id = icon_index_from_card(upgrade.type),
@@ -498,7 +497,7 @@ dice_scoring :: proc(dt: real) {
 				add_text(
 					die.position,
 					fmt.aprintf("+%.f", die.current_score),
-					die.color1,
+					die.color,
 					delay = delay,
 					lifetime = duration * 1.1,
 				)
@@ -525,13 +524,13 @@ die_death :: proc(victim: ^Die, killer: ^Die=nil){
 	player2 := &game.players[(victim.player+1) % 2]
 
 	if .CardRoll_Immortality in player.roll.effects{
-		add_text(victim.position, fmt.aprint("IMMORTAL!"), victim.color1, 2.0)
+		add_text(victim.position, fmt.aprint("IMMORTAL!"), victim.color, 2.0)
 		return
 	}
 
-	add_particles(victim.position, victim.color1)
+	add_particles(victim.position, victim.color)
 	add_text(victim.position, L.ghost_positions[victim.player],
-			"", rl.ColorAlpha(victim.color1, .5), 1.0, icon_id=Vector2{0, 7+f32(victim.current_number)},
+			"", rl.ColorAlpha(victim.color, .5), 1.0, icon_id=Vector2{0, 7+f32(victim.current_number)},
 		    icon_size=L.font_size1)
 
 	victim.state = .DEAD
@@ -551,7 +550,7 @@ die_death :: proc(victim: ^Die, killer: ^Die=nil){
 	}
 
 	if .CardRoll_Exorcism in player.roll.effects{
-		add_text(victim.position, fmt.aprint("EXORCISED!"), victim.color1, 2.0)
+		add_text(victim.position, fmt.aprint("EXORCISED!"), victim.color, 2.0)
 		return
 	}
 

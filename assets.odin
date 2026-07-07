@@ -56,7 +56,7 @@ load_data :: proc(texts_buffer: ^string, path: string) {
 			    app.texts[global_key] = value
 			} else if texts_buffer[key_end+1] == '[' && local_key == "texture_id"{
 			    values := strings.split(value, ",", context.temp_allocator)
-				fmt.println("Parsed texture coordinates for", section, ": ", values)
+				// fmt.println("Parsed texture coordinates for", section, ": ", values)
 				x_coord, x_ok := strconv.parse_int(values[0])
 				y_coord, y_ok := strconv.parse_int(values[1])
 				if x_ok && y_ok {

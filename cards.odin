@@ -167,7 +167,7 @@ cards_battle :: proc(dt: real) {
 					suidice := &game.dice[suidice_index]
 
 					die_death(suidice)
-					add_text(suidice.position, fmt.aprint("SUIDICE!"), suidice.color1)
+					add_text(suidice.position, fmt.aprint("SUIDICE!"), suidice.color)
 
 					for &dice, d in game.dice {
 						if dice.state != .ALIVE || dice.player == u8(p) do continue
@@ -326,7 +326,7 @@ card_activate :: proc(player: ^Player, card: ^Card){
 		player.max_lifetime_roll_cards += 1
 	case .CardCycle_ExtraDie:
 		// player.n_dice += 1
-		append(&game.dice, Die{player=player.id, state=.DEAD, color1=player.color, color2=rl.BLACK})
+		append(&game.dice, Die{player=player.id, state=.DEAD, color=player.color})
 		dice_init(&game.dice[len(game.dice)-1])
 	case .CardCycle_Graveyard:
 		player.ghosts_max += 1
@@ -343,17 +343,17 @@ card_activate :: proc(player: ^Player, card: ^Card){
 			case .CardDice_Historian:
 				if card.category == .ROLL{
 					upgrade.var1 += 1.
-					add_text(dice.position, fmt.aprint("HISTORIAN: +1 SCORE!"), dice.color1, 0.5)
+					add_text(dice.position, fmt.aprint("HISTORIAN: +1 SCORE!"), dice.color, 0.5)
 				}
 			case .CardDice_Librarian:
 				if card.category == .DICE{
 					upgrade.var1 += 1.
-					add_text(dice.position, fmt.aprint("LIBRARIAN: +1 SCORE!"), dice.color1, 0.5)
+					add_text(dice.position, fmt.aprint("LIBRARIAN: +1 SCORE!"), dice.color, 0.5)
 				}
 			case .CardDice_Researcher:
 				if card.category == .CYCLE{
 					upgrade.var1 += 1.
-					add_text(dice.position, fmt.aprint("RESEARCHER: +1 ROLL FACTOR!"), dice.color1, 0.5)
+					add_text(dice.position, fmt.aprint("RESEARCHER: +1 ROLL FACTOR!"), dice.color, 0.5)
 				}
 			}
 		}
@@ -380,7 +380,7 @@ card_assign :: proc(die: ^Die, card: Card, index:i32=-1) -> bool{
 	if index != -1 {
 		add_text(die.position,
 			"",// fmt.aprintf("Upgraded with %v!", get_text(upgrade.type, "title")),
-			die.color1, 1.5, icon_id=icon_index_from_card(card.type))
+			die.color, 1.5, icon_id=icon_index_from_card(card.type))
 
 		die.upgrades[index] = card
 		card_activate(&game.players[die.player], &die.upgrades[index])

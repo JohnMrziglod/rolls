@@ -1,12 +1,8 @@
 package game
 
-import "core:container/handle_map"
 import "core:math"
-import "core:math/linalg"
 import "core:math/rand"
-import "core:unicode/utf8"
 import "core:fmt"
-import "core:slice"
 import "core:reflect"
 import "core:strings"
 import rl "vendor:raylib"
@@ -203,7 +199,7 @@ draw_die :: proc(dice: Die, hoverable:bool=false) -> bool {
     // Check collision between ray and b
     collision := rl.GetRayCollisionBox(ray, {min=dice.position-size, max=dice.position+size})
 
-    color := dice.color1
+    color := dice.color
 	hovered := hoverable && collision.hit
 	if hovered do color = rl.ColorBrightness(color, -0.3)
 
@@ -244,7 +240,7 @@ draw_die :: proc(dice: Die, hoverable:bool=false) -> bool {
 
 		// we only draw the face on this side if we hover it, so icons are more recognisable
 		if hovered {
-			draw_die_face(f, size, texture, {f32(15)*fs.x, 0}, fs, dice.color1, scale=0.95)
+			draw_die_face(f, size, texture, {f32(15)*fs.x, 0}, fs, dice.color, scale=0.95)
 			draw_die_face(f, size, texture, {f32(n-1)*fs.x, 0.}, fs, rl.BLACK, scale=0.45)
 		}
 	}
@@ -607,8 +603,8 @@ draw_full_texture :: proc(texture: rl.Texture, position, size: Vector2, tint: rl
 	rl.DrawTexturePro(texture, {x=0., y=0., width=f32(texture.width), height=f32(texture.height)}, dest, {}+size/2., 0., tint)
 }
 
-fade_out :: proc(){
-	draw_box({-200, -200}, {L.width+400, L.height+400}, fill=rl.ColorAlpha(rl.BLACK, 0.3), thickness=0)
+fade_out :: proc(ratio:f32=0.3){
+	draw_box({-200, -200}, {L.width+400, L.height+400}, fill=rl.ColorAlpha(rl.BLACK, ratio), thickness=0)
 }
 
 draw_card :: proc(
@@ -682,11 +678,11 @@ draw_card :: proc(
 	}
 
 	if hovered {
-		button_pos := position + size + {-10, -50}*S
+		button_pos := position + size + {-15, -60}*S
 
 		for action, i in actions {
 			if button(action, button_pos, font_size=font_size, anchor=.RIGHT) do return hovered, i32(i)
-			button_pos += {-20*S-measure_text(action, font_size).x, 0}
+			button_pos += {-30*S-measure_text(action, font_size).x, 0}
 		}
 	}
 
@@ -770,7 +766,7 @@ draw_die_info :: proc(die: Die, extended:bool=false) -> i32{
     padding := SCALE(4.)
 
     // box_size := Vector2{6*icon_size+10*padding, icon_size+3*padding+L.font_size2}+2.*margin
-    // draw_box(position-margin, box_size, fill=rl.ColorAlpha(die.color1, 0.8), thickness=0.)
+    // draw_box(position-margin, box_size, fill=rl.ColorAlpha(die.color, 0.8), thickness=0.)
 
     card: Card
     card_position: Vector2
@@ -782,7 +778,7 @@ draw_die_info :: proc(die: Die, extended:bool=false) -> i32{
 		upgraded := upgrade.type != .CardNone
 
         tp := Vector2{0, f32(die.faces[u]-1)} // Standard face number
-        color:= die.color1
+        color:= die.color
        	if upgraded {
        		tp = icon_index_from_card(upgrade.type)
         }

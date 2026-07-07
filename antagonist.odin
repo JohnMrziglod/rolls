@@ -7,6 +7,13 @@ import "core:reflect"
 import "core:slice"
 import rl "vendor:raylib"
 
+ENUMERATIONS := []string{
+	"1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th", "10th",
+	"11th", "12th", "13th", "14th", "15th", "16th", "17th", "18th", "19th", "20th",
+	"21st", "22nd", "23rd", "24th", "25th", "26th", "27th", "28th", "29th", "30th",
+	"31st", "32nd", "33rd", "34th", "35th", "36th", "37th", "38th", "39th", "40th",
+}
+
 AntagonistID :: enum{
 	Antagonist_TheNoob,				// Special since it is the first
 	// Aggressor,
@@ -24,16 +31,36 @@ AntagonistID :: enum{
 	// Spiritual,
 	// Tycoon,
 }
+AntagonistSetup :: struct {
+	cards: []CardType,
+	n_dice: i32,
+}
+antagonist_setups := [AntagonistID]AntagonistSetup{
+	.Antagonist_TheNoob={
+		cards={},
+		n_dice=5,
+	},
+	.Antagonist_TheDictator={
+		cards={.CardRoll_FakeNews, .CardDice_Tank, .CardDice_General},
+		n_dice=5,
+	},
+	.Antagonist_TheMathematician={
+		cards={.CardDice_PowerUp, .CardDice_PlusOne},
+		n_dice=5,
+	},
+}
+
 
 TutorialID :: enum{Begin1, Begin2, GhostDice, GhostBoard, Cards, Cycles, Introduction}
 
 Antagonist :: struct {
 	id:				AntagonistID,
+	count:			i32,
 	name:			string,
 	past_ids:		bit_set[AntagonistID],
 	level:			u32,					// move to the next level as soon as all antagonists have been met.
 	story_id:    	string,
-	story_index:       	i32,
+	story_index:    i32,
 	blocking:		bool,
 	wanted_power:	f32,
 	win_score:  	sco,
@@ -74,6 +101,14 @@ antagonist_set :: proc(id: AntagonistID) {
 	game.antagonist.id = id
 	game.antagonist.past_ids += {id}
 	game.antagonist.name = get_text(reflect.enum_string(game.antagonist.id), "name")
+	game.antagonist.count += 1
+
+	// setup the antagonist's cards and dice
+	setup := antagonist_setups[id]
+	game.players[1].cards = {}
+	for card_type in setup.cards do append(&game.players[1].cards, Card{type=card_type, lifetime=999})
+	// game.players[1].n_dice = setup.n_dice
+
 	state_change(.ANTAGONIST_INTRODUCTION)
 }
 
@@ -101,7 +136,8 @@ show_antagonist_details :: proc() {
 
 	if !spelling_done do return
 	subline_font_size := L.font_size2// * splash_shrink(subline_clock/0.5, 1.)
-	draw_text("1st  ANTAGONIST", board_position+padding+{0, font_size+10*S}, subline_font_size, color)
+	subline := fmt.tprintf("%v  ANTAGONIST", ENUMERATIONS[game.antagonist.count-1])
+	draw_text(subline, board_position+padding+{0, font_size+10*S}, subline_font_size, color)
 
 	subline_clock := game.state_clock-spelling_time-delay-0.8
 	if subline_clock < 0. do return
@@ -113,7 +149,10 @@ show_antagonist_details :: proc() {
 
 	font_size = L.font_size1
 	position := board_position + {padding, icon_position.y+icon_size/2.+padding}
-	draw_text("[h]ABILITIES:[h] [iCardRoll_HappyHour] + 6x [iDieFace6] with 2x [iCardDice_Optimist], 4x [iCardDice_PlusOne]\n[h]SCORE TO WIN:[h] 1000", position, font_size, color)
+	// abilities := "[iCardRoll_HappyHour] + 6x [iDieFace6] with [iCardDice_Optimist], [iCardDice_PlusOne]"
+	abilities := antagonist_setups[game.antagonist.id]
+	description := fmt.tprintf("[h]ABILITIES:[h] %v\n[h]SCORE TO WIN:[h] %v", abilities, game.antagonist.win_score)
+	draw_text(description, position, font_size, color)
 
 	if game.state == .VICTORY{
 		draw_text("YOU WON!", board_position+board_size/2, L.font_size1+SCALE(10), rl.BLACK, anchor=.CENTER, boxed=COLOR_PLAYERS[0])

@@ -3,7 +3,6 @@ package game
 import "core:fmt"
 import "core:os"
 import "core:math/rand"
-import "core:strconv"
 import "core:strings"
 import rl "vendor:raylib"
 
@@ -24,6 +23,8 @@ Application :: struct {
 app: Application
 
 main :: proc() {
+	rl.SetTraceLogLevel(.ERROR)
+
 	// Initialize window
 	init_window()
 	defer rl.CloseWindow()

@@ -21,7 +21,10 @@ COLOR_CARDS := [CardCategory]rl.Color {
 	.CYCLE = rl.Color{106, 168, 168, 255},
 }
 COLOR_TABLE := rl.Color{196, 109, 94, 255}
-COLOR_PLAYERS := [2]rl.Color{rl.Color{243, 201, 139, 255}, rl.Color{156, 246, 246, 255}}
+COLOR_PLAYERS := [2]rl.Color{
+	{243, 201, 139, 255},
+	{156, 246, 246, 255},
+}
 COLOR_SHIFT :: -0.3
 
 CAMERA_HEIGHT :: 75.
@@ -36,8 +39,7 @@ Die :: struct {
 	state:          EntityState,
 	using body:     RigidBody,
 	player:         u8,
-	color1:         rl.Color, // face color (back ground)
-	color2:         rl.Color, // points and borders color
+	color:	        rl.Color, // face color (back ground)
 	faces:          [6]i32, // which numbers are shown on the faces, normally 1..6 but it can be manipulated
 	current_face:   int, // which face/side is shown on top, from 0..5
 	current_number: i32, // which number is shown on top face, depends on the numbers in .faces
@@ -231,6 +233,8 @@ game_init :: proc(){
 	dice_reset(first_round = true)
 
 	antagonist_set(.Antagonist_TheNoob)
+	game.antagonist.tutorials_off = true
+	// game.state = .DEFEAT
 	// tutorial(.Begin1)
 }
 
@@ -565,7 +569,7 @@ update_level_end :: proc() {
 		if die.player == loser {
 			die.state = .DEAD
 		} else {
-			add_particles(die.position, die.color1)
+			add_particles(die.position, die.color)
 		}
 	}
 	for i in 0 ..< 10 {
@@ -583,18 +587,19 @@ show_level_end :: proc(){
 
 	player_won := game.state == .VICTORY
 
-	fade_out()
+	fade_out(.5)
 	delay :: f32(.5)
 
 	ai := &game.players[1]
 	text_color := rl.BLACK
+	board_color := player_won ? COLOR_PLAYERS[0] : rl.Color{100, 100, 100, 255}
 
 	font_size := L.font_size1+20*S
 	board_size := min(L.width, L.height)-200*S
 	board_position := rl.Vector2{(L.width - board_size) / 2., 50*S}
 	padding := font_size
 
-	draw_box(board_position, {}+board_size, fill=player_won ? COLOR_PLAYERS[0] : rl.RED)
+	draw_box(board_position, {}+board_size, fill=board_color)
 
 	message := player_won ? "YOU WON" : "YOU LOST"
 	char_duration :f32= 0.16
@@ -610,22 +615,23 @@ show_level_end :: proc(){
 
 	subline_clock := game.state_clock-spelling_time-delay-0.8
 	if subline_clock < 0. do return
-	icon_size := splash_shrink(subline_clock, 1.) * board_size/2. * 1.3
-	icon_position := board_position + board_size/2. - {0, SCALE(100)}
-	draw_antagonist(game.antagonist.id, icon_position, icon_size, rl.RED)
+	icon_size := splash_shrink(subline_clock, 1.) * board_size/2. * 0.9
+	icon_position := board_position + board_size/2. - {0, SCALE(200)}
+	draw_antagonist(game.antagonist.id, icon_position, icon_size, COLOR_PLAYERS[1])
 
 	if subline_clock-2.0 < 0. do return
 	font_size = L.font_size1
-	position := board_position + {padding, icon_position.y+icon_size/2.+padding}
+	position := board_position + {board_size/2., board_size-padding-SCALE(150)}
 
-	if game.state == .VICTORY && button("START NEXT LEVEL", position, font_size=font_size){
+	if game.state == .VICTORY && button("START NEXT LEVEL", position, font_size=font_size, anchor=.CENTER){
 		next_level()
 	} else if game.state == .DEFEAT {
-		if button("RESTART", position){
+		if button("TRY IT AGAIN", position, anchor=.CENTER){
 			game_init()
 			return
 		}
-		if button("MAIN MENU", position+{board_size/2., 0}){
+		if button("MAIN MENU", position+{0, SCALE(80)}, anchor=.CENTER){
+			game_init()
 			app.state = .Menu
 			return
 		}
@@ -633,6 +639,8 @@ show_level_end :: proc(){
 }
 
 next_level :: proc(){
+	dice_reset(first_round = true)
+
 	antagonist_next()
 
 	game.antagonist.win_score *= 10.
@@ -651,13 +659,13 @@ game_draw :: proc(dt: real) {
 	anti_bg := rl.Color{}
 	if game.state == .WAIT_FOR_PLAYER {
 		ratio := game.state_timer / 3.
-		color1 := rl.ColorBrightness(COLOR_PLAYERS[game.current_player], COLOR_SHIFT)
+		color := rl.ColorBrightness(COLOR_PLAYERS[game.current_player], COLOR_SHIFT)
 		color2 := rl.ColorBrightness(
 			COLOR_PLAYERS[(game.current_player + 1) % N_PLAYERS],
 			COLOR_SHIFT,
 		)
-		game.bg_color = rl.ColorLerp(color2, color1, ratio)
-		anti_bg = rl.ColorLerp(color1, color2, ratio)
+		game.bg_color = rl.ColorLerp(color2, color, ratio)
+		anti_bg = rl.ColorLerp(color, color2, ratio)
 	} else if game.state == .ROLLING {
 		game.bg_color = rl.ColorBrightness(COLOR_PLAYERS[game.current_player], COLOR_SHIFT)
 		anti_bg = rl.ColorBrightness(
@@ -791,7 +799,7 @@ show_upgrade_die :: proc(){
 			add_text(
 				selected_die.position,
 				fmt.aprint("Die has no free upgrade slots!"),
-				selected_die.color1,
+				selected_die.color,
 				1.5,
 			)
 		}
@@ -986,7 +994,7 @@ show_ghost_board :: proc(){
 	for combo_type, c in CombinationType {
 		if combo_type == .None do continue
 
-		position := board_position + rl.Vector2{20*S, 150*S + f32(c)*L.font_size2*1.6}
+		position := board_position + rl.Vector2{20*S, 150*S + f32(c)*L.font_size2*2.1}
 		match, score, factor := test_combination(
 			combo_type,
 			ghost_selected_numbers[:],
@@ -1023,7 +1031,7 @@ show_ghost_board :: proc(){
 				)
 			}
 
-			if button("Score", position + {700, -4.}*S) {
+			if button("Score", position + {700, -5.}*S) {
 				human.cycle.scored_combinations += {combo_type}
 				human.roll.score += score // @TODO: Add it to roll score
 				ghosts_copy := make([dynamic]i32, len(human.ghosts), cap(human.ghosts))
