@@ -201,6 +201,7 @@ game_init :: proc(){
 				ghosts_max                   = 10,
 				ghosts_costs_per_combination = 5,
 				max_lifetime_roll_cards      = 2, //ghosts={1, 2, 3, 4, 5}
+				roll={factor=1}
 			},
 			{
 				color                        = COLOR_PLAYERS[1],
@@ -209,6 +210,7 @@ game_init :: proc(){
 				ghosts_costs_per_combination = 5,
 				ghosts_max                   = 10,
 				max_lifetime_roll_cards      = 2, //ghosts={1, 2, 3, 4, 5}
+				roll={factor=1}
 			},
 		},
 		ghosts_selected = {-1, -1, -1, -1, -1},
@@ -219,7 +221,7 @@ game_init :: proc(){
 		},
 		power=2.,
 		antagonist={
-			win_score=10,
+			win_score=50,
 		}
 	}
 	camera_reset()
@@ -230,12 +232,51 @@ game_init :: proc(){
 	// camera.rotation = 0.0f;
 	// game.camera2d.zoom = target_ratio
 
-	dice_reset(first_round = true)
+	// we need to
+	// - reset the current player's dice before each roll and reset health and attack of all dice
+	// - create the dice for one player
 
+	player_init(0, n_dice=6)
 	antagonist_set(.Antagonist_TheNoob)
-	game.antagonist.tutorials_off = true
-	// game.state = .DEFEAT
-	// tutorial(.Begin1)
+
+	dice_reset(reset_all=true)
+	// game.antagonist.tutorials_off = true
+	game.state = .WAIT_FOR_PLAYER
+	tutorial(.Begin1)
+}
+
+player_init :: proc (id: u8, n_dice: i32){
+	game.players[id] = {
+		color                        = COLOR_PLAYERS[id],
+		id                           = id,
+		n_dice                       = n_dice,
+		ghosts_max                   = 10,
+		ghosts_costs_per_combination = 5,
+		max_lifetime_roll_cards      = 2,
+		roll={factor=1}
+	}
+
+	// Remove all exisiting dice from this player and add your own:
+	// // Create a destination dynamic array
+    old_dice := make([dynamic]Die, len(game.dice))
+    defer delete(old_dice)
+
+    // Copy elements from source to destination
+    copy(old_dice[:], game.dice[:])
+    clear(&game.dice)
+
+	for old_die, d in old_dice{
+		// filter out this player's dice
+		if old_die.player == id do continue
+
+		append(&game.dice, old_die)
+	}
+
+	// Re-add the new dice for this player:
+	for i in 0 ..< n_dice {
+		die := Die{player=id, color=COLOR_PLAYERS[id]}
+		append(&game.dice, die)
+	}
 }
 
 game_loop :: proc(dt: f32) {
@@ -368,6 +409,9 @@ game_update :: proc(dt: real){
 		scoring_summary(dt)
 	case .WAIT_FOR_AI:
 		wait_for_ai()
+		if game.players[0].total_score > game.antagonist.win_score/2. || game.players[1].total_score > game.antagonist.win_score/2. {
+			tutorial(.Introduction)
+		}
 	case .VICTORY, .DEFEAT:
 		update_level_end()
 	}
@@ -496,13 +540,11 @@ play_sound :: proc(sound_id: i32, volume: f32 = 1., pitch: f32 = 1.) {
 scoring_summary :: proc(dt: real) {
 	roll_scores := [2]sco{}
 	for &player, p in game.players {
-		if player.roll.factor > 0. {
-			player.roll.score *= player.roll.factor
-		}
+		player.roll.score *= player.roll.factor
 
 		// We delay it due to the Revenge Roll Card
 		roll_scores[p] = player.roll.score
-		player.roll = {}
+		player.roll = {factor = 1.,}
 
 		for &card, c in player.cards {
 			card.already_scored = false
@@ -639,15 +681,15 @@ show_level_end :: proc(){
 }
 
 next_level :: proc(){
-	dice_reset(first_round = true)
-
 	antagonist_next()
+
+	dice_reset(reset_all=true)
 
 	game.antagonist.win_score *= 10.
 	game.players[0].total_score = 0
-	game.players[0].roll = {}
+	game.players[0].roll = {factor=1}
 	game.players[1].total_score = 0
-	game.players[1].roll = {}
+	game.players[1].roll = {factor=1}
 }
 
 game_draw :: proc(dt: real) {
@@ -793,17 +835,10 @@ show_upgrade_die :: proc(){
 
 	if rl.IsMouseButtonPressed(.LEFT) && selected_face != -1 {
 		could_upgrade := card_assign(selected_die, game.card_selected, selected_face)
-		game.card_selected = {}
-
-		if !could_upgrade {
-			add_text(
-				selected_die.position,
-				fmt.aprint("Die has no free upgrade slots!"),
-				selected_die.color,
-				1.5,
-			)
+		if could_upgrade {
+			game.card_selected = {}
+			state_change(.WAIT_FOR_PLAYER)
 		}
-		state_change(.WAIT_FOR_PLAYER)
 	} else if rl.IsMouseButtonPressed(.RIGHT) || rl.IsKeyPressed(.ESCAPE) {
 		game.card_selected.triggered = 0.
 		append(&human.cards, game.card_selected)
@@ -1285,7 +1320,11 @@ show_player_stuff :: proc(dt: real){
 			anchor = (p == 1) ? .RIGHT : .LEFT,
 		)
 
-		text = (p == 0) ? "YOU" : "ANTAGONIST"
+		text = "YOU"
+	 	if p == 1 {
+			if .Introduction not_in game.antagonist.tutorials do text = "ANTAGONIST"
+			else do text = game.antagonist.name
+		}
 		draw_text(
 			text,
 			{position.x, position.y + 100*S},
@@ -1302,11 +1341,11 @@ show_player_stuff :: proc(dt: real){
 			if player.is_scoring && player.roll.score > 0. {
 				font_size += math.max((0.3 - game.state_clock), 0.1) * 100*S
 			}
-			if player.roll.factor > 0 {
+			// if player.roll.factor > 1 {
 				text = fmt.tprintf("+ %.f X %.f", player.roll.score, player.roll.factor)
-			} else {
-				text = fmt.tprintf("+ %.f", player.roll.score)
-			}
+			// } else {
+			// 	text = fmt.tprintf("+ %.f", player.roll.score)
+			// }
 
 			if p == 1 {
 				// Shift the right player's score so it is always 50 pixels from the right side

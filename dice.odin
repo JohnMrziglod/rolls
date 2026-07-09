@@ -39,21 +39,9 @@ dice_init :: proc(die: ^Die, position := Vector3{0, 1000, 0}) {
 	}
 }
 
-dice_reset :: proc(power: f32 = 1., first_round: bool = false) {
-	if first_round {
-		clear(&game.dice)
-		for player, p in game.players {
-			for i in 0 ..< player.n_dice {
-				append(
-					&game.dice,
-					Die{player=player.id, color=player.color},
-				)
-			}
-		}
-	}
-
+dice_reset :: proc(power: f32 = 1., reset_all:bool=false) {
 	for &die, d in game.dice {
-		if die.player == game.current_player || first_round {
+		if die.player == game.current_player || reset_all {
 			position := random_vector(-AREA_SIZE / 8.0, AREA_SIZE / 8.0)
 			position.z += -AREA_SIZE / 2.0
 			position.y += AREA_SIZE / 4.0 + 10.
@@ -307,11 +295,11 @@ dice_scoring :: proc(dt: real) {
 				case .CardDice_Journalist:
 					if .CardRoll_FakeNews in player.roll.effects ||
 					   .CardRoll_FakeNews in other_player.roll.effects {
-						player.roll.factor += 0.5
-						text = fmt.aprint("x0.5 ROLL SCORE")
+						player.roll.factor /= 2.
+						text = fmt.aprint("x0.5 ROLL FACTOR")
 					} else {
-						player.roll.factor += 2
-						text = fmt.aprint("x2 ROLL SCORE")
+						player.roll.factor += 1
+						text = fmt.aprint("+1 ROLL FACTOR")
 					}
 				case .CardDice_Influencer:
 					if on_top {

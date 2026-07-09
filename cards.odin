@@ -131,8 +131,8 @@ cards_battle :: proc(dt: real) {
 					lifetime = 1.,
 				)
 			case .CardRoll_HappyHour:
-				player.roll.factor += 2
-				add_text(position, fmt.aprint("ROLL SCORE X2"), player.color, lifetime = 1.)
+				player.roll.factor += 1
+				add_text(position, fmt.aprint("+1 ROLL FACTOR"), player.color, lifetime = 1.)
 			case .CardRoll_MarketCrash:
 				for &dice, d in game.dice {
 					for &upgrade, u in dice.upgrades {
@@ -250,12 +250,13 @@ cards_generate :: proc(cards: []Card, types:CardGenerateTypes){
 			card_type = CardType(rand.int32_range(lower_bound, upper_bound))
 		}
 
-		cards[i] = Card{
-			type=card_type, category=card_category(card_type),
-			var1=card_type==.CardDice_PowerUp?1:0
-		}
+		cards[i] = card_make(card_type)
 		generated_types += {card_type}
 	}
+}
+
+card_make :: proc(card_type: CardType) -> Card{
+	return Card{type=card_type, category=card_category(card_type), var1=card_type==.CardDice_PowerUp ? 1. : 0.}
 }
 
 card_fill_vars :: proc(card: Card, text: string) -> string{
@@ -301,7 +302,7 @@ card_discard :: proc(player: ^Player, index: i32, silent:bool=false){
 card_activate :: proc(player: ^Player, card: ^Card){
 	card.active = true
 	card.triggered = 1.0
-	if card.category == .ROLL{
+	if card.category == .ROLL && player.max_lifetime_roll_cards > card.lifetime{
 		card.lifetime = player.max_lifetime_roll_cards
 	}
 
@@ -367,8 +368,16 @@ card_activate :: proc(player: ^Player, card: ^Card){
 }
 
 card_assign :: proc(die: ^Die, card: Card, index:i32=-1) -> bool{
+	for &upgrade, i in die.upgrades{
+		if upgrade.type == card.type{
+			add_text(die.position, fmt.aprint("Die has been upgraded with this card already!"), die.color)
+			return false // Die cannot have duplicated upgrades
+		}
+	}
+
 	could_upgrade := false
 	index := index
+	// Look for a good spot...
 	if index == -1{
 		for &upgrade, i in die.upgrades{
 			if upgrade.type == .CardNone {
@@ -377,20 +386,21 @@ card_assign :: proc(die: ^Die, card: Card, index:i32=-1) -> bool{
 			}
 		}
 	}
-	if index != -1 {
-		add_text(die.position,
-			"",// fmt.aprintf("Upgraded with %v!", get_text(upgrade.type, "title")),
-			die.color, 1.5, icon_id=icon_index_from_card(card.type))
-
-		die.upgrades[index] = card
-		card_activate(&game.players[die.player], &die.upgrades[index])
-		die.upgrades[index].triggered = 0.
-		apply_dice_upgrades(0.)	// @FIXME: Is that good?
-
-		return true
+	if index == -1 {
+		add_text(die.position, fmt.aprint("Die has no free upgrade slots!"), die.color)
+		return false
 	}
 
-	return false
+	add_text(die.position,
+		"",// fmt.aprintf("Upgraded with %v!", get_text(upgrade.type, "title")),
+		die.color, 1.5, icon_id=icon_index_from_card(card.type))
+
+	die.upgrades[index] = card
+	card_activate(&game.players[die.player], &die.upgrades[index])
+	die.upgrades[index].triggered = 0.
+	apply_dice_upgrades(0.)	// @FIXME: Is that good?
+
+	return true
 }
 
 card_add_to_hand :: proc(player: ^Player, card: Card) {

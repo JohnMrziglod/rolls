@@ -113,7 +113,7 @@ CardDice_Influencer
 /texture_id=[1,7]
 CardDice_Journalist
 /title="JOURNALIST"
-/description="+2 to your [h]ROLL FACTOR[h]."
+/description="+1 to your [h]ROLL FACTOR[h]."
 /texture_id=[1,6]
 CardDice_Medium
 /title="MEDIUM"

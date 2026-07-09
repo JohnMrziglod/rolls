@@ -89,9 +89,11 @@ InfoType :: struct{
 INFO: map[string]InfoType
 load_info :: proc(){
 	INFO["TOP FACE"] = InfoType{text="Whatever is at the top side of your die after it stops rolling."}
-	INFO["ROLL SCORE"] = InfoType{text="The sum of all your points for this ROLL. Will be multiplied by your ROLL FACTOR and added to your total score at the end of the roll."}
-	INFO["ROLL FACTOR"] = InfoType{text="The number that multiplies your ROLL SCORE."}
+	INFO["ROLL SCORE"] = InfoType{text="The sum of all your dice' scores for this roll. It will be multiplied by your ROLL FACTOR and added to your total score."}
+	INFO["ROLL FACTOR"] = InfoType{text="The number that multiplies your ROLL SCORE before adding it to your total score."}
 	INFO["PIPS"] = InfoType{text="The number of dots on the TOP FACE of a die."}
+	INFO["HEALTH"] = InfoType{text="When the HEALTH of a die reaches 0, it will be eliminated."}
+	INFO["ATTACK"] = InfoType{text="A die uses its ATTACK value to remove HEALTH from its fighting opponent."}
 }
 reset_info :: proc(){
 	for term, &info in INFO{

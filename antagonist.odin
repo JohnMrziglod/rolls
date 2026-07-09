@@ -41,17 +41,17 @@ antagonist_setups := [AntagonistID]AntagonistSetup{
 		n_dice=5,
 	},
 	.Antagonist_TheDictator={
-		cards={.CardRoll_FakeNews, .CardDice_Tank, .CardDice_General},
+		cards={.CardRoll_FakeNews, .CardDice_Tank, .CardDice_General, .CardDice_Tank, .CardDice_General},
 		n_dice=5,
 	},
 	.Antagonist_TheMathematician={
-		cards={.CardDice_PowerUp, .CardDice_PlusOne},
+		cards={.CardDice_PowerUp, .CardDice_PlusOne, .CardDice_PowerUp, .CardDice_PlusOne, .CardDice_PowerUp, .CardDice_PlusOne},
 		n_dice=5,
 	},
 }
 
 
-TutorialID :: enum{Begin1, Begin2, GhostDice, GhostBoard, Cards, Cycles, Introduction}
+TutorialID :: enum{None, Begin1, Begin2, GhostDice, GhostBoard, Cards, Cycles, Introduction}
 
 Antagonist :: struct {
 	id:				AntagonistID,
@@ -66,18 +66,7 @@ Antagonist :: struct {
 	win_score:  	sco,
 	tutorials:		bit_set[TutorialID],
 	tutorials_off:	bool,
-}
-
-tutorial :: proc(id: TutorialID) -> bool{
-	if len(game.antagonist.story_id) != 0 do return false
-	if game.antagonist.tutorials_off || id in game.antagonist.tutorials do return false
-
-	game.antagonist.tutorials += {id}
-
-	// Tutorials are always blocking
-	antagonist_story(fmt.aprintf("Tutorial_%s", reflect.enum_string(id)), blocking=true)
-
-	return true
+	tutorial_id: 	TutorialID, // Current Tutorial ID
 }
 
 antagonist_next :: proc(){
@@ -105,9 +94,16 @@ antagonist_set :: proc(id: AntagonistID) {
 
 	// setup the antagonist's cards and dice
 	setup := antagonist_setups[id]
-	game.players[1].cards = {}
-	for card_type in setup.cards do append(&game.players[1].cards, Card{type=card_type, lifetime=999})
-	// game.players[1].n_dice = setup.n_dice
+	player_init(1, setup.n_dice)
+
+	clear(&game.players[1].cards)
+	for card_type in setup.cards {
+		card := card_make(card_type)
+		card.lifetime = 999			// Roll cards should have a very long lifetime!
+		append(&game.players[1].cards, card)
+	}
+
+	antagonist_use_cards(even_on_dead_dice=true)
 
 	state_change(.ANTAGONIST_INTRODUCTION)
 }
@@ -150,8 +146,8 @@ show_antagonist_details :: proc() {
 	font_size = L.font_size1
 	position := board_position + {padding, icon_position.y+icon_size/2.+padding}
 	// abilities := "[iCardRoll_HappyHour] + 6x [iDieFace6] with [iCardDice_Optimist], [iCardDice_PlusOne]"
-	abilities := antagonist_setups[game.antagonist.id]
-	description := fmt.tprintf("[h]ABILITIES:[h] %v\n[h]SCORE TO WIN:[h] %v", abilities, game.antagonist.win_score)
+	abilities := "tbd"//antagonist_setups[game.antagonist.id]
+	description := fmt.tprintf("[h]ABILITIES:[h] %v[n][h]SCORE TO WIN:[h] %v", abilities, game.antagonist.win_score)
 	draw_text(description, position, font_size, color)
 
 	if game.state == .VICTORY{
@@ -179,7 +175,10 @@ show_antagonist_story :: proc(){
 	color_text := game.players[1].color
 	message := get_text(game.antagonist.story_id, game.antagonist.story_index)
 	size := measure_text(message, font_size, max_width = max_width) + padding
-	extra_space := measure_text("Press <SPACE> to continue", sub_font_size).y + padding
+	extra_space := measure_text("Press <SPACE> to continue", sub_font_size) + padding
+
+	size = {max(size.x, extra_space.x), size.y+extra_space.y}
+
 	position := Vector2{L.width - 40*S, L.height - 200*S} - size - padding
 
 	// SPECIAL TREATMENT if we have end of level screen or antagonist introduction
@@ -187,47 +186,57 @@ show_antagonist_story :: proc(){
 		position = {3*L.width/4, L.height/2} - size - padding
 	}
 
-	rl.DrawRectangleV(position, size+{0,extra_space}, color_fill)
+
+	rl.DrawRectangleV(position, size, color_fill)
 	rl.DrawRectangleLinesEx(
 		{
 			position.x - thickness,
 			position.y - thickness,
 			size.x + 2 * thickness,
-			size.y+extra_space + 2 * thickness,
+			size.y + 2 * thickness,
 		},
 		thickness,
 		rl.BLACK,
 	)
 	draw_text(message, position + padding / 2., font_size, color_text, max_width=max_width)
-	draw_text("Press <SPACE> to continue", position + {padding / 2.,size.y}, sub_font_size, color_text)
+	draw_text("Press <SPACE> to continue", position + {padding / 2.,size.y-extra_space.y}, sub_font_size, color_text)
 
 	hovered := rl.CheckCollisionPointRec(
 		rl.GetMousePosition(),
-		{x = position.x, y = position.y, width = size.x, height = size.y+extra_space},
+		{x = position.x, y = position.y, width = size.x, height = size.y},
 	)
 	clicked := hovered && rl.IsMouseButtonPressed(.LEFT)
 	if clicked {
 		antagonist_story_continue()
 	}
 
-	button_pos := position + size
+	// button_pos := position + size
 	// if button(fmt.tprint("<SPACE>"), button_pos, font_size=L.font_size2, anchor=.RIGHT, text_color=color_text, hover_motion=false) {
 	// 	antagonist_story_continue()
 	// }
 }
 
+tutorial :: proc(id: TutorialID) -> bool{
+	if len(game.antagonist.story_id) != 0 do return false
+	if game.antagonist.tutorials_off || id in game.antagonist.tutorials do return false
+
+	game.antagonist.tutorials += {id}
+	game.antagonist.tutorial_id = id
+
+	// Tutorials are always blocking
+	antagonist_story(fmt.aprintf("Tutorial_%s", reflect.enum_string(id)), blocking=true)
+
+	return true
+}
 antagonist_is_speaking :: proc() -> bool{
 	return len(game.antagonist.story_id) != 0
 }
-
 antagonist_story :: proc(story_id: string, index: i32=1, blocking:bool=false) {
-	fmt.println("antagonist story:", story_id, index, blocking)
 	game.antagonist.story_id = story_id
 	game.antagonist.story_index = index
 	game.antagonist.blocking = blocking
 }
 antagonist_story_continue :: proc() {
-	fmt.println("story continue:", game.antagonist.story_id, game.antagonist.story_index, game.antagonist.blocking)
 	if len(game.antagonist.story_id) == 0 do return
 
 	game.antagonist.story_index += 1
@@ -236,6 +245,10 @@ antagonist_story_continue :: proc() {
 		antagonist_story(game.antagonist.story_id, game.antagonist.story_index)
 	} else {
 		antagonist_story_cancel()
+		if game.antagonist.tutorial_id == .Introduction {
+			state_change(.ANTAGONIST_INTRODUCTION)
+		}
+		game.antagonist.tutorial_id = .None
 	}
 }
 antagonist_story_cancel :: proc(){
@@ -349,32 +362,37 @@ wait_for_ai :: proc() {
 		}
 	}
 
-	if len(ai.cards) > 0 {
-		cards_to_discard := [dynamic]i32{}
-		defer delete(cards_to_discard)
-		for &card, c in ai.cards {
-			if card.active do continue
+	antagonist_use_cards()
 
-			#partial switch card.category {
-			case .ROLL, .FLASH:
-				card_activate(ai, &card)
-			case .DICE:
-				for &die in game.dice {
-					if die.state != .ALIVE || die.player != 1 do continue
-					if card_assign(&die, card) {
-						append(&cards_to_discard, i32(c))
-						break
-					}
+	state_change(.WAIT_FOR_PLAYER)
+	tutorial(.Begin2)
+}
+
+antagonist_use_cards :: proc(even_on_dead_dice:bool=false){
+	ai := &game.players[1]
+	if len(ai.cards) == 0 do return
+
+	cards_to_discard := [dynamic]i32{}
+	defer delete(cards_to_discard)
+
+	for &card, c in ai.cards {
+		if card.active do continue
+
+		#partial switch card.category {
+		case .ROLL, .FLASH:
+			card_activate(ai, &card)
+		case .DICE:
+			for &die in game.dice {
+				if (die.state != .ALIVE && !even_on_dead_dice) || die.player != 1 do continue
+				if card_assign(&die, card) {
+					append(&cards_to_discard, i32(c))
+					break
 				}
 			}
 		}
-
-		#reverse for index in cards_to_discard {
-			ordered_remove(&ai.cards, index)
-		}
 	}
 
-	state_change(.WAIT_FOR_PLAYER)
-
-	tutorial(.Begin2)
+	#reverse for index in cards_to_discard {
+		ordered_remove(&ai.cards, index)
+	}
 }
