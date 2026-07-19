@@ -65,7 +65,7 @@ GameState :: enum {
 	ROLLING,
 	DICE_UPGRADES,
 	CARDS_BATTLE,
-	DICES_BATTLE,
+	DICE_BATTLE,
 	DICE_DEATHS,
 	DICE_SCORING,
 	CARDS_SCORING,
@@ -255,6 +255,7 @@ player_init :: proc (id: u8, n_dice: i32){
 		color                        = COLOR_PLAYERS[id],
 		id                           = id,
 		n_dice                       = n_dice,
+		ghosts = {1, 2, 3, 4, 5},
 		ghosts_max                   = 10,
 		ghosts_costs_per_combination = 5,
 		max_lifetime_roll_cards      = 2,
@@ -403,7 +404,7 @@ game_update :: proc(dt: real){
 		dice_upgrades(dt)
 	case .CARDS_BATTLE:
 		cards_battle(dt)
-	case .DICES_BATTLE:
+	case .DICE_BATTLE:
 		dice_battle(dt)
 	case .DICE_DEATHS:
 		dice_deaths(dt)
@@ -771,18 +772,21 @@ game_draw :: proc(dt: real) {
 			game.players[game.current_player].color,
 		)
 		rl.DrawRectangleLinesEx({x, y, width, height}, 2.*S, rl.BLACK)
-	case .DICES_BATTLE:
+	case .DICE_BATTLE:
 		if game.battle.state == .Fighting{
+            clash_position := (game.battle.previous_positions[0] + game.battle.previous_positions[1]) / 2.
+            position_2d := rl.GetWorldToScreen(clash_position, game.camera3d)
 			for &die, d in game.battle.dice {
+			    delta := Vector2{0, SCALE(-100)}
+				if d == 0 do delta *= -1
 				info := fmt.tprintf("%v[iAttack], %v[iHealth]", die.attack, die.health)
-				draw_text(info, rl.GetWorldToScreen(die.position, game.camera3d),
-					anchor=.CENTER, color=rl.BLACK, boxed=die.color)
+				draw_text(info, position_2d+delta, anchor=.CENTER, color=rl.BLACK, boxed=die.color)
 			}
 		}
 	case .GHOST_BOARD:
 		show_ghost_board()
 	case .ANTAGONIST_INTRODUCTION:
-		show_antagonist_details()
+		show_antagonist_introduction()
 	case .WAIT_FOR_PLAYER:
 		if !antagonist_is_speaking() && continue_button() do state_change(.CHARGING)
 	case .CARDS_OFFER:
@@ -819,6 +823,12 @@ state_change :: proc(new_state: GameState, wait: f32 = 0.) {
 		camera_reset()
 		game.die_selected = -1
 	}
+
+	if new_state == .ANTAGONIST_INTRODUCTION {
+    	sound := app.sounds[13]
+    	rl.SetSoundVolume(sound, 1.)
+    	rl.PlaySound(sound)
+    }
 }
 
 show_upgrade_die :: proc(){
@@ -1010,7 +1020,7 @@ show_ghost_board :: proc(){
 		ghost_number := human.ghosts[ghost_index]
 		active := contains(game.ghosts_selected[:], i32(ghost_index))
 
-		if dice_button(ghost_number, position, ghost_size, active_color=human.color, active=active, clickable=true) {
+		if dice_button(ghost_number, position, ghost_size, active_color=human.color, active=active, clickable=len(human.ghosts)>=5) {
 			free_index := -1
 			for &slot, slot_index in game.ghosts_selected {
 				if slot == ghost_index {
@@ -1020,18 +1030,21 @@ show_ghost_board :: proc(){
 				}
 				if slot == -1 {
 					free_index = slot_index
-					break
+					continue
 				}
 			}
 			if free_index >= 0 {
 				game.ghosts_selected[free_index] = ghost_index
 			}
+			fmt.println(free_index, game.ghosts_selected)
 		}
 	}
 	highlighted := [5]bool{}
 	ghost_selected_numbers := [5]i32{}
 	for i, ghost_index in game.ghosts_selected {
-		if i == -1 do break
+		// `i` is the stored ghost index (value). A sentinel of -1 means
+		// that slot is empty; skip it but keep processing later slots.
+		if i == -1 do continue
 
 		ghost_selected_numbers[ghost_index] = human.ghosts[i]
 	}

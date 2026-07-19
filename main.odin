@@ -89,6 +89,7 @@ main :: proc() {
 		rl.LoadSound("assets/sounds/card_activate.wav"),
 		rl.LoadSound("assets/sounds/card_discard.wav"),
 		rl.LoadSound("assets/sounds/button.wav"),
+		rl.LoadSound("assets/sounds/antagonist.wav"),
 	}
 	defer {
 		for sound in app.sounds {
@@ -128,7 +129,7 @@ main :: proc() {
 		if rl.IsKeyPressed(rl.KeyboardKey.T) do app.tutorials_off = !app.tutorials_off
 
 		dt := rl.GetFrameTime()
-		if (!rl.IsWindowFocused()) {
+		if (!rl.IsWindowFocused() && rl.IsWindowFullscreen()) {
 			rl.MinimizeWindow()
 			rl.BeginDrawing()
 			rl.EndDrawing()

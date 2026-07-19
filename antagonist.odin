@@ -95,19 +95,22 @@ antagonist_set :: proc(id: AntagonistID) {
 	setup := antagonist_setups[id]
 	player_init(1, setup.n_dice)
 
+	balanced_amount := setup.n_dice/2
+
 	clear(&game.players[1].cards)
 	for card_type in setup.cards {
 		card := card_make(card_type)
 		card.lifetime = 999			// Roll cards should have a very long lifetime!
-		append(&game.players[1].cards, card)
+		n_times := card.category == .ROLL ? 1 : balanced_amount
+		for i in 0..< n_times{
+		    append(&game.players[1].cards, card)
+		}
 	}
-
-	antagonist_use_cards(even_on_dead_dice=true)
 
 	state_change(.ANTAGONIST_INTRODUCTION)
 }
 
-show_antagonist_details :: proc() {
+show_antagonist_introduction :: proc() {
 	fade_out()
 	delay :: f32(.5)
 
@@ -155,7 +158,13 @@ show_antagonist_details :: proc() {
 		draw_text("YOU LOST!", board_position+board_size/2, L.font_size1+SCALE(10), rl.BLACK, anchor=.CENTER, boxed=rl.RED)
 	}
 
-	if rl.IsKeyPressed(rl.KeyboardKey.SPACE) || continue_button() do state_change(.WAIT_FOR_PLAYER)
+	if rl.IsKeyPressed(rl.KeyboardKey.SPACE) || continue_button() {
+	    state_change(.WAIT_FOR_PLAYER)
+		antagonist_use_cards(even_on_dead_dice=true)
+	}
+
+	// if subline_clock < 5. do return
+	// state_change(.ANTAGONIST_INTRODUCTION)
 }
 
 show_antagonist_story :: proc(){

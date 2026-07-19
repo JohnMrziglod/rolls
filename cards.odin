@@ -205,7 +205,7 @@ cards_battle :: proc(dt: real) {
 		}
 	}
 
-	state_change(.DICES_BATTLE, 0.3)
+	state_change(.DICE_BATTLE, 0.3)
 }
 
 cards_scoring :: proc(dt: real) {
