@@ -11,11 +11,11 @@ import rl "vendor:raylib"
 CardCategory :: enum {NONE, FLASH, ROLL, DICE, CYCLE}
 CardType :: enum i32{
 		CardNone,
+	CardFlash_Doppelgeist,
 	CardFlash_GraveRoll,
 		FlashCards,
 	CardRoll_Attack,
 	CardRoll_Defense,
-	CardRoll_Doppelgeist,
 	CardRoll_Exorcism,
 	CardRoll_FakeNews,
 	CardRoll_GhostHour,
@@ -113,13 +113,6 @@ cards_battle :: proc(dt: real) {
 						lifetime = 0.6,
 					)
 				}
-			case .CardRoll_Doppelgeist:
-				ghosts := player.ghosts
-				for ghost in ghosts {
-					if i32(len(player.ghosts)) >= player.ghosts_max do clear(&player.ghosts)
-					append(&player.ghosts, ghost)
-				}
-				slice.sort(player.ghosts[:])
 			case .CardRoll_GhostHour:
 				ghost_score: sco
 				for ghost in player.ghosts do ghost_score += sco(ghost)
@@ -176,10 +169,10 @@ cards_battle :: proc(dt: real) {
 					}
 				}
 			case .CardRoll_TombRaider:
-				if len(other_player.ghosts) == 0 {
+				if len(other_player.ghosts) < 1 {
 					add_text(
 						position,
-						fmt.aprint("NO GHOSTS TO STEAL"),
+						fmt.aprint("NOT ENOUGH GHOSTS TO STEAL"),
 						COLOR_CARDS[card.category],
 						lifetime = 1.,
 					)
@@ -313,6 +306,13 @@ card_activate :: proc(player: ^Player, card: ^Card){
 	}
 
 	#partial switch card.type {
+	case .CardFlash_Doppelgeist:
+		ghosts := player.ghosts
+		for ghost in ghosts {
+			if i32(len(player.ghosts)) >= player.ghosts_max do clear(&player.ghosts)
+			append(&player.ghosts, ghost)
+		}
+		slice.sort(player.ghosts[:])
 	case .CardFlash_GraveRoll:
 		if len(player.ghosts) > 0{
 			for &ghost in player.ghosts{

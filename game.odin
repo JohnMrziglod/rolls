@@ -36,6 +36,7 @@ EntityState :: enum {
 	ALIVE,
 }
 Die :: struct {
+	id: 			i32,
 	state:          EntityState,
 	using body:     RigidBody,
 	player:         u8,
@@ -44,6 +45,10 @@ Die :: struct {
 	current_face:   int, // which face/side is shown on top, from 0..5
 	current_number: i32, // which number is shown on top face, depends on the numbers in .faces
 	current_score:  sco,
+	total_score:	sco,	// sum over the whole game
+	total_deaths: 	i32,
+	total_kills:	i32,
+	killed_by:		i32,	// index of the killer die
 	already_scored: bool,
 	upgrades:       [6]Card, // For each side is one upgrade possible:
 	attack:         sco,
@@ -186,6 +191,9 @@ camera_shake :: proc(intensity: f32, duration: f32) {
 }
 
 game_init :: proc(){
+	// we call this function also after a game over, so remember what tutorials we already did
+	tutorials := game.antagonist.tutorials
+
 	game = {
 		running = true,
 		speed = 2,
@@ -232,17 +240,14 @@ game_init :: proc(){
 	// camera.rotation = 0.0f;
 	// game.camera2d.zoom = target_ratio
 
-	// we need to
-	// - reset the current player's dice before each roll and reset health and attack of all dice
-	// - create the dice for one player
-
 	player_init(0, n_dice=6)
 	antagonist_set(.Antagonist_TheNoob)
-
+	game.antagonist.tutorials = tutorials
 	dice_reset(reset_all=true)
-	// game.antagonist.tutorials_off = true
-	game.state = .WAIT_FOR_PLAYER
-	tutorial(.Begin1)
+
+	// app.tutorials_off = true
+	if tutorial(.Begin1) do game.state = .WAIT_FOR_PLAYER
+	else do game.state = .ANTAGONIST_INTRODUCTION
 }
 
 player_init :: proc (id: u8, n_dice: i32){
@@ -265,16 +270,16 @@ player_init :: proc (id: u8, n_dice: i32){
     copy(old_dice[:], game.dice[:])
     clear(&game.dice)
 
-	for old_die, d in old_dice{
+	for &old_die, d in old_dice{
 		// filter out this player's dice
 		if old_die.player == id do continue
-
+		old_die.id = i32(d)
 		append(&game.dice, old_die)
 	}
 
 	// Re-add the new dice for this player:
 	for i in 0 ..< n_dice {
-		die := Die{player=id, color=COLOR_PLAYERS[id]}
+		die := Die{player=id, color=COLOR_PLAYERS[id], id=i32(len(game.dice))}
 		append(&game.dice, die)
 	}
 }
@@ -320,6 +325,7 @@ game_handle_input :: proc(dt: f32){
 		}
 	case rl.KeyboardKey.UP, rl.KeyboardKey.DOWN:
 		game.speed += key_pressed == rl.KeyboardKey.UP ? 0.5 : -0.5
+		game.speed = max(0.5, min(5., game.speed))
 		add_text(
 			Vector2{L.width / 2., L.height / 2.},
 			fmt.aprintf("Speed: %.1f", game.speed),
@@ -529,7 +535,7 @@ rolling :: proc(duration: real) {
 }
 
 play_sound :: proc(sound_id: i32, volume: f32 = 1., pitch: f32 = 1.) {
-	volume :f32= 0.
+	// volume :f32= 0.
 	sound := app.sounds[sound_id]
 	rl.StopSound(sound)
 	rl.SetSoundVolume(sound, volume * 1.)
@@ -765,6 +771,14 @@ game_draw :: proc(dt: real) {
 			game.players[game.current_player].color,
 		)
 		rl.DrawRectangleLinesEx({x, y, width, height}, 2.*S, rl.BLACK)
+	case .DICES_BATTLE:
+		if game.battle.state == .Fighting{
+			for &die, d in game.battle.dice {
+				info := fmt.tprintf("%v[iAttack], %v[iHealth]", die.attack, die.health)
+				draw_text(info, rl.GetWorldToScreen(die.position, game.camera3d),
+					anchor=.CENTER, color=rl.BLACK, boxed=die.color)
+			}
+		}
 	case .GHOST_BOARD:
 		show_ghost_board()
 	case .ANTAGONIST_INTRODUCTION:

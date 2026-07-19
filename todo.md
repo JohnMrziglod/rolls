@@ -1,23 +1,8 @@
-- allow to swap face upgrades of die (but not to current top face?)
-
-# ablauf
-- Tutorial_Begin1
-- One Roll
-- Tutorial_Begin2
-- Many other rolls
-- When reaching X score, Tutorial_Introduction
-- When losing:
-  - Antagonist_TheNoob/Victory
-  - Level repeats
-- When winning:
-  - Antagonist_TheNoob/Defeat
-  - Show achievements... and unlocked items, etc.
-  - Ready for next level?
-  - Next level (win score * 100), choose a random antagonist (or scale them by difficulty)
-  - 
+- allow to replace old face upgrades with new one
+- 
 
 # dice cards
-- spikes: This die eliminates all opponent's dice that it touches
+- spikes: This die applies -1 HEALTH for all antagonist's dice that it touches
 - copy cat: copies the abilities from the upgrade on its left
 - vodooist: This die creates a ghost joker die when it dies.
 - mirror: Retriggers the abilities from the upgrade on its left.

@@ -65,7 +65,6 @@ Antagonist :: struct {
 	wanted_power:	f32,
 	win_score:  	sco,
 	tutorials:		bit_set[TutorialID],
-	tutorials_off:	bool,
 	tutorial_id: 	TutorialID, // Current Tutorial ID
 }
 
@@ -218,7 +217,7 @@ show_antagonist_story :: proc(){
 
 tutorial :: proc(id: TutorialID) -> bool{
 	if len(game.antagonist.story_id) != 0 do return false
-	if game.antagonist.tutorials_off || id in game.antagonist.tutorials do return false
+	if app.tutorials_off || id in game.antagonist.tutorials do return false
 
 	game.antagonist.tutorials += {id}
 	game.antagonist.tutorial_id = id

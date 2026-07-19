@@ -19,6 +19,7 @@ Application :: struct {
 
 	// state handling
 	state: 			AppState,
+	tutorials_off: 	bool,
 }
 app: Application
 
@@ -48,6 +49,7 @@ main :: proc() {
 
 	app = {
 		font = rl.LoadFont("assets/fonts/Paperlogy-6SemiBold.ttf"),
+		tutorials_off = true
 	}
 	defer rl.UnloadFont(app.font)
 	rl.GenTextureMipmaps(&app.font.texture)
@@ -122,6 +124,8 @@ main :: proc() {
 
 	for !rl.WindowShouldClose() {
 		if app.state == .Exit do break
+
+		if rl.IsKeyPressed(rl.KeyboardKey.T) do app.tutorials_off = !app.tutorials_off
 
 		dt := rl.GetFrameTime()
 		if (!rl.IsWindowFocused()) {

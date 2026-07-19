@@ -342,7 +342,7 @@ draw_text :: proc(text: string, position: rl.Vector2, font_size: f32=-1.,
 		color: rl.Color=rl.WHITE, spacing:f32=1.0, line_spacing:f32=1.2, max_width:f32=9999,
 		strikethrough:bool=false, overline:bool=false, underline:bool=false, boxed:rl.Color=rl.BLANK, box_width:f32=-1,
 		padding:f32=10, anchor:TextAnchor=.LEFT, draw:bool=true, highlight_color:rl.Color=rl.RAYWHITE,
-		outline:rl.Color=rl.BLANK) -> rl.Vector2{
+		outline:rl.Color=rl.BLANK, icon_bg_color:rl.Color=rl.BLANK) -> rl.Vector2{
 
 	font_size := font_size > 0. ? font_size : L.font_size2
 	padding := SCALE(padding)
@@ -393,7 +393,9 @@ draw_text :: proc(text: string, position: rl.Vector2, font_size: f32=-1.,
 						text_offset_x = 0.
              		}
           			if draw{
-             			draw_box(position + rl.Vector2{text_offset_x, text_offset_y-2*S}, {4., 4.}*S+font_size, fill=color, thickness=0)
+             			if icon_bg_color != rl.BLANK{
+             				draw_box(position + rl.Vector2{text_offset_x, text_offset_y-2*S}, {4., 4.}*S+font_size, fill=icon_bg_color, thickness=0)
+              			}
 						draw_texture_by_string(strings.to_string(icon_id),
 							position + rl.Vector2{text_offset_x+2.*S, text_offset_y}, font_size, highlight_color)
              		}
@@ -613,7 +615,7 @@ draw_card :: proc(
 		upside_down:bool=false,
 ) -> (bool, i32){
     size := L.card_size
-   	font_size :f32= L.font_size2-2
+   	font_size :f32= L.font_size2-3
 	padding :f32= SCALE(12)
 	margin: f32 = SCALE(12)
 	header_height := font_size+2*padding
@@ -702,6 +704,7 @@ draw_card :: proc(
             text_size := draw_text(
                     text, text_pos, font_size, rl.BLACK,
                     max_width=size.x, highlight_color=color,
+                    icon_bg_color=rl.BLACK,
                     boxed=color, box_width=size.x, padding=10)
             previous_info_height = draw_term_info(text, text_pos, color, padding, margin)
             text_pos.y += max(text_size.y, previous_info_height)+SCALE(2*10.)

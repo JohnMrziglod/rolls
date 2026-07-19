@@ -12,15 +12,11 @@ import rl "vendor:raylib"
 dice_init :: proc(die: ^Die, position := Vector3{0, 1000, 0}) {
 	half_size: f32 = DICE_HALF_SIZE
 	mass := math.pow(half_size, 3) * 8.
-	orientation := die.orientation
-	rotation := die.rotation
-	acceleration := die.acceleration
 
 	die^ = {
 		state = .DEAD,
 		shape = ShapeBox{half_size = half_size},
 		position = position,
-		velocity = die.velocity,
 		orientation = random_orientation(),
 		rotation = random_vector(-20.0, 20.0),
 		acceleration = Vector3{0.0, -50.0, 0.0},
@@ -28,14 +24,22 @@ dice_init :: proc(die: ^Die, position := Vector3{0, 1000, 0}) {
 		angular_damping = 0.9,
 		inverse_mass = 1. / mass,
 		can_sleep = true,
-		player = die.player,
-		color = die.color,
+
 		current_number = 0,
 		current_score = 0,
 		attack = 1,
 		health = 1,
-		upgrades = die.upgrades,
 		faces = {1, 2, 3, 4, 5, 6},
+		killed_by = -1,
+
+		// things we keep over the rolls:
+		player = die.player,
+		color = die.color,
+		velocity = die.velocity,
+		upgrades = die.upgrades,
+		total_score = die.total_score,
+		total_kills = die.total_kills,
+		total_deaths = die.total_deaths,
 	}
 }
 
@@ -168,7 +172,7 @@ dice_battle :: proc(dt: real) {
 
 				add_particles(die1.position, die1.color)
 				add_particles(die2.position, die2.color)
-				add_text(die1.position, fmt.aprint("FIGHT!"), rl.RAYWHITE, 1.5)
+				// add_text(die1.position, fmt.aprint("FIGHT!"), rl.RAYWHITE, 1.5)
 
 				sound := app.sounds[5]
 				rl.SetSoundVolume(sound, rand.float32_range(0.8, 1.)) // Set volume based on bounce speed
@@ -203,14 +207,14 @@ dice_battle :: proc(dt: real) {
 	// one dice each is eliminated and won't give points to either player.
 	for &die, d in game.dice {
 		if die.state != .ALIVE do continue
-		can_always_attack := die_has_upgrade(die, .CardDice_Drunk)
+		has_drunk_upgrade := die_has_upgrade(die, .CardDice_Drunk)
 		for &die2, d2 in game.dice {
 			bid := battle_id(d, d2)
 			if bid in game.battle.seen || d == d2 || die2.state != .ALIVE || die.player == die2.player do continue
 
 			can_attack := die.current_number == die2.current_number
-			can_attack |= can_always_attack
-			if can_attack && die.attack + die.health > 0 && die2.attack + die2.health > 0 {
+			can_attack |= has_drunk_upgrade
+			if can_attack && ((die.attack > 0 && die2.health > 0)|| (die2.attack > 0 && die.health > 0)) {
 				dice_fight(&die, &die2)
 				game.battle.seen[bid] = true
 				return
@@ -487,9 +491,9 @@ dice_scoring :: proc(dt: real) {
 					fmt.aprintf("+%.f", die.current_score),
 					die.color,
 					delay = delay,
-					lifetime = duration * 1.1,
+					lifetime = 0.9*duration,
 				)
-				wait(delay + 1.1 * duration)
+				wait(delay + 0.9*duration)
 			}
 
 			return
@@ -505,6 +509,7 @@ dice_kills :: proc(killer: ^Die, victim: ^Die) {
 	for &upgrade in killer.upgrades{
 		if upgrade.type == .CardDice_WarHero do upgrade.var1 += 1
 	}
+	victim.killed_by = killer.id
 }
 
 die_death :: proc(victim: ^Die, killer: ^Die=nil){
@@ -522,6 +527,7 @@ die_death :: proc(victim: ^Die, killer: ^Die=nil){
 		    icon_size=L.font_size1)
 
 	victim.state = .DEAD
+	victim.total_deaths += 1
 	victim.position.y = 1000.
 	body_calculate_derived_data(victim)
 
@@ -531,6 +537,10 @@ die_death :: proc(victim: ^Die, killer: ^Die=nil){
 		if upgrade.type == .CardDice_Veteran do upgrade.var1 = 0.
 	}
 
+	killer := killer
+	if killer == nil && (victim.killed_by >= 0 && int(victim.killed_by) < len(game.dice)){
+		killer = &game.dice[victim.killed_by]
+	}
 	if killer != nil{
 		for &upgrade in killer.upgrades{
 			if upgrade.type == .CardDice_WarHero do upgrade.var1 += 1
