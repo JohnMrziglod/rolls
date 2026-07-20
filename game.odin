@@ -241,7 +241,7 @@ game_init :: proc(){
 	// game.camera2d.zoom = target_ratio
 
 	player_init(0, n_dice=6)
-	antagonist_set(.Antagonist_TheNoob)
+	antagonist_set(.Antagonist_TheShark)
 	game.antagonist.tutorials = tutorials
 	dice_reset(reset_all=true)
 

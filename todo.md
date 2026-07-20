@@ -2,6 +2,7 @@
 - 
 
 # dice cards
+- !hedge fund!: This die adds the sum of all your other dice to its own score. Sets the other dice' scores to 0.
 - spikes: This die applies -1 HEALTH for all antagonist's dice that it touches
 - copy cat: copies the abilities from the upgrade on its left
 - vodooist: This die creates a ghost joker die when it dies.
@@ -29,21 +30,25 @@
 
 # antagonists
 - Each antagonists has a special army of dice and some starting roll cards with a high lifetime
-- The NOOB: Is the first opponent, has nothing and gives tutorial. 
-  You encounter him later again. He is obsessed with you, he improved. 
-  In the final stage, he is driven by madness and became... like you (nickname: Mirror? Fanatic? Stalker?)
+
+## in progress
 - The MOGUL: journalists, influencers
-- The CEO: investors, hedge funds
-- The Fascist: tanks, generals, !VIP! + fake news
+- The CEO: investors, !HEDGE FUND!
 - The Aggressor: assassins + full attack
 - The Chaos: anarchists + suidice, market crash
 - The Tycoon: trains, engineers
 - The Scientist: librarians, historians, researchers, !genius!
 - The Spiritual: mediums + ghost hour, doppel geist
 - The PARTY: optimists, !birthday kid! + happy hour
-- The Mathematician: power ups, plus ones
 - The Calm: average joes, !introvert!
 - The Outlaw: pirates + tomb raider
+
+## done
+- The NOOB: Is the first opponent, has nothing and gives tutorial. 
+  You encounter him later again. He is obsessed with you, he improved. 
+  In the final stage, he is driven by madness and became... like you (nickname: Mirror? Fanatic? Stalker?)
+- The Dictator: tanks, generals, !VIP! + fake news
+- The Mathematician: power ups, plus ones
 
 daskennstdudochschonpassmalauf
 

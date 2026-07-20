@@ -45,6 +45,9 @@ Antagonist_TheNoob/Victory
 Antagonist_TheDictator
 /name="THE DICTATOR"
 /texture_id=[0,2]
+Antagonist_TheShark
+/name="THE SHARK"
+/texture_id=[0,6]
 
 Antagonist_TheMathematician
 /name="THE MATHEMATICIAN"

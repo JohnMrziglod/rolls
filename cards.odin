@@ -49,8 +49,10 @@ CardType :: enum i32{
 	CardDice_Train,
 	CardDice_Veteran,
 	CardDice_WarHero,
+	CardDice_Hedgefund,
 		DiceCards,				// <- Until we got dice cards
 	CardDice_BirthdayKid,
+
 	CardDice_Introvert,
 	CardDice_SuperHero,
 	CardDice_VIP,

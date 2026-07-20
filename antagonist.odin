@@ -20,6 +20,7 @@ AntagonistID :: enum{
 	// Calm,
 	// CEO,
 	// Chaos,
+	Antagonist_TheShark,
 	Antagonist_TheDictator,
 	// TheEntertainer
 	Antagonist_TheMathematician,
@@ -42,6 +43,10 @@ antagonist_setups := [AntagonistID]AntagonistSetup{
 	},
 	.Antagonist_TheDictator={
 		cards={.CardRoll_FakeNews, .CardDice_Tank, .CardDice_General, .CardDice_Tank, .CardDice_General},
+		n_dice=5,
+	},
+	.Antagonist_TheShark={
+		cards={.CardDice_Hedgefund, .CardDice_Investor},
 		n_dice=5,
 	},
 	.Antagonist_TheMathematician={

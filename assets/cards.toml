@@ -183,8 +183,11 @@ CardDice_WarHero
 CardDice_BirthdayKid
 /title="BIRTHDAY KID"
 /description="This die duplicates one of your hand cards when it survives (and if you have space)."
-/description2="When being on [h]TOP FACE[h] and the only surviving die, multiply this die score by the number of your total dice."
-/texture_id=[2,4]
+/texture_id=[2,5]
+CardDice_Hedgefund
+/title="HEDGE FUND"
+/description="This die adds the sum of all your other dice to its own score. Sets the other dice' scores to 0."
+/texture_id=[2,7]
 CardDice_Introvert
 /title="INTROVERT"
 /description="Multiplies die's SCORE with amount of empty upgrade slots on the same die.[n]Currently: [h]x%VAR1_F[h]"
