@@ -16,7 +16,7 @@ COLOR_BACKGROUND := rl.Color{203, 161, 53, 255}
 COLOR_CARDS := [CardCategory]rl.Color {
 	.NONE  = rl.BLACK,
 	.ROLL  = rl.Color{200, 224, 193, 255},
-	.FLASH = rl.Color{152, 95, 153, 255},
+	.FLASH = rl.Color{253, 253, 150, 255},
 	.DICE  = rl.Color{245, 105, 96, 255},
 	.CYCLE = rl.Color{106, 168, 168, 255},
 }
@@ -1245,6 +1245,7 @@ show_cards_offer :: proc(){
 	if hovered_card != nil {
 		actions := []string{"KEEP", "ACTIVATE"}
 		if hovered_card.category == .DICE do actions = {"KEEP", "ASSIGN"}
+		else if hovered_card.category == .FLASH do actions = {"KEEP", "USE"}
 		else if hovered_card.category == .CYCLE do actions = {"ACTIVATE"}
 		_, action := draw_card(hovered_card^, hovered_position, actions = actions)
 		if action == 1 {
