@@ -354,7 +354,7 @@ wait_for_ai :: proc() {
 				.CardRoll_Exorcism,
 				.CardRoll_FakeNews,
 				.CardRoll_MarketCrash,
-				.CardRoll_WhiteElephant,
+				.CardFlash_WhiteElephant,
 			}
 			cards := [3]Card{}
 			cards_generate(cards[:], .FlashRollAndDiceCards)

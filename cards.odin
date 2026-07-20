@@ -13,6 +13,9 @@ CardType :: enum i32{
 		CardNone,
 	CardFlash_Doppelgeist,
 	CardFlash_GraveRoll,
+	CardFlash_Points10,
+	CardFlash_Points25,
+	CardFlash_Points50,
 		FlashCards,
 	CardRoll_Attack,
 	CardRoll_Defense,
@@ -25,7 +28,7 @@ CardType :: enum i32{
 	CardRoll_Revenge,
 	CardRoll_Suidice,
 	CardRoll_TombRaider,
-	CardRoll_WhiteElephant,
+	CardFlash_WhiteElephant,
 		RollCards,				// <- Until here we got roll cards
 	CardDice_Antenna,
 	CardDice_Assassin,
@@ -306,6 +309,7 @@ card_activate :: proc(player: ^Player, card: ^Card){
 		rl.SetSoundVolume(sound, 1.)
 		rl.PlaySound(sound)
 	}
+	player2 := &game.players[(player.id + 1) % N_PLAYERS]
 
 	#partial switch card.type {
 	case .CardFlash_Doppelgeist:
@@ -325,6 +329,15 @@ card_activate :: proc(player: ^Player, card: ^Card){
 		} else {
 			add_text_fixed(L.ghost_positions[player.id], fmt.aprint("NO GHOSTS TO REROLL!"), player.color, anchor=.LEFT)
 		}
+	case .CardFlash_Points10, .CardFlash_Points25, .CardFlash_Points50:
+	    points := sco(10)
+		if card.type == .CardFlash_Points25 do points = sco(25)
+		if card.type == .CardFlash_Points50 do points = sco(50)
+	    player.roll.score += points
+        add_text_fixed(L.ghost_positions[player.id], fmt.aprintf("+%v ROLL SCORE!", points), player.color, anchor=.LEFT)
+	case .CardFlash_WhiteElephant:
+		// @TODO: The player gives all their dice to its opponent
+
 	case .CardCycle_EternalRoll:
 		player.max_lifetime_roll_cards += 1
 	case .CardCycle_ExtraDie:

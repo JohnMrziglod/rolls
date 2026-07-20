@@ -552,15 +552,9 @@ die_death :: proc(victim: ^Die, killer: ^Die=nil){
 		return
 	}
 
-	if .CardRoll_WhiteElephant in player.roll.effects{
-		if i32(len(player2.ghosts)) >= player2.ghosts_max do clear(&player2.ghosts)
-		append(&player2.ghosts, victim.current_number)
-		slice.sort(player2.ghosts[:])
-	} else {
-		if i32(len(player.ghosts)) >= player.ghosts_max do clear(&player.ghosts)
-		append(&player.ghosts, victim.current_number)
-		slice.sort(player.ghosts[:])
-	}
+	if i32(len(player.ghosts)) >= player.ghosts_max do clear(&player.ghosts)
+	append(&player.ghosts, victim.current_number)
+	slice.sort(player.ghosts[:])
 }
 
 dice_fight :: proc(die1: ^Die, die2: ^Die) {

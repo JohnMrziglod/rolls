@@ -1,5 +1,5 @@
 - allow to replace old face upgrades with new one
-- 
+- transform the necessary flash cards
 
 # dice cards
 - !hedge fund!: This die adds the sum of all your other dice to its own score. Sets the other dice' scores to 0.

@@ -25,10 +25,23 @@ CardFlash_GraveRoll
 /title="GRAVE ROLL"
 /description="Reroll your GHOST DICE."
 /texture_id=[4,8]
+CardFlash_WhiteElephant
+/title="WHITE ELEPHANT"
+/description="Give all your current GHOST DICE to your antagonist."
+/texture_id=[4,3]
+CardFlash_Points10
+/title="+10 POINTS"
+/description="Add +10 points to your ROLL SCORE."
+/texture_id=[4,14]
 CardFlash_Points25
 /title="+25 POINTS"
 /description="Add +25 points to your ROLL SCORE."
-/texture_id=[4,4]
+/texture_id=[4,15]
+CardFlash_Points50
+/title="+50 POINTS"
+/description="Add +50 points to your ROLL SCORE."
+/texture_id=[4,16]
+
 # ROLL CARDS
 CardRoll_Attack
 /title="FULL ATTACK!"
@@ -70,10 +83,6 @@ CardRoll_Suidice
 /title="SUIDICE"
 /description="Your highest DIE explodes and eliminates all of your ANTAGONIST'S DICE."
 /texture_id=[4,11]
-CardRoll_WhiteElephant
-/title="WHITE ELEPHANT"
-/description="Your antagonist gets all your GHOST DICE of the next roll."
-/texture_id=[4,3]
 CardRoll_TombRaider
 /title="TOMB RAIDER"
 /description="Steal one of your antagonist's GHOST DICE after each roll."
