@@ -154,7 +154,9 @@ show_antagonist_introduction :: proc() {
 	position := board_position + {padding, icon_position.y+icon_size/2.+padding}
 	// abilities := "[iCardRoll_HappyHour] + 6x [iDieFace6] with [iCardDice_Optimist], [iCardDice_PlusOne]"
 	abilities := "tbd"//antagonist_setups[game.antagonist.id]
-	description := fmt.tprintf("[h]ABILITIES:[h] %v[n][h]SCORE TO WIN:[h] %v", abilities, game.antagonist.win_score)
+	score := game.antagonist.win_score/10 + f64(game.state_clock-5.)*game.antagonist.win_score/3
+	score = min(score, game.antagonist.win_score)
+	description := fmt.tprintf("[h]ABILITIES:[h] %v[n][h]SCORE TO WIN:[h] %.f", abilities, score)
 	draw_text(description, position, font_size, color)
 
 	if game.state == .VICTORY{
@@ -397,7 +399,7 @@ antagonist_use_cards :: proc(even_on_dead_dice:bool=false){
 		case .DICE:
 			for &die in game.dice {
 				if (die.state != .ALIVE && !even_on_dead_dice) || die.player != 1 do continue
-				if card_assign(&die, card) {
+				if card_assign(&die, card, silent=false) {
 					append(&cards_to_discard, i32(c))
 					break
 				}

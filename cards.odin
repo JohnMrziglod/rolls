@@ -16,6 +16,7 @@ CardType :: enum i32{
 	CardFlash_Points10,
 	CardFlash_Points25,
 	CardFlash_Points50,
+	CardFlash_WhiteElephant,
 		FlashCards,
 	CardRoll_Attack,
 	CardRoll_Defense,
@@ -28,7 +29,6 @@ CardType :: enum i32{
 	CardRoll_Revenge,
 	CardRoll_Suidice,
 	CardRoll_TombRaider,
-	CardFlash_WhiteElephant,
 		RollCards,				// <- Until here we got roll cards
 	CardDice_Antenna,
 	CardDice_Assassin,
@@ -336,7 +336,13 @@ card_activate :: proc(player: ^Player, card: ^Card){
 	    player.roll.score += points
         add_text_fixed(L.ghost_positions[player.id], fmt.aprintf("+%v ROLL SCORE!", points), player.color, anchor=.LEFT)
 	case .CardFlash_WhiteElephant:
-		// @TODO: The player gives all their dice to its opponent
+		// @TODO: The player gives all their ghost dice to its opponent
+		for &ghost in player.ghosts{
+            if i32(len(player2.ghosts)) >= player2.ghosts_max do clear(&player2.ghosts)
+            append(&player2.ghosts, ghost)
+        }
+        slice.sort(player2.ghosts[:])
+        clear(&player.ghosts)
 
 	case .CardCycle_EternalRoll:
 		player.max_lifetime_roll_cards += 1
@@ -382,7 +388,7 @@ card_activate :: proc(player: ^Player, card: ^Card){
 	// 	rl.GetMousePosition()-L.card_size/2., L.card_size, texture_ids, COLOR_CARDS[card.category])
 }
 
-card_assign :: proc(die: ^Die, card: Card, index:i32=-1) -> bool{
+card_assign :: proc(die: ^Die, card: Card, index:i32=-1, silent:bool=false) -> bool{
 	for &upgrade, i in die.upgrades{
 		if upgrade.type == card.type{
 			add_text(die.position, fmt.aprint("Die has been upgraded with this card already!"), die.color)

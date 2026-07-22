@@ -487,8 +487,8 @@ dice_scoring :: proc(dt: real) {
 				play_sound(6, pitch = pitch)
 
 				add_text(
-					die.position,
-					fmt.aprintf("+%.f", die.current_score),
+				    die.position,
+				    fmt.aprintf("+%.f", die.current_score),
 					die.color,
 					delay = delay,
 					lifetime = 0.9*duration,

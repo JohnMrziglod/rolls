@@ -57,7 +57,7 @@ CardRoll_Exorcism
 /texture_id=[4,5]
 CardRoll_FakeNews
 /title="FAKE NEWS"
-/description="All JOURNALIST DICE will only add 0.5 to the [h]ROLL FACTOR[h]."
+/description="All JOURNALIST DICE will divide the [h]ROLL FACTOR[h] by 2."
 /texture_id=[4,7]
 CardRoll_GhostHour
 /title="GHOST HOUR"

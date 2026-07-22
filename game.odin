@@ -773,14 +773,15 @@ game_draw :: proc(dt: real) {
 		)
 		rl.DrawRectangleLinesEx({x, y, width, height}, 2.*S, rl.BLACK)
 	case .DICE_BATTLE:
-		if game.battle.state == .Fighting{
+		if game.battle.state >= .Fighting{
             clash_position := (game.battle.previous_positions[0] + game.battle.previous_positions[1]) / 2.
             position_2d := rl.GetWorldToScreen(clash_position, game.camera3d)
 			for &die, d in game.battle.dice {
 			    delta := Vector2{0, SCALE(-100)}
 				if d == 0 do delta *= -1
-				info := fmt.tprintf("%v[iAttack], %v[iHealth]", die.attack, die.health)
-				draw_text(info, position_2d+delta, anchor=.CENTER, color=rl.BLACK, boxed=die.color)
+				info := fmt.tprintf("%v[iAttack] %v[iHealth]", die.attack, die.health)
+				position_2d = rl.GetWorldToScreen(die.position, game.camera3d)
+				draw_text(info, position_2d, anchor=.CENTER, color=rl.BLACK, boxed=die.color)
 			}
 		}
 	case .GHOST_BOARD:
@@ -953,9 +954,9 @@ show_animations :: proc(dt: real){
 
 		if len(animation.text) == 0 do continue
 
-		// text_size := measure_text(animation.text, font_size)
+		text_size := measure_text(animation.text, font_size)
 		// x -= text_size.x/2.
-		// y -= text_size.y/2.
+		y -= text_size.y/2.
 
 		// box_position := Vector2{x-5, y-5}
 		// if animation.anchor == .LEFT do box_position.x += text_size.x/2.
@@ -1036,7 +1037,6 @@ show_ghost_board :: proc(){
 			if free_index >= 0 {
 				game.ghosts_selected[free_index] = ghost_index
 			}
-			fmt.println(free_index, game.ghosts_selected)
 		}
 	}
 	highlighted := [5]bool{}
@@ -1369,11 +1369,11 @@ show_player_stuff :: proc(dt: real){
 			if player.is_scoring && player.roll.score > 0. {
 				font_size += math.max((0.3 - game.state_clock), 0.1) * 100*S
 			}
-			// if player.roll.factor > 1 {
+			if player.roll.factor > 1 {
 				text = fmt.tprintf("+ %.f X %.f", player.roll.score, player.roll.factor)
-			// } else {
-			// 	text = fmt.tprintf("+ %.f", player.roll.score)
-			// }
+			} else {
+	 	        text = fmt.tprintf("+ %.f X %.1f", player.roll.score, player.roll.factor)
+			}
 
 			if p == 1 {
 				// Shift the right player's score so it is always 50 pixels from the right side
