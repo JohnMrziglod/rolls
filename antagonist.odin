@@ -106,7 +106,8 @@ antagonist_set :: proc(id: AntagonistID) {
 	for card_type in setup.cards {
 		card := card_make(card_type)
 		card.lifetime = 999			// Roll cards should have a very long lifetime!
-		n_times := card.category == .ROLL ? 1 : balanced_amount
+		unique := card.category == .ROLL || card.category == .FLASH || card_is_unique(card.type)
+		n_times := unique ? 1 : balanced_amount
 		for i in 0..< n_times{
 		    append(&game.players[1].cards, card)
 		}
@@ -399,7 +400,7 @@ antagonist_use_cards :: proc(even_on_dead_dice:bool=false){
 		case .DICE:
 			for &die in game.dice {
 				if (die.state != .ALIVE && !even_on_dead_dice) || die.player != 1 do continue
-				if card_assign(&die, card, silent=false) {
+				if card_assign(&die, card, silent=true) {
 					append(&cards_to_discard, i32(c))
 					break
 				}

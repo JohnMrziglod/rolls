@@ -52,9 +52,9 @@ CardType :: enum i32{
 	CardDice_Train,
 	CardDice_Veteran,
 	CardDice_WarHero,
-	CardDice_Hedgefund,
 		DiceCards,				// <- Until we got dice cards
 	CardDice_BirthdayKid,
+	CardDice_Hedgefund,
 
 	CardDice_Introvert,
 	CardDice_SuperHero,
@@ -77,6 +77,11 @@ Card :: struct{
 	active: bool,
 	lifetime: i32,		// Number of rolls until discard
 	triggered: f32,		// How long it should be displayed as triggered in seconds
+}
+
+// further information about the card type to help the ai play better
+CardTypeInfo :: struct{
+	is_multiplier: bool,
 }
 
 cards_battle :: proc(dt: real) {
@@ -282,6 +287,9 @@ card_category :: proc(type: CardType) -> CardCategory{
 card_is_unique :: proc(type: CardType) -> bool{
 	return type > .DiceCards && type < .UniqueDiceCards
 }
+card_is_multiplier :: proc(type: CardType) -> bool{
+	return app.card_type_info[reflect.enum_string(type)].is_multiplier
+}
 
 card_is_hovered :: proc(position: rl.Vector2, ) -> bool{
 	return rl.CheckCollisionPointRec(rl.GetMousePosition(), {x=position.x, y=position.y, width=f32(L.card_size.x), height=f32(L.card_size.y)})
@@ -391,7 +399,9 @@ card_activate :: proc(player: ^Player, card: ^Card){
 card_assign :: proc(die: ^Die, card: Card, index:i32=-1, silent:bool=false) -> bool{
 	for &upgrade, i in die.upgrades{
 		if upgrade.type == card.type{
-			add_text(die.position, fmt.aprint("Die has been upgraded with this card already!"), die.color)
+			if !silent {
+				add_text(die.position, fmt.aprint("Die has been upgraded with this card already!"), die.color)
+			}
 			return false // Die cannot have duplicated upgrades
 		}
 	}
@@ -400,15 +410,27 @@ card_assign :: proc(die: ^Die, card: Card, index:i32=-1, silent:bool=false) -> b
 	index := index
 	// Look for a good spot...
 	if index == -1{
-		for &upgrade, i in die.upgrades{
-			if upgrade.type == .CardNone {
-				index = i32(i)
-				break
+		to_the_right := card_is_multiplier(card.type)
+		if to_the_right {
+			#reverse for &upgrade, i in die.upgrades{
+				if upgrade.type == .CardNone {
+					index = i32(i)
+					break
+				}
+			}
+		} else {
+			for &upgrade, i in die.upgrades{
+				if upgrade.type == .CardNone {
+					index = i32(i)
+					break
+				}
 			}
 		}
 	}
 	if index == -1 {
-		add_text(die.position, fmt.aprint("Die has no free upgrade slots!"), die.color)
+		if !silent {
+			add_text(die.position, fmt.aprint("Die has no free upgrade slots!"), die.color)
+		}
 		return false
 	}
 

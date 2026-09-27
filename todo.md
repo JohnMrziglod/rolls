@@ -1,5 +1,13 @@
 - allow to replace old face upgrades with new one
 - transform the necessary flash cards
+- make it smooth: the game loop must have the same speed everywhere:
+  - roll: can't be changed
+  - cards applied previous roll
+  - dice battle
+  - dice scoring
+  - dice upgrading
+- dice fighting: keep the attack and health bars steady?
+- wait a few seconds before introducing the antagonist
 
 # dice cards
 - !hedge fund!: This die adds the sum of all your other dice to its own score. Sets the other dice' scores to 0.
@@ -24,7 +32,7 @@
 - create two random dice cards
 - create two random flash cards
 - duplicate a random hand card
-- recreate your last used tactic card
+- recreate your last used flash card (except this card)
 - mechanic: if in hand, you can reclaim a dice card from an upgraded die
 - 
 

@@ -317,6 +317,30 @@ dice_scoring :: proc(dt: real) {
 						cards_generate(player.cards[len(player.cards) - 1:], .DiceCards)
 						text = fmt.aprint("+1 DICE CARD")
 					}
+				case .CardDice_Hedgefund:
+					// "steals" all scores from your own dice and add them to this:
+					bonus := 0.
+					for d2 in player.dice_sorted {
+						die2 := &game.dice[d2]
+						if d == d2 || die2.state != .ALIVE do continue
+
+						bonus += die2.current_score
+						die2.current_score = 0
+						add_text(
+							die2.position,
+							fmt.aprintf("+%v", die2.current_number),
+							die2.color,
+							delay = delay,
+							lifetime = duration,
+							icon_id = icon_index_from_id("CardDice_Hedgefund"),
+							icon_size = 50,
+						)
+						delay += duration / 3.
+					}
+					if bonus > 0. {
+						text = fmt.aprintf("+%.f", bonus)
+						die.current_score += bonus
+					}
 				case .CardDice_Investor:
 					if on_top {
 						text = fmt.aprintf("PAYOUT +%.f", upgrade.var1)

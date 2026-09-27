@@ -51,10 +51,15 @@ load_data :: proc(texts_buffer: ^string, path: string) {
 			local_key := texts_buffer[key_start+1:key_end]
 			global_key := strings.join({section, local_key}, "/")
 
-            value := texts_buffer[key_end+2:i-1-shift_end] // +2 for =", -2 to remove " and the \r before \n
+			// remove double quotes or brackets if present:
+			extra_shift := 0
+			if texts_buffer[key_end+1] == '"' || texts_buffer[key_end+1] == '[' do extra_shift = 1
+			// +1 for =, -1 to remove the \r before \n
+            value := texts_buffer[key_end+1+extra_shift:i-extra_shift-shift_end]
+
 			if texts_buffer[key_end+1] == '"' {
 			    app.texts[global_key] = value
-			} else if texts_buffer[key_end+1] == '[' && local_key == "texture_id"{
+			} else if local_key == "texture_id" && texts_buffer[key_end+1] == '['{
 			    values := strings.split(value, ",", context.temp_allocator)
 				// fmt.println("Parsed texture coordinates for", section, ": ", values)
 				x_coord, x_ok := strconv.parse_int(values[0])
@@ -67,6 +72,16 @@ load_data :: proc(texts_buffer: ^string, path: string) {
 				} else {
 				    fmt.printfln("Error parsing texture coordinates for %v (0: %v, 1: %v)", section, x_ok, y_ok)
 				}
+			} else if local_key == "is_multiplier" {
+				card_type_info := app.card_type_info[section]
+				if value == "true" {
+					card_type_info.is_multiplier = true
+				} else if value == "false" {
+					card_type_info.is_multiplier = false
+				} else {
+				    fmt.printfln("Error parsing is_multiplier for %v (value: %v)", section, value)
+				}
+				app.card_type_info[section] = card_type_info
             } else {
                 fmt.printfln("Warning: value for key %s in section %s is neither a string nor a texture id:\n%s", local_key, section, value)
             }

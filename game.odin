@@ -229,7 +229,7 @@ game_init :: proc(){
 		},
 		power=2.,
 		antagonist={
-			win_score=50,
+			win_score=500,
 		}
 	}
 	camera_reset()
@@ -241,7 +241,7 @@ game_init :: proc(){
 	// game.camera2d.zoom = target_ratio
 
 	player_init(0, n_dice=6)
-	antagonist_set(.Antagonist_TheShark)
+	antagonist_set(.Antagonist_TheNoob)
 	game.antagonist.tutorials = tutorials
 	dice_reset(reset_all=true)
 
@@ -780,8 +780,8 @@ game_draw :: proc(dt: real) {
 			    delta := Vector2{0, SCALE(-100)}
 				if d == 0 do delta *= -1
 				info := fmt.tprintf("%v[iAttack] %v[iHealth]", die.attack, die.health)
-				position_2d = rl.GetWorldToScreen(die.position, game.camera3d)
-				draw_text(info, position_2d, anchor=.CENTER, color=rl.BLACK, boxed=die.color)
+				// position_2d = rl.GetWorldToScreen(die.position, game.camera3d)
+				draw_text(info, position_2d+delta, anchor=.CENTER, color=rl.BLACK, boxed=die.color)
 			}
 		}
 	case .GHOST_BOARD:
@@ -1369,10 +1369,10 @@ show_player_stuff :: proc(dt: real){
 			if player.is_scoring && player.roll.score > 0. {
 				font_size += math.max((0.3 - game.state_clock), 0.1) * 100*S
 			}
-			if player.roll.factor > 1 {
-				text = fmt.tprintf("+ %.f X %.f", player.roll.score, player.roll.factor)
+			if has_decimals(player.roll.factor){
+				text = fmt.tprintf("+ %.f X %.1f", player.roll.score, player.roll.factor)
 			} else {
-	 	        text = fmt.tprintf("+ %.f X %.1f", player.roll.score, player.roll.factor)
+	 	        text = fmt.tprintf("+ %.f X %.f", player.roll.score, player.roll.factor)
 			}
 
 			if p == 1 {

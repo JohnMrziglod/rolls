@@ -16,6 +16,7 @@ Application :: struct {
 	sounds:      	[]rl.Sound,
 	musics:      	[]rl.Music,
 	texts:       	map[string]string,
+	card_type_info:		map[string]CardTypeInfo,
 
 	// state handling
 	state: 			AppState,

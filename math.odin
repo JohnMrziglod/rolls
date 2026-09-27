@@ -14,6 +14,10 @@ Matrix3 :: matrix[3,3]real
 Matrix4 :: matrix[3,4]real // the last row is awlays 0,0,0,1, we don't need to store it
 Quaternion :: quaternion128
 
+has_decimals :: proc(number: f64) -> bool{
+	return number != math.floor(number)
+}
+
 sine_wave :: proc (speed:f32=5., amplitude:f32=6., shift:f32=0.) -> f32{
 	return math.sin(f32(rl.GetTime())*speed+shift)*amplitude*S
 }
